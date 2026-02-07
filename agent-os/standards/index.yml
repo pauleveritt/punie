@@ -6,6 +6,10 @@ root:
   authoring-conventions:
     description: Needs description - run /index-standards
 
+product:
+  roadmap-format:
+    description: Standard format for roadmap.md with numbered task groups, statuses, and checkboxes
+
 services:
   frozen-dataclass-services:
     description: Needs description - run /index-standards
