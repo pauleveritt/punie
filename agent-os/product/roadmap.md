@@ -3,7 +3,7 @@
 ## 1. Project Foundation
 **Status:** In Progress
 
-- [ ] 1.1 Set up project structure matching existing projects (svcs-di, tdom-svcs)
+- [x] 1.1 Set up project structure matching existing projects (svcs-di, tdom-svcs)
 - [ ] 1.2 Create comprehensive examples
 - [ ] 1.3 Add documentation with deep research on python-sdk and Pydantic AI
 - [ ] 1.4 Configure pytest setup proving python-sdk works correctly
@@ -46,3 +46,21 @@
 - [ ] 6.2 Implement custom deterministic policies for project-specific rules
 - [ ] 6.3 Add support for free-threaded Python (PEP 703)
 - [ ] 6.4 Optimize for parallel agent operations across multiple cores
+
+## Research
+
+### Monty For Code Mode
+
+**References:**
+- [Pydantic Monty announcement](https://news.ycombinator.com/item?id=46920388)
+- [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode/)
+- [Anthropic Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+
+Pydantic introduced Monty as a radical improvement to agent tool execution performance. Similar work from Cloudflare and Anthropic shows this is a key area for optimization. Code mode allows agents to generate and execute tool calls programmatically rather than through traditional JSON-based tool use, resulting in:
+
+- Faster tool invocation
+- More efficient token usage
+- Better agent reasoning about tool composition
+- Reduced latency in multi-step workflows
+
+**Relevance to Punie:** As Punie delegates tool execution to PyCharm via ACP, implementing code mode patterns could significantly improve performance, especially for complex multi-tool workflows. This could be particularly beneficial for the advanced features in Phase 6, where parallel agent operations and free-threaded execution would benefit from optimized tool calling patterns.

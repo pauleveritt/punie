@@ -1,6 +1,56 @@
 [project]
 name = "punie"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI coding agent that delegates tool execution to PyCharm via ACP"
 requires-python = ">=3.14"
 dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+[dependency-groups]
+dev = [
+    "anyio>=4.0.0",
+    "coverage>=7.13.0",
+    "furo>=2025.12.19",
+    "linkify-it-py>=2.0.3",
+    "myst-parser",
+    "pyrefly>=0.46.1",
+    "pyright>=1.1.407",
+    "pytest>=8.4.2",
+    "pytest-cov>=4.1.0",
+    "pytest-run-parallel>=0.8.1",
+    "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.14.10",
+    "sphinx>=8",
+    "sphinx-autobuild>=2025.8.25",
+    "sybil[pytest]>=8.4.2",
+    "ty>=0.0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src", "examples"]
+python_files = ["test_*.py"]
+addopts = "-p no:doctest -m \"not slow\""
+pythonpath = ["examples"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "freethreaded: marks tests that verify free-threading compatibility",
+]
+# Free-threading safety: timeout tests to detect hangs/deadlocks
+timeout = 60
+faulthandler_timeout = 120
+
+[tool.coverage.report]
+fail_under = 80
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
