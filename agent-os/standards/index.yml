@@ -1,0 +1,24 @@
+# Agent OS Standards Index
+
+root:
+  agent-verification:
+    description: Needs description - run /index-standards
+  authoring-conventions:
+    description: Needs description - run /index-standards
+
+services:
+  frozen-dataclass-services:
+    description: Needs description - run /index-standards
+  protocol-first-design:
+    description: Needs description - run /index-standards
+
+testing:
+  fakes-over-mocks:
+    description: Needs description - run /index-standards
+  function-based-tests:
+    description: Needs description - run /index-standards
+  protocol-satisfaction-test:
+    description: Needs description - run /index-standards
+  sybil-doctest:
+    description: Needs description - run /index-standards
+
