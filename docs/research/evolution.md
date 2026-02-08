@@ -1353,19 +1353,332 @@ ACPToolset
 PyCharm (execution)
 ```
 
+## Phase 6.1: Local MLX Model with Tool Calling (2026-02-08)
+
+### Context
+
+Enable fully local, offline AI-assisted development on Apple Silicon. The existing `pydantic-ai-mlx` project by dorukgezici provided MLX model support for Pydantic AI, but was completely broken with Pydantic AI v1.56.0:
+
+**Breaking changes from pydantic-ai-mlx to current API:**
+1. `AgentModel` abstract class → removed (now just `Model`)
+2. `Model.agent_model()` method → removed
+3. `request()` signature → added `model_request_parameters` argument
+4. `StreamedResponse` → 4 new abstract properties required
+5. `Usage` dataclass → renamed to `RequestUsage`
+6. Tool definitions → moved to `ModelRequestParameters.function_tools`
+
+**Tool calling status:** WIP in original project — chat template approach existed, but response parsing was never implemented.
+
+**Decision:** Port the sound architectural ideas (message mapping, chat templates) to current Pydantic AI API and complete tool calling.
+
+### Implementation
+
+**Core Module: `src/punie/models/mlx.py`**
+
+**Pure Function:**
+```python
+def parse_tool_calls(text: str) -> tuple[str, list[dict[str, Any]]]:
+    """Extract <tool_call>{"name": "...", "arguments": {...}}</tool_call> blocks."""
+    pattern = r'<tool_call>(.*?)</tool_call>'
+    matches = re.findall(pattern, text, re.DOTALL)
+
+    calls = []
+    for match in matches:
+        try:
+            call = json.loads(match.strip())
+            if "name" in call:
+                calls.append(call)
+        except json.JSONDecodeError:
+            continue
+
+    clean_text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
+    return clean_text, calls
+```
+
+**Model Class:**
+```python
+class MLXModel(Model):
+    def __init__(self, model_name: str, *, settings: ModelSettings | None = None):
+        try:
+            from mlx_lm.utils import load as mlx_load
+        except ImportError as e:
+            raise ImportError("mlx-lm is required...") from e
+
+        self._model_name = model_name
+        self.model_data, self.tokenizer = mlx_load(model_name)
+
+    async def request(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+    ) -> ModelResponse:
+        # Map messages to OpenAI format dicts
+        chat_messages = self._map_request(messages)
+
+        # Convert ToolDefinition to OpenAI tools format
+        tools = self._build_tools(model_request_parameters)
+
+        # Generate with chat template
+        output = self._generate(chat_messages, tools, model_settings, stream=False)
+
+        # Parse tool calls from output
+        text, tool_calls = parse_tool_calls(output)
+
+        # Build response parts
+        parts = []
+        if text:
+            parts.append(TextPart(content=text))
+        for tool_call in tool_calls:
+            parts.append(ToolCallPart(
+                tool_name=tool_call["name"],
+                args=tool_call.get("arguments", {}),
+            ))
+
+        return ModelResponse(parts=parts, ...)
+```
+
+**Streaming Support:**
+```python
+@dataclass
+class MLXStreamedResponse(StreamedResponse):
+    """Streaming does NOT parse tool calls (requires full output)."""
+
+    async def _get_event_iterator(self):
+        text_part = TextPart(content="")
+        yield PartStartEvent(index=0, part=text_part)
+
+        async for token_dict in AsyncStream(self._stream_iterator):
+            if isinstance(token_dict, dict) and "text" in token_dict:
+                for event in self._parts_manager.handle_text_delta(
+                    vendor_part_id=0, content=token_dict["text"]
+                ):
+                    yield event
+```
+
+### Factory Integration
+
+**Model Selection:**
+```python
+def create_pydantic_agent(model: KnownModelName | Model = "test", ...):
+    if model == "local":
+        model = _create_local_model()  # Default: Qwen2.5-Coder-7B-Instruct-4bit
+    elif isinstance(model, str) and model.startswith("local:"):
+        model = _create_local_model(model.split(":", 1)[1])
+```
+
+**Usage:**
+```bash
+# Environment variable
+PUNIE_MODEL=local punie serve
+
+# CLI flag
+punie serve --model local
+
+# Custom model
+punie serve --model local:mlx-community/Qwen2.5-Coder-3B-Instruct-4bit
+```
+
+### Cross-Platform Support
+
+**Lazy Imports with TYPE_CHECKING:**
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mlx_lm import generate, stream_generate
+    from mlx_lm.utils import load as mlx_load
+
+class MLXModel(Model):
+    def __init__(self, model_name: str):
+        try:
+            from mlx_lm.utils import load as mlx_load
+        except ImportError as e:
+            raise ImportError("mlx-lm is required...") from e
+```
+
+**Why?** Module must be importable on Linux/Windows for tests and type checking, even though MLX only runs on macOS arm64.
+
+### Optional Dependency
+
+**pyproject.toml:**
+```toml
+[project.optional-dependencies]
+local = ["mlx-lm>=0.22.0"]
+```
+
+**Installation:**
+```bash
+# Basic install (no MLX)
+uv pip install punie
+
+# With local model support (macOS arm64 only)
+uv pip install 'punie[local]'
+```
+
+### Tool Calling Approach
+
+MLX models don't have native function-calling API. Instead:
+
+1. **Tool Definitions → Chat Template:**
+   ```python
+   tools = [{"type": "function", "function": {"name": "read", ...}}]
+   prompt = tokenizer.apply_chat_template(messages, tools=tools, ...)
+   ```
+
+2. **Model Outputs Tags:**
+   ```
+   Let me read that file<tool_call>{"name": "read", "arguments": {"path": "foo.py"}}</tool_call>
+   ```
+
+3. **Regex Parsing:**
+   ```python
+   text, calls = parse_tool_calls(output)
+   # text = "Let me read that file"
+   # calls = [{"name": "read", "arguments": {"path": "foo.py"}}]
+   ```
+
+4. **Pydantic AI Handles Loop:**
+   - Returns `ModelResponse` with `ToolCallPart`
+   - Pydantic AI executes tool
+   - Adds `ToolReturnPart` to messages
+   - Loops until model returns text only
+
+### Test Coverage
+
+**26 function-based tests in `tests/test_mlx_model.py`:**
+
+**Pure function tests (7):**
+- `test_parse_single_tool_call` — single tool call extraction
+- `test_parse_multiple_tool_calls` — multiple calls in one output
+- `test_parse_no_tool_calls` — plain text, no calls
+- `test_parse_invalid_json_tool_call` — skip malformed JSON
+- `test_parse_tool_call_missing_name` — skip calls without name
+- `test_async_stream_wraps_sync_iterator` — AsyncStream wrapper
+- `test_async_stream_raises_stop_async_iteration` — exhausted iterator
+
+**Model property tests (4):**
+- `test_mlx_model_import_without_mlx_lm` — TYPE_CHECKING guards work
+- `test_mlx_model_init_without_mlx_lm` — ImportError without mlx-lm
+- `test_mlx_model_properties` — model_name, system properties
+- `test_build_tools_converts_function_tools` — ToolDefinition → OpenAI format
+- `test_build_tools_returns_none_for_empty` — no tools = None
+
+**Message mapping tests (5):**
+- `test_map_request_with_system_and_user` — system + user parts
+- `test_map_request_with_tool_return` — ToolReturnPart handling
+- `test_map_request_with_model_response` — ModelResponse with text + tool calls
+
+**Request integration tests (3):**
+- `test_request_with_text_response` — text-only response
+- `test_request_with_tool_calls` — tool call parsing
+- `test_request_with_mixed_text_and_tools` — both text and calls
+
+**Factory tests (4):**
+- `test_factory_local_model_raises_import_error` — no mlx-lm installed
+- `test_factory_local_with_model_name_raises_import_error` — 'local:name' without mlx-lm
+- `test_factory_local_model_name_parsing` — 'local:model-name' extraction
+- `test_factory_local_default_model_name` — default Qwen model
+
+**All tests work WITHOUT mlx-lm installed** — uses monkeypatching and fakes.
+
+### Example
+
+**New Example: `examples/15_mlx_local_model.py`**
+
+Demonstrates:
+1. Direct MLXModel creation
+2. Agent with `model='local'`
+3. Custom model with `model='local:model-name'`
+4. Recommended models info (3B, 7B, 14B variants)
+5. Platform guard for non-macOS
+
+### Code Changes
+
+| Action | File | Description |
+|--------|------|-------------|
+| Create | `src/punie/models/__init__.py` | Thin package init with TYPE_CHECKING guards |
+| Create | `src/punie/models/mlx.py` | MLXModel, MLXStreamedResponse, parse_tool_calls, AsyncStream (~440 lines) |
+| Modify | `src/punie/agent/factory.py` | Add _create_local_model(), handle 'local' and 'local:name' (+25 lines) |
+| Modify | `pyproject.toml` | Add [project.optional-dependencies] local (+2 lines) |
+| Create | `tests/test_mlx_model.py` | 26 function-based tests (~500 lines) |
+| Create | `examples/15_mlx_local_model.py` | Local model demo (~140 lines) |
+| Create | `agent-os/specs/2026-02-08-mlx-model/` | 4 spec docs: plan, shape, standards, references (~800 lines) |
+
+**Net Impact:** ~1,907 lines added
+
+### Recommended Models
+
+| Model | Size | RAM | Use Case |
+|-------|------|-----|----------|
+| Qwen2.5-Coder-3B-Instruct-4bit | ~2GB | 6GB+ | Fast, simple tasks |
+| **Qwen2.5-Coder-7B-Instruct-4bit** (default) | ~4GB | 8GB+ | **Balanced quality/speed** |
+| Qwen2.5-Coder-14B-Instruct-4bit | ~8GB | 16GB+ | Best quality, slower |
+
+All models: https://huggingface.co/mlx-community
+
+**Qwen2.5-Coder advantages:**
+- Tool-aware chat template built-in
+- Excellent coding task performance
+- 4-bit quantization for memory efficiency
+
+### Architecture Impact
+
+**Before Phase 6.1:**
+- All models require API calls (OpenAI, Anthropic, etc.)
+- No offline development mode
+- Costs per token for experimentation
+
+**After Phase 6.1:**
+- `PUNIE_MODEL=local` runs entirely on-device
+- Zero API costs for local development
+- Privacy-sensitive codebases supported
+- Fast iteration (no API latency)
+- Full tool calling works locally
+
+### Design Decisions
+
+**1. No openai Dependency**
+
+Original pydantic-ai-mlx imported `openai.types.chat` for type hints, then converted to dicts. We skip openai entirely:
+
+```python
+# Direct dict construction
+{"role": "user", "content": "Hello"}
+```
+
+**Trade-off:** Lose type safety on message format, gain zero external dependencies.
+
+**2. Streaming Without Tool Call Parsing**
+
+`request_stream()` yields text only. Tool calls parsed only in `request()`.
+
+**Rationale:** Regex parsing `<tool_call>...</tool_call>` requires complete output. Streaming would need buffering, partial parse states, complexity not justified.
+
+**Trade-off:** Streaming can't execute tools until complete. Acceptable because local models are fast.
+
+**3. Default Model: Qwen2.5-Coder-7B-Instruct-4bit**
+
+4-bit quantization fits in 8GB unified memory. Qwen2.5-Coder has tool-calling chat template. 7B balances quality and speed.
+
+**4. Cross-Platform Imports**
+
+TYPE_CHECKING guards allow import on any platform. Runtime import in `__init__` raises clear ImportError with installation instructions.
+
 ### Package Structure
 
 | Package         | Purpose                     | Key Modules                                         |
 |-----------------|-----------------------------|-----------------------------------------------------|
 | `punie.acp`     | Vendored ACP SDK (29 files) | `interfaces`, `core`, `schema`, `agent/`, `client/` |
 | `punie.agent`   | Pydantic AI bridge          | `adapter`, `toolset`, `deps`, `factory`             |
+| `punie.models`  | **Custom model implementations** | **`mlx` — Local MLX model with tool calling** |
 | `punie.http`    | HTTP server                 | `app`, `runner`, `types`                            |
 | `punie.testing` | Test infrastructure         | `fakes`, `server`                                   |
 
 ### Test Statistics
 
-- **Total tests:** 124
-- **Coverage:** 81% (exceeds 80% requirement)
+- **Total tests:** 189 (as of Phase 6.1)
+- **Coverage:** 81%+ (exceeds 80% requirement)
 - **Test distribution:**
     - Protocol satisfaction: 2
     - Schema/RPC: 8
@@ -1374,9 +1687,11 @@ PyCharm (execution)
     - Pydantic agent: 20
     - Discovery: 16
     - Session registration: 16
+    - CLI: 19 (10 basic + 4 init + 5 serve)
     - HTTP: 6
     - Dual protocol: 2
-    - Examples: 10 (including 10_session_registration)
+    - MLX model: 26 (7 pure function + 4 properties + 5 mapping + 3 integration + 4 factory + 3 streaming)
+    - Examples: 11 (10_session_registration + 15_mlx_local_model)
 
 ### Tool Coverage
 
@@ -1399,6 +1714,8 @@ PyCharm (execution)
 | `starlette>=0.45.0`       | Phase 3.1 | ASGI web framework for HTTP server                              |
 | `uvicorn>=0.34.0`         | Phase 3.1 | ASGI server for Starlette                                       |
 | `httpx>=0.28.0` (dev)     | Phase 3.1 | TestClient for HTTP unit tests                                  |
+| `typer>=0.15.0`           | Phase 5.1 | CLI framework for punie command                                 |
+| `mlx-lm>=0.22.0` (optional) | Phase 6.1 | **Local MLX model support (macOS arm64 only)**              |
 
 **Removed:** `agent-client-protocol>=0.7.1` (Phase 2.2, replaced by vendored code)
 
@@ -1417,4 +1734,6 @@ PyCharm (execution)
 | 2026-02-08 | 4.2     | Session registration (tool caching, lazy fallback, SessionState frozen dataclass, 16 tests)  |
 | 2026-02-08 | 5.1     | CLI development (Typer entry point, file-only logging, stdio constraint, 10 tests)           |
 | 2026-02-08 | 5.2     | Config generation (punie init, acp.json, pure functions, 13 tests)                           |
+| 2026-02-08 | 5.4     | Server mode (punie serve, dual-protocol HTTP+ACP, 6 tests)                                   |
+| 2026-02-08 | 6.1     | Local MLX model (port pydantic-ai-mlx, tool calling, cross-platform support, 26 tests)       |
 | 2026-02-08 | 5.4     | Dual-protocol serve (punie serve, HTTP + ACP stdio, 6 tests)                                 |

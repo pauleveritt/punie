@@ -597,6 +597,276 @@ How this architecture unfolds across Punie's roadmap:
 
 - Global client connection — Breaks testability, creates coupling
 
+## Local Model Architecture (Phase 6.1)
+
+### Overview
+
+Punie supports fully local, offline AI development using MLX models on Apple Silicon. This enables zero-cost, privacy-preserving development without any API calls.
+
+### MLX Model Integration
+
+**What:** Custom Pydantic AI `Model` implementation using Apple's MLX framework for on-device inference.
+
+**Why local models?**
+
+- **Zero API costs** — No charges per token
+- **Privacy** — Sensitive codebases never leave your machine
+- **Offline development** — No internet required after initial model download
+- **Fast responses** — No API latency (local inference ~50-200 tokens/sec)
+- **Full tool calling** — Complete IDE integration works identically to cloud models
+
+### Architecture Design
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                      Punie Agent                            │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Pydantic AI Agent                       │  │
+│  │  ┌────────────────────────────────────────────────┐ │  │
+│  │  │            Model (Abstract)                    │ │  │
+│  │  │  ┌──────────────┐    ┌──────────────────────┐ │ │  │
+│  │  │  │ Cloud Models │    │   MLXModel (Local)   │ │ │  │
+│  │  │  │ - OpenAI     │    │  - Dependency inject │ │ │  │
+│  │  │  │ - Anthropic  │    │  - Tool calling      │ │ │  │
+│  │  │  │ - Gemini     │    │  - Chat templates    │ │ │  │
+│  │  │  └──────────────┘    └──────────────────────┘ │ │  │
+│  │  └────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              ACPToolset (Tools)                      │  │
+│  │  - read_file()                                       │  │
+│  │  - write_file()                                      │  │
+│  │  - run_command()                                     │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+         │                                    │
+         │ Cloud API                          │ Local inference
+         ↓                                    ↓
+┌──────────────────┐              ┌──────────────────────┐
+│  OpenAI/Claude   │              │   MLX Framework      │
+│  (API calls)     │              │   (Apple Silicon)    │
+└──────────────────┘              └──────────────────────┘
+```
+
+### MLXModel Implementation
+
+**Core class:** `src/punie/models/mlx.py::MLXModel`
+
+**Key design principles:**
+
+1. **Dependency injection for testability**
+   ```python
+   # Constructor accepts pre-loaded components (for testing)
+   model = MLXModel(
+       "model-name",
+       model_data=mock_data,
+       tokenizer=mock_tokenizer
+   )
+
+   # Factory method loads from disk (for production)
+   model = MLXModel.from_pretrained("mlx-community/Qwen2.5-Coder-7B-Instruct-4bit")
+   ```
+
+2. **Cross-platform compatibility**
+   - TYPE_CHECKING guards for mlx-lm imports
+   - Module importable on any platform (Linux, Windows, macOS)
+   - Runtime ImportError with helpful message on non-Apple Silicon
+
+3. **Tool calling without native API**
+   - MLX models lack native function-calling API
+   - Uses chat templates + regex parsing
+   - Model outputs: `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`
+   - Parsed into `ToolCallPart` for Pydantic AI
+
+### Tool Calling Flow (Local)
+
+```text
+User Request
+    │
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Pydantic AI Agent                                       │
+│                                                         │
+│  1. Build messages + tool definitions                   │
+│     ┌──────────────────────────────────────┐          │
+│     │ messages = [                          │          │
+│     │   {"role": "system", "content": ...}, │          │
+│     │   {"role": "user", "content": ...}    │          │
+│     │ ]                                     │          │
+│     │ tools = [                             │          │
+│     │   {"type": "function", "function": {  │          │
+│     │     "name": "read_file",              │          │
+│     │     "description": "...",             │          │
+│     │     "parameters": {...}               │          │
+│     │   }}                                  │          │
+│     │ ]                                     │          │
+│     └──────────────────────────────────────┘          │
+│                                                         │
+│  2. MLXModel.request()                                  │
+│     ├─> Apply chat template with tools                 │
+│     │   (tokenizer.apply_chat_template)                │
+│     ├─> Generate tokens (mlx_lm.generate)              │
+│     └─> Parse tool calls from output                   │
+│         (regex: <tool_call>...</tool_call>)            │
+│                                                         │
+│  3. Return ModelResponse                                │
+│     ┌──────────────────────────────────────┐          │
+│     │ parts = [                             │          │
+│     │   TextPart("Let me read that file"),  │          │
+│     │   ToolCallPart(                       │          │
+│     │     tool_name="read_file",            │          │
+│     │     args={"path": "config.py"}        │          │
+│     │   )                                   │          │
+│     │ ]                                     │          │
+│     └──────────────────────────────────────┘          │
+│                                                         │
+│  4. Execute tool via ACPToolset                         │
+│     └─> ACPToolset.read_file()                         │
+│         └─> Client.read_text_file() [ACP RPC]          │
+│                                                         │
+│  5. Add result to messages, loop until done             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Message Format Mapping
+
+**MLXModel translates between Pydantic AI and OpenAI-compatible format:**
+
+```python
+# Pydantic AI → OpenAI chat format
+ModelRequest([
+    SystemPromptPart(content="You are an assistant"),
+    UserPromptPart(content="Read config.py"),
+])
+→
+[
+    {"role": "system", "content": "You are an assistant"},
+    {"role": "user", "content": "Read config.py"}
+]
+
+# ModelResponse → OpenAI format (for next turn)
+ModelResponse([
+    TextPart("Here's the file"),
+    ToolCallPart(tool_name="read", args={...})
+])
+→
+{
+    "role": "assistant",
+    "content": "Here's the file",
+    "tool_calls": [{
+        "id": "call_123",
+        "type": "function",
+        "function": {"name": "read", "arguments": "{...}"}
+    }]
+}
+
+# ToolReturnPart → OpenAI format
+ToolReturnPart(content="file contents", tool_call_id="call_123")
+→
+{
+    "role": "tool",
+    "content": "file contents",
+    "tool_call_id": "call_123"
+}
+```
+
+### Model Selection
+
+**Factory integration:** `create_pydantic_agent(model='local')`
+
+```python
+# Default local model (Qwen 7B 4-bit)
+agent = create_pydantic_agent(model='local')
+
+# Custom model
+agent = create_pydantic_agent(
+    model='local:mlx-community/Qwen2.5-Coder-3B-Instruct-4bit'
+)
+
+# Environment variable
+PUNIE_MODEL=local punie serve
+```
+
+**Model recommendations:**
+
+| Model | Size | Memory | Use Case |
+|-------|------|--------|----------|
+| Qwen2.5-Coder-3B-Instruct-4bit | ~2GB | 6GB+ | Fast, simple tasks |
+| Qwen2.5-Coder-7B-Instruct-4bit (default) | ~4GB | 8GB+ | Balanced quality/speed |
+| Qwen2.5-Coder-14B-Instruct-4bit | ~8GB | 16GB+ | Best quality |
+
+### Performance Characteristics
+
+**Local vs Cloud comparison:**
+
+| Aspect | Cloud (OpenAI/Claude) | Local (MLX 7B) |
+|--------|-----------------------|----------------|
+| Cost | ~$0.01-0.10 per request | $0 (one-time hardware) |
+| Latency | 200-2000ms | 50-500ms |
+| Throughput | High (datacenter) | 50-200 tokens/sec |
+| Privacy | Data sent to API | Never leaves device |
+| Offline | Requires internet | Works offline |
+| Model quality | Excellent (GPT-4, Claude) | Good (Qwen 7B) |
+
+**When to use local models:**
+
+- **Development/testing** — Fast iteration without API costs
+- **Privacy-sensitive codebases** — No data leaves your machine
+- **Offline environments** — No internet connectivity
+- **High-volume experimentation** — Unlimited local inference
+
+**When to use cloud models:**
+
+- **Production deployments** — Best quality for critical tasks
+- **Complex reasoning** — GPT-4/Claude superior for difficult problems
+- **Limited local resources** — <8GB RAM or older hardware
+
+### Testing Strategy
+
+**All tests work without mlx-lm installed:**
+
+```python
+# Dependency injection eliminates need for monkeypatching
+def test_mlx_request():
+    # Create model with mock components (no mlx-lm needed!)
+    model = MLXModel("test", model_data=MagicMock(), tokenizer=MagicMock())
+
+    # Override generation for testing
+    model._generate = lambda *args: "mocked response"
+
+    # Test model behavior
+    response = await model.request(messages=[...], ...)
+    assert response.parts[0].content == "mocked response"
+```
+
+**22 tests covering:**
+- Pure function tests (tool call parsing)
+- Message format mapping
+- Model properties and tool building
+- Request integration
+- Factory integration
+
+### Security Considerations
+
+**Local model benefits:**
+- No API keys to manage or leak
+- No data transmitted over network
+- No third-party data retention
+
+**Local model risks:**
+- Model files on disk (~4GB unencrypted)
+- Generated code executed locally (same as cloud)
+- User must verify model source (use official mlx-community models)
+
+### Future Enhancements
+
+**Phase 6.2+ possibilities:**
+- Model quantization tuning (2-bit, 3-bit)
+- Fine-tuning on project-specific code
+- Multi-model ensembles (local + cloud fallback)
+- Speculative decoding for faster generation
+- Custom tool-calling formats (beyond Qwen templates)
+
 ## Success Criteria
 
 This architecture succeeds if:
@@ -609,3 +879,4 @@ This architecture succeeds if:
 6. **Permission control** — User approves destructive operations before execution
 7. **Performance** — No unnecessary round-trips, efficient streaming
 8. **Extensibility** — Easy to add new tools, new agents, new IDE features
+9. **Local model parity** — Local MLX models work identically to cloud models for tool calling

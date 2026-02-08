@@ -162,9 +162,9 @@ coverage/quality improvements which provide more immediate value.
     - Type checking passes (ty), linting passes (ruff), all tests pass
     - Created spec documentation in agent-os/specs/2026-02-08-init-command/
     - Created working example: examples/12_init_config.py
-- [~] 5.3 Add model download command - Deferred
+- [~] 5.3 Add model download command - Deferred → Revived in Phase 6.2
     - Decision deferred until local model strategy is decided
-    - Will implement when there's clarity on recommended models and storage patterns
+    - Revived as part of Phase 6 Local Model Integration (task 6.2)
 - [x] 5.4 Add HTTP/WebSocket server mode - Completed 2026-02-08
     - Implemented `punie serve` subcommand
     - Runs dual-protocol mode: ACP stdio + HTTP server concurrently
@@ -177,32 +177,83 @@ coverage/quality improvements which provide more immediate value.
     - Created spec documentation in agent-os/specs/2026-02-08-serve-command/
     - Created working example: examples/13_serve_dual.py
 
-## 6. Web UI Development
+## 6. Local Model Integration
+
+**Status:** Phase 6.1 Completed (2026-02-08)
+
+**Context:** Enable fully local, offline AI-assisted development using Apple Silicon (M1/M2/M3) without external API calls. Ported pydantic-ai-mlx architecture to current Pydantic AI v1.56.0 API with complete tool calling support. Agent can execute tools locally without API calls.
+
+**Dependencies:** Optional mlx-lm>=0.22.0 (macOS arm64 only)
+
+**References:**
+- [pydantic-ai-mlx by dorukgezici](https://github.com/dorukgezici/pydantic-ai-mlx)
+- [MLX on Apple Silicon](https://github.com/ml-explore/mlx)
+- [Qwen2.5-Coder models](https://huggingface.co/mlx-community)
+
+- [x] 6.1 Port pydantic-ai-mlx with tool calling - Completed 2026-02-08
+    - Created MLXModel implementing current Pydantic AI Model interface
+    - Implemented tool calling via chat templates and regex parsing of <tool_call> tags
+    - Added lazy imports with TYPE_CHECKING guards for cross-platform compatibility
+    - Added [project.optional-dependencies] local = ["mlx-lm>=0.22.0"] in pyproject.toml
+    - Integrated with factory: model='local' and 'local:model-name' support
+    - Default model: mlx-community/Qwen2.5-Coder-7B-Instruct-4bit (4GB, 8GB+ RAM)
+    - Full test coverage: 26 function-based tests (all work without mlx-lm installed)
+    - Type checking passes (ty), linting passes (ruff), all tests pass
+    - Created spec documentation in agent-os/specs/2026-02-08-mlx-model/
+    - Created working example: examples/15_mlx_local_model.py
+- [ ] 6.2 Model Download CLI (revives Phase 5.3)
+    - Add `punie download-model` command to download Qwen2.5-Coder-7B-Instruct-4bit
+    - Store models in ~/.punie/models/ directory
+    - Support Hugging Face authentication for model access
+    - Show download progress and verify model integrity
+    - Add --list flag to show available/downloaded models
+- [ ] 6.3 Local Tools (adapts ACP tools from Phase 3.3)
+    - Create LocalToolset wrapping existing read_file/write_file tools
+    - Implement in-memory agent that uses LocalDeps instead of ACPDeps
+    - Reuse ToolCallTracker for lifecycle notifications
+    - Test tools work without ACP Client dependency
+- [ ] 6.4 Agent Configuration
+    - Define structured output models for code analysis/refactoring
+    - Create coding-specific system prompts/instructions
+    - Configure temperature=0.0 for deterministic code generation
+    - Add output validation for code syntax correctness
+- [ ] 6.5 Safety Constraints (workspace-only isolation)
+    - Implement workspace boundary checking in LocalToolset
+    - Prevent file access outside project directory
+    - Add path validation before read/write operations
+    - Test safety with malicious path attempts (../../../etc/passwd)
+- [ ] 6.6 Memory Optimization
+    - Profile M1 memory usage during model inference
+    - Optimize model loading and quantization settings
+    - Target: 6-7GB runtime footprint (model + agent + OS)
+    - Add memory monitoring and graceful degradation
+
+## 7. Web UI Development
 
 **Status:** Not Started
 
-- [ ] 6.1 Design multi-agent tracking interface
-- [ ] 6.2 Build browser-based monitoring dashboard
-- [ ] 6.3 Implement agent interaction controls
-- [ ] 6.4 Add simultaneous agent management features
+- [ ] 7.1 Design multi-agent tracking interface
+- [ ] 7.2 Build browser-based monitoring dashboard
+- [ ] 7.3 Implement agent interaction controls
+- [ ] 7.4 Add simultaneous agent management features
 
-## 7. Performance
-
-**Status:** Not Started
-
-- [ ] 7.1 Measure agent performance using ACP tools vs. native tools
-- [ ] 7.2 Benchmark tool execution latency across protocols
-- [ ] 7.3 Profile memory usage and token consumption patterns
-- [ ] 7.4 Identify bottlenecks in IDE tool delegation
-
-## 8. Advanced Features
+## 8. Performance
 
 **Status:** Not Started
 
-- [ ] 8.1 Create domain-specific skills and policies framework
-- [ ] 8.2 Implement custom deterministic policies for project-specific rules
-- [ ] 8.3 Add support for free-threaded Python (PEP 703)
-- [ ] 8.4 Optimize for parallel agent operations across multiple cores
+- [ ] 8.1 Measure agent performance using ACP tools vs. native tools
+- [ ] 8.2 Benchmark tool execution latency across protocols
+- [ ] 8.3 Profile memory usage and token consumption patterns
+- [ ] 8.4 Identify bottlenecks in IDE tool delegation
+
+## 9. Advanced Features
+
+**Status:** Not Started
+
+- [ ] 9.1 Create domain-specific skills and policies framework
+- [ ] 9.2 Implement custom deterministic policies for project-specific rules
+- [ ] 9.3 Add support for free-threaded Python (PEP 703)
+- [ ] 9.4 Optimize for parallel agent operations across multiple cores
 
 ## Research
 
@@ -225,7 +276,7 @@ programmatically rather than through traditional JSON-based tool use, resulting 
 
 **Relevance to Punie:** As Punie delegates tool execution to PyCharm via ACP, implementing code mode patterns could
 significantly improve performance, especially for complex multi-tool workflows. This could be particularly beneficial
-for the advanced features in Phase 6, where parallel agent operations and free-threaded execution would benefit from
+for the advanced features in Phase 9, where parallel agent operations and free-threaded execution would benefit from
 optimized tool calling patterns.
 
 ### Extensible Deterministic Tools

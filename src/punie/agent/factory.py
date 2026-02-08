@@ -45,6 +45,28 @@ def _create_enhanced_test_model() -> TestModel:
     )
 
 
+def _create_local_model(model_name: str | None = None) -> Model:
+    """Create a local MLX model for offline inference on Apple Silicon.
+
+    Args:
+        model_name: Optional HuggingFace model name.
+                   Defaults to mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+
+    Returns:
+        MLXModel instance
+
+    Raises:
+        ImportError: If mlx-lm is not installed or not on macOS arm64
+    """
+    from punie.models.mlx import MLXModel
+
+    if model_name is None:
+        model_name = "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+
+    logger.info("Creating local MLX model: %s", model_name)
+    return MLXModel.from_pretrained(model_name)
+
+
 def create_pydantic_agent(
     model: KnownModelName | Model = "test",
     toolset: FunctionToolset[ACPDeps] | None = None,
@@ -53,6 +75,10 @@ def create_pydantic_agent(
 
     Args:
         model: Model name (default: "test" for enhanced TestModel, no LLM calls).
+               Special values:
+               - "test": Enhanced TestModel with realistic responses
+               - "local": Local MLX model (mlx-community/Qwen2.5-Coder-7B-Instruct-4bit)
+               - "local:model-name": Local MLX model with specific HuggingFace model
                Other options: "openai:gpt-4", "anthropic:claude-3-5-sonnet", etc.
                Can also pass a Model instance directly.
         toolset: Optional toolset to use. If None, uses create_toolset() (all 7 static tools).
@@ -69,6 +95,10 @@ def create_pydantic_agent(
     if model == "test":
         logger.info("Using enhanced test model for better debugging")
         model = _create_enhanced_test_model()
+    elif model == "local":
+        model = _create_local_model()
+    elif isinstance(model, str) and model.startswith("local:"):
+        model = _create_local_model(model.split(":", 1)[1])
 
     agent = Agent[ACPDeps, str](
         model,
