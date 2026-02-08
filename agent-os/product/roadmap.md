@@ -92,11 +92,28 @@ coverage/quality improvements which provide more immediate value.
     - All 91 tests pass, coverage 81.12% (exceeds 80% requirement)
     - Created spec documentation in agent-os/specs/2026-02-08-pydantic-ai-best-practices/
 
-## 4. ACP Integration
+## 4. Dynamic Tool Discovery
 
-**Status:** Not Started
+**Status:** ✅ Phase 4.1 Completed (2026-02-08)
 
-- [ ] 4.1 Implement dynamic tool discovery via ACP
+- [x] 4.1 Implement dynamic tool discovery via ACP - Completed 2026-02-08
+    - Extended Client protocol with `discover_tools()` method (Punie extension, not upstream)
+    - Created discovery schema: ToolDescriptor and ToolCatalog (frozen dataclasses with query methods)
+    - Implemented three-tier toolset fallback system:
+        - Tier 1: Catalog-based (discover_tools returns tool descriptors from IDE)
+        - Tier 2: Capability-based (client_capabilities flags when discovery unavailable)
+        - Tier 3: Default (all 7 static tools for backward compatibility)
+    - Added dynamic toolset factories: create_toolset_from_catalog(), create_toolset_from_capabilities()
+    - Generic bridge for unknown IDE tools (forwards to ext_method)
+    - Per-session Pydantic AI agent construction with session-specific toolset
+    - Updated PunieAgent to store client_capabilities and wire discovery into prompt()
+    - Extended FakeClient with discover_tools() support for testing
+    - Cleaned up dead code: removed unused _sessions set from adapter
+    - Full test coverage: 16 new discovery tests (frozen dataclass verification, catalog queries, toolset factories, adapter integration, fallback chain)
+    - Updated example 09 from aspirational Tier 3 to working Tier 1 demonstration
+    - Type checking passes (ty), linting passes (ruff), all 143 tests pass
+    - Created spec documentation in agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/
+    - Updated docs/research/evolution.md with Phase 4.1 details
 - [ ] 4.2 Register IDE tools automatically
 - [ ] 4.3 Enable agent awareness of PyCharm capabilities
 

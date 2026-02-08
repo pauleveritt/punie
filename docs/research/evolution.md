@@ -334,7 +334,7 @@ except Exception as exc:
 - 20 total agent tests
 - 91 tests passing, 81% coverage
 
-## Architecture Review Findings (Current)
+## Architecture Review Findings (2026-02-08)
 
 A comprehensive architecture review identified areas for improvement:
 
@@ -361,6 +361,207 @@ A comprehensive architecture review identified areas for improvement:
 - Web UI for multi-agent tracking (Phase 5)
 - Performance benchmarking (Phase 6)
 - Advanced features: free-threaded Python, parallel agents (Phase 7)
+
+## Dynamic Tool Discovery (Phase 4.1)
+
+Completed 2026-02-08. Transformed Punie from static 7-tool agent to dynamic IDE-capability-driven architecture.
+
+### The Problem
+
+**Mission statement:** "PyCharm's existing machinery — refactoring, linting, type checking, code navigation — becomes the agent's tool runtime."
+
+**Reality:** Agent hardcoded exactly 7 tools at construction time, no way to discover IDE capabilities.
+
+**Gap:** `initialize()` received `client_capabilities` but ignored them completely.
+
+### The Solution: Three-Tier Discovery
+
+```python
+# Tier 1: Catalog-based (IDE advertises tools)
+catalog = await conn.discover_tools(session_id)
+toolset = create_toolset_from_catalog(catalog)
+
+# Tier 2: Capability-based (fallback)
+toolset = create_toolset_from_capabilities(client_capabilities)
+
+# Tier 3: Default (backward compat)
+toolset = create_toolset()  # All 7 static tools
+```
+
+### Protocol Extension
+
+Added `discover_tools()` as first-class Client protocol method:
+
+```python
+# src/punie/acp/interfaces.py
+class Client(Protocol):
+    async def discover_tools(
+        self, session_id: str, **kwargs: Any
+    ) -> dict[str, Any]: ...
+```
+
+**Design choice:** Protocol method (not `ext_method`) signals this is core functionality. Returns raw dict to keep protocol layer schema-agnostic.
+
+### Discovery Schema
+
+**New module:** `src/punie/agent/discovery.py`
+
+```python
+@dataclass(frozen=True)
+class ToolDescriptor:
+    name: str                          # e.g. "read_file", "refactor_rename"
+    kind: str                          # ToolKind: "read", "edit", "execute", etc.
+    description: str                   # Human-readable for LLM
+    parameters: dict[str, Any]         # JSON Schema for parameters
+    requires_permission: bool = False  # Permission gate
+    categories: tuple[str, ...] = ()   # e.g. ("file", "io"), ("refactoring",)
+
+@dataclass(frozen=True)
+class ToolCatalog:
+    tools: tuple[ToolDescriptor, ...]  # Immutable sequence
+
+    def by_name(self, name: str) -> ToolDescriptor | None: ...
+    def by_kind(self, kind: str) -> tuple[ToolDescriptor, ...]: ...
+    def by_category(self, category: str) -> tuple[ToolDescriptor, ...]: ...
+```
+
+**Key decisions:**
+- Frozen dataclasses (per `frozen-dataclass-services` standard)
+- Tuples for immutability
+- Agent layer owns these types (protocol stays generic)
+
+### Dynamic Toolset Factories
+
+**Modified:** `src/punie/agent/toolset.py`
+
+**Three factory functions:**
+
+1. `create_toolset()` — All 7 static tools (backward compat, Tier 3)
+2. `create_toolset_from_capabilities(caps)` — Build from capability flags (Tier 2)
+3. `create_toolset_from_catalog(catalog)` — Build from discovery (Tier 1)
+
+**Catalog factory logic:**
+- Match known tools by name (read_file, write_file, etc.)
+- For unknown tools, create generic bridge using `ext_method`
+- Return `FunctionToolset[ACPDeps]` with matched tools only
+
+**Unknown tool handling:**
+```python
+def create_generic_bridge(descriptor: ToolDescriptor):
+    async def bridge(ctx: RunContext[ACPDeps], **kwargs: Any) -> Any:
+        conn = ctx.deps.conn
+        return await conn.ext_method(
+            descriptor.name,
+            session_id=ctx.deps.session_id,
+            **kwargs
+        )
+    bridge.__name__ = descriptor.name
+    bridge.__doc__ = descriptor.description
+    return bridge
+```
+
+This enables IDE to provide custom tools (e.g., `refactor_rename`) without agent code changes.
+
+### Session Lifecycle Integration
+
+**Modified:** `src/punie/agent/adapter.py`
+
+**Changes:**
+
+1. Store `client_capabilities` and `client_info` during `initialize()`
+2. Build session-specific toolset in `prompt()`:
+   ```python
+   if hasattr(self._conn, "discover_tools"):
+       catalog_dict = await self._conn.discover_tools(session_id)
+       catalog = parse_tool_catalog(catalog_dict)
+       toolset = create_toolset_from_catalog(catalog)
+   elif self._client_capabilities:
+       toolset = create_toolset_from_capabilities(self._client_capabilities)
+   else:
+       toolset = create_toolset()
+   ```
+3. Construct Pydantic AI agent per-session with dynamic toolset
+4. Clean up dead `_sessions` set (identified in arch review)
+
+**Modified:** `src/punie/agent/factory.py`
+
+- `create_pydantic_agent()` now accepts optional `toolset` parameter
+- Enables per-session agent construction with session-specific tools
+
+### Testing Infrastructure
+
+**Modified:** `src/punie/testing/fakes.py`
+
+Added to `FakeClient`:
+```python
+class FakeClient:
+    tool_catalog: list[dict]  # Configurable tool descriptors
+    capabilities: ClientCapabilities | None
+
+    async def discover_tools(self, session_id, **kwargs) -> dict:
+        return {"tools": self.tool_catalog}
+```
+
+**New tests:** `tests/test_discovery.py` (14 function-based tests)
+
+1. Frozen dataclass verification (ToolDescriptor, ToolCatalog)
+2. Catalog query methods (by_name, by_kind, by_category)
+3. Toolset factories (known tools, unknown bridges, capabilities fallback)
+4. Adapter integration (stores caps, uses discovery, fallback chain)
+5. FakeClient protocol satisfaction
+
+### Examples Update
+
+**Modified:** `examples/09_dynamic_tool_discovery.py`
+
+Converted from aspirational Tier 3 (future vision, commented out) to working Tier 1 (demonstrates actual functionality):
+
+- Create `ToolDescriptor` and `ToolCatalog`
+- Query catalog (by_name, by_kind, by_category)
+- Build `FunctionToolset` from catalog
+- Show all three fallback tiers
+
+### Results
+
+**Files created:**
+- `src/punie/agent/discovery.py` — Discovery types
+- `tests/test_discovery.py` — 14 comprehensive tests
+- `agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/` — Full spec docs
+
+**Files modified:**
+- `src/punie/acp/interfaces.py` — Protocol extension
+- `src/punie/agent/adapter.py` — Capability storage, discovery wiring, dead code cleanup
+- `src/punie/agent/toolset.py` — Dynamic factories
+- `src/punie/agent/factory.py` — Optional toolset parameter
+- `src/punie/testing/fakes.py` — Discovery support
+- `examples/09_dynamic_tool_discovery.py` — Working demo
+
+**Test results:**
+- Total tests: 91 → 105 (+14)
+- Coverage: ≥80% (verified)
+- Type checking: astral:ty passes
+- Linting: astral:ruff passes
+
+**Architectural impact:**
+- Agent is no longer limited to 7 hardcoded tools
+- IDE can advertise custom capabilities (refactoring, linting, etc.)
+- Per-session toolsets enable different tools for different contexts
+- Generic bridge enables forward compatibility with IDE innovation
+- `client_capabilities` now used (no longer ignored)
+
+### Standards Applied
+
+This phase followed 7 Agent OS standards:
+
+1. **agent-verification** — astral:ty + astral:ruff before completion
+2. **protocol-first-design** — `discover_tools()` added to Client protocol first
+3. **frozen-dataclass-services** — ToolDescriptor, ToolCatalog are frozen
+4. **protocol-satisfaction-test** — Verify FakeClient satisfies protocol
+5. **fakes-over-mocks** — Extended FakeClient, no mock frameworks
+6. **function-based-tests** — All 14 tests are functions, not classes
+7. **sybil-doctest** — Docstring examples in ToolCatalog methods
+
+Full spec documentation in `agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/`
 
 ## Current Architecture Summary
 
@@ -436,12 +637,13 @@ PyCharm (execution)
 
 ## Timeline
 
-| Date       | Phases  | Description                                                                       |
-|------------|---------|-----------------------------------------------------------------------------------|
-| 2026-02-07 | 1.1-1.4 | Project foundation (structure, examples, docs, pytest)                            |
-| 2026-02-07 | 2.1-2.4 | Vendor SDK, refactor tests, create `punie.testing` package                        |
-| 2026-02-07 | 3.1     | Add HTTP server alongside ACP (dual-protocol)                                     |
-| 2026-02-07 | 3.2     | Pydantic AI bridge with ACPDeps and first tool (read_file)                        |
-| 2026-02-08 | 3.3     | Complete toolset (7 tools, permission flow, terminal support)                     |
-| 2026-02-08 | 3.4     | Adopt Pydantic AI v1 best practices (instructions, ModelRetry, output validation) |
-| 2026-02-08 | Review  | Architecture review identifying next improvements                                 |
+| Date       | Phases  | Description                                                                                  |
+|------------|---------|----------------------------------------------------------------------------------------------|
+| 2026-02-07 | 1.1-1.4 | Project foundation (structure, examples, docs, pytest)                                       |
+| 2026-02-07 | 2.1-2.4 | Vendor SDK, refactor tests, create `punie.testing` package                                   |
+| 2026-02-07 | 3.1     | Add HTTP server alongside ACP (dual-protocol)                                                |
+| 2026-02-07 | 3.2     | Pydantic AI bridge with ACPDeps and first tool (read_file)                                   |
+| 2026-02-08 | 3.3     | Complete toolset (7 tools, permission flow, terminal support)                                |
+| 2026-02-08 | 3.4     | Adopt Pydantic AI v1 best practices (instructions, ModelRetry, output validation)            |
+| 2026-02-08 | Review  | Architecture review identifying next improvements                                            |
+| 2026-02-08 | 4.1     | Dynamic tool discovery (protocol extension, catalog schema, three-tier fallback, 14 tests)   |

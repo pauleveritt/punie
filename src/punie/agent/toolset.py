@@ -2,15 +2,23 @@
 
 Exposes ACP Client methods as Pydantic AI tools: read_file, write_file (with
 permission), run_command (with permission), and terminal lifecycle tools.
+
+Provides three toolset factories:
+- create_toolset() — All 7 static tools (backward compat, Tier 3 fallback)
+- create_toolset_from_capabilities() — Build from ClientCapabilities (Tier 2 fallback)
+- create_toolset_from_catalog() — Build from ToolCatalog (Tier 1, dynamic discovery)
 """
+
+from typing import Any
 
 from pydantic_ai import FunctionToolset, ModelRetry, RunContext
 
 from punie.acp.contrib.permissions import default_permission_options
 from punie.acp.helpers import text_block, tool_content, tool_terminal_ref
-from punie.acp.schema import ToolCallLocation
+from punie.acp.schema import ClientCapabilities, ToolCallLocation
 
 from .deps import ACPDeps
+from .discovery import ToolCatalog, ToolDescriptor
 
 
 async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:
@@ -266,7 +274,7 @@ async def kill_terminal(ctx: RunContext[ACPDeps], terminal_id: str) -> str:
 
 
 def create_toolset() -> FunctionToolset[ACPDeps]:
-    """Create ACP toolset with all client tools.
+    """Create ACP toolset with all client tools (Tier 3 fallback).
 
     Returns a FunctionToolset configured with tools that bridge Pydantic AI
     to ACP Client Protocol:
@@ -277,6 +285,10 @@ def create_toolset() -> FunctionToolset[ACPDeps]:
     - release_terminal
     - wait_for_terminal_exit
     - kill_terminal
+
+    This is the backward-compatible "all tools" factory, used when:
+    - No client capabilities provided (old clients)
+    - No tool catalog available (discovery not supported)
     """
     return FunctionToolset[ACPDeps](
         tools=[
@@ -289,6 +301,128 @@ def create_toolset() -> FunctionToolset[ACPDeps]:
             kill_terminal,
         ]
     )
+
+
+def create_toolset_from_capabilities(
+    caps: ClientCapabilities,
+) -> FunctionToolset[ACPDeps]:
+    """Create toolset from client capabilities (Tier 2 fallback).
+
+    Builds a toolset based on what the client declares it can do via
+    ClientCapabilities. Only includes tools the client supports.
+
+    Args:
+        caps: Client capabilities from initialize()
+
+    Returns:
+        FunctionToolset with capability-filtered tools
+
+    >>> from punie.acp.schema import ClientCapabilities, FileSystemCapability
+    >>> caps = ClientCapabilities(
+    ...     fs=FileSystemCapability(read_text_file=True, write_text_file=False),
+    ...     terminal=False
+    ... )
+    >>> toolset = create_toolset_from_capabilities(caps)
+    >>> len(toolset.tools)
+    1
+    """
+    tools = []
+
+    # File tools based on fs capability
+    if caps.fs and caps.fs.read_text_file:
+        tools.append(read_file)
+    if caps.fs and caps.fs.write_text_file:
+        tools.append(write_file)
+
+    # Terminal tools if terminal capability enabled
+    if caps.terminal:
+        tools.extend(
+            [
+                run_command,
+                get_terminal_output,
+                release_terminal,
+                wait_for_terminal_exit,
+                kill_terminal,
+            ]
+        )
+
+    return FunctionToolset[ACPDeps](tools=tools)
+
+
+def _create_generic_bridge(descriptor: ToolDescriptor):
+    """Create a generic bridge function for unknown IDE tools.
+
+    For tools not in the known set (read_file, write_file, etc.), generate
+    a dynamic bridge that forwards calls to ext_method.
+
+    Args:
+        descriptor: Tool descriptor from IDE
+
+    Returns:
+        Async function matching Pydantic AI tool signature
+    """
+
+    async def bridge(ctx: RunContext[ACPDeps], **kwargs: Any) -> Any:
+        """Generic bridge to IDE tool via ext_method."""
+        conn = ctx.deps.client_conn
+        try:
+            return await conn.ext_method(
+                descriptor.name, params={"session_id": ctx.deps.session_id, **kwargs}
+            )
+        except Exception as exc:
+            raise ModelRetry(f"Failed to call {descriptor.name}: {exc}") from exc
+
+    # Set function metadata for Pydantic AI
+    bridge.__name__ = descriptor.name
+    bridge.__doc__ = descriptor.description
+    return bridge
+
+
+def create_toolset_from_catalog(catalog: ToolCatalog) -> FunctionToolset[ACPDeps]:
+    """Create toolset from tool catalog (Tier 1, dynamic discovery).
+
+    Builds a toolset from the IDE's advertised capabilities via discover_tools().
+    Matches known tools by name, creates generic bridges for unknowns.
+
+    Args:
+        catalog: Tool catalog from discover_tools() response
+
+    Returns:
+        FunctionToolset with catalog-matched tools
+
+    >>> from punie.agent.discovery import ToolDescriptor, ToolCatalog
+    >>> descriptor = ToolDescriptor(
+    ...     name="read_file",
+    ...     kind="read",
+    ...     description="Read file",
+    ...     parameters={"type": "object"}
+    ... )
+    >>> catalog = ToolCatalog(tools=(descriptor,))
+    >>> toolset = create_toolset_from_catalog(catalog)
+    >>> len(toolset.tools)
+    1
+    """
+    # Known tools mapping
+    known_tools = {
+        "read_file": read_file,
+        "write_file": write_file,
+        "run_command": run_command,
+        "get_terminal_output": get_terminal_output,
+        "release_terminal": release_terminal,
+        "wait_for_terminal_exit": wait_for_terminal_exit,
+        "kill_terminal": kill_terminal,
+    }
+
+    tools = []
+    for descriptor in catalog.tools:
+        if descriptor.name in known_tools:
+            # Use known implementation
+            tools.append(known_tools[descriptor.name])
+        else:
+            # Create generic bridge for IDE-provided tool
+            tools.append(_create_generic_bridge(descriptor))
+
+    return FunctionToolset[ACPDeps](tools=tools)
 
 
 # Alias for backward compatibility

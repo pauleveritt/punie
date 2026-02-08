@@ -145,6 +145,19 @@ class Client(Protocol):
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalCommandResponse | None: ...
 
+    async def discover_tools(
+        self, session_id: str, **kwargs: Any
+    ) -> dict[str, Any]:
+        """Discover available tools from the IDE (Punie extension).
+
+        This is a Punie-specific extension to the ACP protocol, not part of upstream.
+        Returns a dict with "tools" key containing list of tool descriptors.
+
+        The protocol layer keeps this schema-agnostic (returns dict), while the agent
+        layer parses it into ToolCatalog.
+        """
+        ...
+
     async def ext_method(
         self, method: str, params: dict[str, Any]
     ) -> dict[str, Any]: ...

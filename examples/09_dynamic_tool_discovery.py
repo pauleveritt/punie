@@ -1,134 +1,164 @@
-"""Example 09: Dynamic Tool Discovery (Aspirational)
+"""Example 09: Dynamic Tool Discovery
 
-Demonstrates dynamic tool discovery pattern for Phase 4.
-
-**STATUS: ASPIRATIONAL** — This example shows the intended discovery pattern.
-The ToolKind enumeration and grouping works today. The discovery protocol is
-documented in comments as future functionality.
+Demonstrates dynamic tool discovery via the three-tier fallback system.
 
 This example shows:
-- Current: Enumerating all ToolKind values (works today)
-- Current: Grouping tools by category (works today)
-- Future: Runtime discovery protocol (Phase 4)
-- Future: IDE advertises available tools dynamically
-- Future: Agent queries tool catalog at session start
+- Creating ToolDescriptor and ToolCatalog
+- Querying catalog (by_name, by_kind, by_category)
+- Building Pydantic AI toolsets from catalogs
+- Three-tier fallback: catalog → capabilities → default
 
-For implementation reference, see:
-- acp.schema.ToolKind enum definition
-
-Tier: 3 (Aspirational)
+Tier: 1 (Working)
 """
 
-from punie.acp import start_tool_call
-from punie.acp.schema import ToolCallLocation
+from punie.acp.schema import ClientCapabilities, FileSystemCapability
+from punie.agent.discovery import ToolCatalog, ToolDescriptor
+from punie.agent.toolset import (
+    create_toolset,
+    create_toolset_from_capabilities,
+    create_toolset_from_catalog,
+)
 
 
 def main() -> None:
-    """Demonstrate current tool enumeration and future discovery pattern."""
+    """Demonstrate dynamic tool discovery and catalog queries."""
 
     # ============================================================
-    # PART 1: What works today — Tool enumeration and grouping
+    # PART 1: Tool Discovery via Catalog (Tier 1)
     # ============================================================
 
-    # Tool kinds as defined in ACP schema (lowercase)
-    ide_tools = [
-        "read",
-        "edit",
-        "delete",
-        "move",
-        "search",
-        "execute",
+    # IDE returns tool catalog via discover_tools()
+    descriptors = [
+        ToolDescriptor(
+            name="read_file",
+            kind="read",
+            description="Read contents of a file",
+            parameters={"type": "object", "properties": {"path": {"type": "string"}}},
+            requires_permission=False,
+            categories=("file", "io"),
+        ),
+        ToolDescriptor(
+            name="write_file",
+            kind="edit",
+            description="Write contents to a file",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+            },
+            requires_permission=True,
+            categories=("file", "io"),
+        ),
+        ToolDescriptor(
+            name="refactor_rename",
+            kind="edit",
+            description="Rename a symbol across the project",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "old_name": {"type": "string"},
+                    "new_name": {"type": "string"},
+                },
+            },
+            requires_permission=True,
+            categories=("refactoring", "ide"),
+        ),
     ]
 
-    # Agent tools (AI-specific operations)
-    agent_tools = [
-        "think",
-    ]
+    catalog = ToolCatalog(tools=tuple(descriptors))
 
-    # Meta tools (protocol operations)
-    meta_tools = [
-        "fetch",
-        "switch_mode",
-        "other",
-    ]
+    print("=== Tool Discovery (Tier 1) ===")
+    print(f"Total tools in catalog: {len(catalog.tools)}")
 
-    all_tools = ide_tools + agent_tools + meta_tools
+    # Query by name
+    read_tool = catalog.by_name("read_file")
+    if read_tool:
+        print(f"\nFound by name: {read_tool.name}")
+        print(f"  Kind: {read_tool.kind}")
+        print(f"  Description: {read_tool.description}")
+        print(f"  Permission required: {read_tool.requires_permission}")
 
-    # Demonstrate constructing a tool call for each category
-    for idx, tool_kind in enumerate(ide_tools[:3]):  # Sample first 3 IDE tools
-        tool_call = start_tool_call(
-            f"call-{idx}",
-            f"Using {tool_kind}",
-            kind=tool_kind,  # ty: ignore[invalid-argument-type]  # tool_kind is string from literal list
-            status="in_progress",
-            locations=[ToolCallLocation(path="/example/file.py")],
-            raw_input=f'{{"kind": "{tool_kind}"}}',
-        )
-        assert tool_call.kind == tool_kind
+    # Query by kind
+    edit_tools = catalog.by_kind("edit")
+    print(f"\nTools with kind='edit': {len(edit_tools)}")
+    for tool in edit_tools:
+        print(f"  - {tool.name}: {tool.description}")
 
-    print(
-        f"✓ Current functionality: {len(all_tools)} tool kinds enumerated and grouped"
+    # Query by category
+    file_tools = catalog.by_category("file")
+    print(f"\nTools with category='file': {len(file_tools)}")
+    for tool in file_tools:
+        print(f"  - {tool.name}")
+
+    refactoring_tools = catalog.by_category("refactoring")
+    print(f"\nTools with category='refactoring': {len(refactoring_tools)}")
+    for tool in refactoring_tools:
+        print(f"  - {tool.name}")
+
+    # Build Pydantic AI toolset from catalog
+    toolset = create_toolset_from_catalog(catalog)
+    print(f"\nBuilt toolset with {len(toolset.tools)} tools from catalog")
+    for tool_name in toolset.tools:
+        print(f"  - {tool_name}")
+
+    # ============================================================
+    # PART 2: Capability-Based Fallback (Tier 2)
+    # ============================================================
+
+    print("\n=== Capability-Based Fallback (Tier 2) ===")
+
+    # When discover_tools() is unavailable, use client capabilities
+    caps = ClientCapabilities(
+        fs=FileSystemCapability(read_text_file=True, write_text_file=True),
+        terminal=True,
     )
-    print(f"  - IDE tools: {len(ide_tools)}")
-    print(f"  - Agent tools: {len(agent_tools)}")
-    print(f"  - Meta tools: {len(meta_tools)}")
+
+    toolset_from_caps = create_toolset_from_capabilities(caps)
+    print(f"Built toolset with {len(toolset_from_caps.tools)} tools from capabilities")
+    for tool_name in toolset_from_caps.tools:
+        print(f"  - {tool_name}")
 
     # ============================================================
-    # PART 2: Future pattern — Dynamic tool discovery (Phase 4)
+    # PART 3: Default Fallback (Tier 3)
     # ============================================================
 
-    # The intended pattern (not yet implemented):
-    #
-    # # At session initialization, agent queries available tools
-    # tool_catalog = await acp_client.discover_tools(session_id)
-    #
-    # # tool_catalog structure:
-    # # {
-    # #   "ide_tools": [
-    # #     {
-    # #       "kind": "Read",
-    # #       "schema": {...},  # JSON schema for parameters
-    # #       "description": "Read file contents",
-    # #       "categories": ["file", "io"]
-    # #     },
-    # #     {
-    # #       "kind": "Edit",
-    # #       "schema": {...},
-    # #       "description": "Edit file with string replacement",
-    # #       "categories": ["file", "io", "write"]
-    # #     },
-    # #     ...
-    # #   ],
-    # #   "agent_tools": [...],
-    # #   "meta_tools": [...]
-    # # }
-    #
-    # # Agent can now:
-    # # 1. Query available tools dynamically
-    # # 2. Filter by category ("show me all file tools")
-    # # 3. Discover tool schemas without hardcoding
-    # # 4. Adapt to IDE extensions adding new tools
-    #
-    # # Example: Find all tools that can modify files
-    # write_tools = [
-    #     tool for tool in tool_catalog["ide_tools"]
-    #     if "write" in tool["categories"]
-    # ]
-    #
-    # # Example: Get schema for Edit tool to construct call correctly
-    # edit_schema = next(
-    #     tool["schema"] for tool in tool_catalog["ide_tools"]
-    #     if tool["kind"] == "Edit"
-    # )
-    #
-    # Benefits:
-    # - Tools not hardcoded in agent
-    # - IDE can extend tool catalog via plugins
-    # - Agent adapts to available tools automatically
-    # - Schema-driven tool call construction
-    # - Runtime capability negotiation
+    print("\n=== Default Fallback (Tier 3) ===")
 
-    print("✓ Future pattern: Dynamic tool discovery protocol documented")
+    # When no discovery and no capabilities, use all 7 static tools
+    default_toolset = create_toolset()
+    print(f"Built default toolset with {len(default_toolset.tools)} tools")
+    for tool_name in default_toolset.tools:
+        print(f"  - {tool_name}")
+
+    # ============================================================
+    # PART 4: Unknown Tool Handling (Generic Bridge)
+    # ============================================================
+
+    print("\n=== Unknown Tool Handling ===")
+
+    # When IDE provides a tool not in the known set, generic bridge is created
+    unknown_tool = ToolDescriptor(
+        name="ide_debug_breakpoint",
+        kind="execute",
+        description="Set a debugger breakpoint",
+        parameters={
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "number"},
+            },
+        },
+    )
+    unknown_catalog = ToolCatalog(tools=(unknown_tool,))
+    unknown_toolset = create_toolset_from_catalog(unknown_catalog)
+
+    tool = unknown_toolset.tools["ide_debug_breakpoint"]
+    print(f"Unknown tool creates generic bridge: {tool.name}")
+    print(f"  Description: {tool.description}")
+
+    print("\n✓ Dynamic tool discovery demonstrated")
 
 
 if __name__ == "__main__":

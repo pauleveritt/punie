@@ -86,10 +86,14 @@ class FakeClient:
     - File operations use `files` dict
     - Permission prompts use `permission_outcomes` queue
     - Notifications are recorded in `notifications` list
+    - Tool discovery via `tool_catalog` (dynamic discovery)
+    - Client capabilities via `capabilities` (capability-based fallback)
 
     Args:
         files: Initial file system state (path -> content mapping)
         default_file_content: Content returned for files not in `files` dict
+        tool_catalog: List of tool descriptor dicts for discover_tools()
+        capabilities: Client capabilities for capability-based fallback
     """
 
     __test__ = False  # Prevent pytest collection
@@ -98,6 +102,8 @@ class FakeClient:
         self,
         files: dict[str, str] | None = None,
         default_file_content: str = "default content",
+        tool_catalog: list[dict[str, Any]] | None = None,
+        capabilities: ClientCapabilities | None = None,
     ) -> None:
         self.files: dict[str, str] = files or {}
         self.default_file_content = default_file_content
@@ -108,6 +114,8 @@ class FakeClient:
         self._agent_conn = None
         self.terminals: dict[str, FakeTerminal] = {}
         self._next_terminal_id: int = 0
+        self.tool_catalog = tool_catalog or []
+        self.capabilities = capabilities
 
     def on_connect(self, conn) -> None:
         self._agent_conn = conn
@@ -252,6 +260,16 @@ class FakeClient:
         if terminal_id and terminal_id in self.terminals:
             del self.terminals[terminal_id]
         return KillTerminalCommandResponse()
+
+    async def discover_tools(
+        self, session_id: str, **kwargs: Any
+    ) -> dict[str, Any]:
+        """Return configured tool catalog for dynamic discovery.
+
+        Returns the tool_catalog set at construction time. Used to test
+        dynamic tool discovery (Tier 1 fallback).
+        """
+        return {"tools": self.tool_catalog}
 
     async def ext_method(self, method: str, params: dict) -> dict:
         self.ext_calls.append((method, params))
