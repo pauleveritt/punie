@@ -339,7 +339,9 @@ async def test_fake_client_terminal_output():
     terminal_id = client.queue_terminal(
         command="echo", output="test output", exit_code=0
     )
-    response = await client.terminal_output(session_id="sess-1", terminal_id=terminal_id)
+    response = await client.terminal_output(
+        session_id="sess-1", terminal_id=terminal_id
+    )
     assert response.output == "test output"
     assert response.truncated is False
 

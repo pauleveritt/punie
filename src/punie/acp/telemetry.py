@@ -13,9 +13,9 @@ else:  # pragma: no cover - optional
     os.environ.setdefault("LOGFIRE_IGNORE_NO_CONFIG", "1")
 
 try:  # pragma: no cover - opentelemetry is optional
-    from opentelemetry.trace import get_tracer as otel_get_tracer  # type: ignore[unresolved-import]
+    from opentelemetry.trace import get_tracer as otel_get_tracer
 except ModuleNotFoundError:  # pragma: no cover - opentelemetry is optional
-    otel_get_tracer = None
+    otel_get_tracer = None  # ty: ignore[invalid-assignment]
 
 DEFAULT_TAGS = ["acp"]
 TRACER = otel_get_tracer(__name__) if otel_get_tracer else None

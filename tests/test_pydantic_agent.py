@@ -149,9 +149,7 @@ async def test_fake_client_terminal_methods():
     assert "term-0" in fake_client.terminals
 
     # Test terminal_output (default empty)
-    output = await fake_client.terminal_output(
-        session_id="test", terminal_id="term-0"
-    )
+    output = await fake_client.terminal_output(session_id="test", terminal_id="term-0")
     assert output.output == ""
 
     # Test wait_for_terminal_exit (default 0)
