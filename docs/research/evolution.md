@@ -1672,15 +1672,113 @@ TYPE_CHECKING guards allow import on any platform. Runtime import in `__init__` 
 | `punie.acp`     | Vendored ACP SDK (29 files) | `interfaces`, `core`, `schema`, `agent/`, `client/` |
 | `punie.agent`   | Pydantic AI bridge          | `adapter`, `toolset`, `deps`, `factory`             |
 | `punie.models`  | **Custom model implementations** | **`mlx` — Local MLX model with tool calling** |
+| `punie.local`   | **Standalone local tools** | **`client` — LocalClient with real filesystem/subprocess** |
 | `punie.http`    | HTTP server                 | `app`, `runner`, `types`                            |
 | `punie.testing` | Test infrastructure         | `fakes`, `server`                                   |
 
+## Phase 6.3: Local Tools (2026-02-08)
+
+### Context
+
+Phase 6.3 makes Punie fully standalone by implementing local filesystem and subprocess tools that work without ACP/PyCharm. The key design goal is **easy switching between local tools and IDE-discovered tools** by implementing the existing `Client` protocol.
+
+**Design principle:** Same 7 tool functions, same `ACPDeps` — only swap the `Client` implementation.
+
+### Implementation
+
+**Core Module: `src/punie/local/client.py`**
+
+```python
+@dataclass
+class LocalClient:
+    """Client protocol implementation using local filesystem and subprocess."""
+    workspace: Path  # Root directory for file operations
+    _terminals: dict[str, asyncio.subprocess.Process] = field(default_factory=dict, init=False)
+    _terminal_outputs: dict[str, str] = field(default_factory=dict, init=False)
+    _agent: Any | None = field(default=None, init=False)
+```
+
+**Protocol implementation:**
+
+| Client Method | LocalClient Implementation |
+|--------------|---------------------------|
+| `read_text_file` | `Path(workspace / path).read_text()` |
+| `write_text_file` | `Path(workspace / path).write_text(content)` |
+| `request_permission` | Auto-approve (return first option selected) |
+| `session_update` | No-op (no IDE to receive notifications) |
+| `create_terminal` | `asyncio.create_subprocess_exec()` |
+| `terminal_output` | Read from stored process stdout |
+| `release_terminal` | Clean up process reference |
+| `wait_for_terminal_exit` | `process.wait()` |
+| `kill_terminal` | `process.kill()` |
+| `discover_tools` | Return empty dict (no IDE discovery) |
+| `ext_method` | Raise NotImplementedError |
+| `ext_notification` | No-op |
+| `on_connect` | Store agent reference |
+
+**Factory Integration:**
+
+```python
+def create_local_agent(
+    model: KnownModelName | Model = "local",
+    workspace: Path | None = None,
+):
+    """Create a Pydantic AI agent with local filesystem tools."""
+    from punie.local import LocalClient
+
+    workspace = workspace or Path.cwd()
+    client = LocalClient(workspace=workspace)
+    agent = create_pydantic_agent(model=model)
+
+    return agent, client
+```
+
+### Key Design Decisions
+
+1. **Not frozen:** Must track mutable subprocess state in `_terminals` dict
+2. **workspace parameter:** Constrains file paths (preparation for Phase 6.5 safety)
+3. **Auto-approve permissions:** No IDE to prompt user — Phase 6.5 will add workspace safety checks
+4. **No-op session_update:** `ToolCallTracker` still runs, notifications just go nowhere
+5. **Empty discover_tools:** Local mode has no IDE for tool discovery
+
+### Testing
+
+- **24 comprehensive tests** using real `tmp_path` filesystem (no mocks)
+- Protocol satisfaction verified at runtime: `isinstance(client, Client)`
+- Tests cover:
+  - File operations (read, write, missing files, line/limit parameters)
+  - Permission auto-approval
+  - Subprocess management (create, output, wait, kill, release)
+  - Error handling (missing terminal IDs)
+  - Integration with ACPDeps and ToolCallTracker
+
+### Architecture Impact
+
+```
+┌─────────────────────────────────────────────┐
+│  Same 7 tools in src/punie/agent/toolset.py │
+│  Same ACPDeps (client_conn, session_id,     │
+│               tracker)                      │
+└──────────────┬──────────────────────────────┘
+               │ client_conn is either:
+    ┌──────────┴──────────┐
+    │                     │
+ ACP Client          LocalClient
+ (PyCharm RPC)       (real filesystem)
+```
+
+**Why this approach:**
+- Zero changes to existing 7 tool functions
+- Zero changes to `ACPDeps` or `ToolCallTracker`
+- Easy to switch between local and IDE modes
+- Preparation for Phase 6.5 workspace safety constraints
+
 ### Test Statistics
 
-- **Total tests:** 189 (as of Phase 6.1)
+- **Total tests:** 213 (as of Phase 6.3)
 - **Coverage:** 81%+ (exceeds 80% requirement)
 - **Test distribution:**
-    - Protocol satisfaction: 2
+    - Protocol satisfaction: 3 (includes LocalClient)
     - Schema/RPC: 8
     - Tool calls/concurrency: 8
     - Fakes: 39
@@ -1691,6 +1789,7 @@ TYPE_CHECKING guards allow import on any platform. Runtime import in `__init__` 
     - HTTP: 6
     - Dual protocol: 2
     - MLX model: 26 (7 pure function + 4 properties + 5 mapping + 3 integration + 4 factory + 3 streaming)
+    - Local client: 24 (protocol satisfaction + filesystem + subprocess + permissions + tracker)
     - Examples: 11 (10_session_registration + 15_mlx_local_model)
 
 ### Tool Coverage
@@ -1737,3 +1836,4 @@ TYPE_CHECKING guards allow import on any platform. Runtime import in `__init__` 
 | 2026-02-08 | 5.4     | Server mode (punie serve, dual-protocol HTTP+ACP, 6 tests)                                   |
 | 2026-02-08 | 6.1     | Local MLX model (port pydantic-ai-mlx, tool calling, cross-platform support, 26 tests)       |
 | 2026-02-08 | 6.2     | Model download CLI + Python 3.14 (download-model command, model validation, remove free-threading)  |
+| 2026-02-08 | 6.3     | Local tools (LocalClient with real filesystem/subprocess, reuses Client protocol, 24 tests)  |

@@ -5,6 +5,7 @@ configured with ACPDeps and toolset (static or dynamic).
 """
 
 import logging
+from pathlib import Path
 
 from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
@@ -117,3 +118,31 @@ def create_pydantic_agent(
         return output
 
     return agent
+
+
+def create_local_agent(
+    model: KnownModelName | Model = "local",
+    workspace: Path | None = None,
+):
+    """Create a Pydantic AI agent with local filesystem tools.
+
+    This creates an agent that uses LocalClient for filesystem and subprocess
+    operations instead of delegating to IDE via ACP. The agent works standalone
+    without requiring PyCharm or any IDE connection.
+
+    Args:
+        model: Model name (default: "local" for MLX model).
+               Can use "test" for enhanced TestModel or any other model.
+        workspace: Root directory for file operations. Defaults to current directory.
+
+    Returns:
+        tuple: (agent, client) tuple. Callers construct ACPDeps per prompt using:
+               ACPDeps(client_conn=client, session_id=..., tracker=...)
+    """
+    from punie.local import LocalClient
+
+    workspace = workspace or Path.cwd()
+    client = LocalClient(workspace=workspace)
+    agent = create_pydantic_agent(model=model)
+
+    return agent, client
