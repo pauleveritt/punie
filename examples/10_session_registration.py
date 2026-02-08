@@ -62,7 +62,7 @@ async def main() -> None:
     # Verify SessionState was cached
     if session_id in agent._sessions:
         state: SessionState = agent._sessions[session_id]
-        print(f"\nSessionState cached:")
+        print("\nSessionState cached:")
         print(f"  Discovery tier: {state.discovery_tier}")
         print(f"  Catalog tools: {len(state.catalog.tools) if state.catalog else 0}")
         print(f"  Agent cached: {state.agent is not None}")
@@ -82,11 +82,11 @@ async def main() -> None:
             session_id=session_id,
         )
 
-    print(f"\nPrompt calls: 3")
+    print("\nPrompt calls: 3")
     print(
         f"Additional discovery calls: {len(fake.discover_tools_calls) - initial_discovery_calls}"
     )
-    print(f"✓ No re-discovery occurred (cached state reused)")
+    print("✓ No re-discovery occurred (cached state reused)")
 
     # ============================================================
     # PART 3: Lazy Fallback for Unknown Sessions
@@ -106,7 +106,7 @@ async def main() -> None:
     )
 
     print(f"Discovery calls after lazy fallback: {len(fake.discover_tools_calls) - before_calls}")
-    print(f"✓ Lazy discovery triggered and result cached")
+    print("✓ Lazy discovery triggered and result cached")
 
     # Second call to same unknown session should use cached state
     before_calls = len(fake.discover_tools_calls)
@@ -118,7 +118,7 @@ async def main() -> None:
     print(
         f"Discovery calls on second prompt: {len(fake.discover_tools_calls) - before_calls}"
     )
-    print(f"✓ Lazy-discovered state was cached and reused")
+    print("✓ Lazy-discovered state was cached and reused")
 
     # ============================================================
     # PART 4: Three-Tier Fallback

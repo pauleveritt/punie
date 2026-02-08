@@ -1792,6 +1792,186 @@ def create_local_agent(
     - Local client: 24 (protocol satisfaction + filesystem + subprocess + permissions + tracker)
     - Examples: 11 (10_session_registration + 15_mlx_local_model)
 
+## Phase 6.4-6.6: Agent Configuration, Workspace Safety, Memory Optimization
+
+**Context:** Completes Local Model Integration by making the agent mode-aware (6.4), workspace-safe (6.5), and memory-efficient (6.6). PyCharm/ACP remains the default mode; set `PUNIE_MODE=local` for standalone local operation.
+
+**Key Design Principle:** Default (ACP mode) uses PyCharm instructions with no safety/memory constraints. Local mode uses standalone instructions with workspace boundary enforcement and memory checks.
+
+### Phase 6.4: Agent Configuration
+
+**Goal:** Make agent instructions and behavior configurable for different execution modes.
+
+**Implementation:**
+
+1. **AgentConfig frozen dataclass** (`src/punie/agent/config.py`)
+   - Fields: `instructions`, `temperature`, `max_tokens`, `retries`, `output_retries`, `validate_python_syntax`
+   - Two instruction constants:
+     - `PUNIE_INSTRUCTIONS`: PyCharm/ACP default (IDE-centric)
+     - `PUNIE_LOCAL_INSTRUCTIONS`: Standalone local (workspace-centric)
+   - Default: `PUNIE_INSTRUCTIONS` + `validate_python_syntax=False` (backward compatible)
+
+2. **Factory updates** (`src/punie/agent/factory.py`)
+   - `create_pydantic_agent()` accepts optional `AgentConfig` parameter
+   - Uses `config.instructions`, `config.temperature`, `config.max_tokens`, etc.
+   - Added `_validate_python_code_blocks()` helper using `ast.parse()` on fenced Python blocks
+   - Output validator calls validation when `config.validate_python_syntax=True`
+   - `create_local_agent()` defaults to local config with syntax validation enabled
+
+3. **Mode switching** (`src/punie/cli.py`)
+   - Added `resolve_mode()` following `resolve_model()` pattern
+   - Priority: CLI flag > `PUNIE_MODE` env var > `"acp"` default
+   - Foundation for future CLI integration (not fully wired in this phase)
+
+**Key Decisions:**
+- Frozen dataclass per standard — immutable config
+- Backward compatible: no config param = same as before
+- Python syntax validation OFF by default (ACP mode), ON for local mode
+- Small local models may produce malformed code — `ast.parse()` catches it
+
+### Phase 6.5: Workspace Safety
+
+**Goal:** Prevent LocalClient from accessing files outside the workspace directory.
+
+**Implementation:**
+
+1. **Safety utilities** (`src/punie/local/safety.py`)
+   - `WorkspaceBoundaryError` custom exception with `path` and `workspace` attributes
+   - `resolve_workspace_path(workspace, path)` pure function:
+     - Join workspace + path
+     - Call `.resolve()` to canonicalize (handles symlinks, `..`, etc.)
+     - Check `resolved.is_relative_to(workspace.resolve())`
+     - Raise `WorkspaceBoundaryError` if outside
+
+2. **LocalClient integration** (`src/punie/local/client.py`)
+   - Replaced `_resolve_path()` implementation to call `resolve_workspace_path()`
+   - All file operations (read, write) go through `_resolve_path()`
+   - Terminal `cwd` also goes through `_resolve_path()` — commands can't escape
+
+3. **Exports** (`src/punie/local/__init__.py`)
+   - Exported `WorkspaceBoundaryError` and `resolve_workspace_path`
+
+**Key Decisions:**
+- Pure function `resolve_workspace_path()` — easy to test independently
+- Always `resolve()` to canonicalize paths before checking boundary
+- `is_relative_to()` check handles all traversal attacks robustly
+- Absolute paths checked too — `/etc/passwd` fails `is_relative_to(workspace)`
+
+**Security Coverage:**
+- Path traversal: `../../etc/passwd` ✅ blocked
+- Absolute outside: `/etc/passwd` ✅ blocked
+- Absolute inside: `/workspace/file.txt` ✅ allowed
+- Symlink escape: `workspace/link -> /etc` ✅ blocked
+- Dot components: `./foo/../bar` ✅ resolves correctly
+
+### Phase 6.6: Memory Monitoring
+
+**Goal:** Warn users before loading models that may exceed available memory.
+
+**Implementation:**
+
+1. **Memory utilities** (`src/punie/models/memory.py`)
+   - `MemorySnapshot` frozen dataclass: `rss_bytes`, `rss_mb`, `peak_rss_bytes`, `peak_rss_mb`
+   - `get_memory_snapshot()` using `resource.getrusage()` (stdlib, no extra dependency)
+     - Handles macOS (bytes) vs Linux (KB) units automatically
+   - `check_memory_available(model_size_mb, safety_margin_mb=1024.0)`:
+     - Simple heuristic: current RSS + model + margin < total RAM
+     - Uses `os.sysconf()` for total system RAM (Unix-only)
+     - Returns `(available: bool, snapshot: MemorySnapshot)`
+   - `MODEL_SIZES_MB` dict: `"3B-4bit": 2048.0`, `"7B-4bit": 4096.0`, `"14B-4bit": 8192.0`
+   - `estimate_model_size(model_name)`: Pattern matching on "3B"/"7B"/"14B", defaults to 4096MB
+
+2. **MLX model integration** (`src/punie/models/mlx.py`)
+   - Added memory check in `from_pretrained()` before `mlx_load()`:
+     - Call `check_memory_available(estimate_model_size(model_name))`
+     - Log info with current RSS and estimated model size
+     - If insufficient, log **warning** (don't block — user may know their system)
+   - After loading, call `get_memory_snapshot()` and log actual memory delta
+
+**Key Decisions:**
+- `resource.getrusage()` — stdlib, no psutil dependency
+- Warning, not error — don't block users who know their system better
+- Simple heuristic — not a sophisticated profiler, just a safety check
+- Model size estimates cover the 3 recommended models from CLI
+
+### Test Statistics
+
+- **Total new tests:** 31
+  - `test_agent_config.py`: 13 tests (frozen dataclass, defaults, custom values, factory integration, syntax validation, mode resolution)
+  - `test_workspace_safety.py`: 10 tests (path resolution, traversal blocking, symlink handling, end-to-end LocalClient)
+  - `test_memory.py`: 8 tests (frozen dataclass, positive values, MB conversion, availability checks, model size estimation)
+
+- **Updated test distribution:**
+  - Protocol satisfaction: 3
+  - Schema/RPC: 8
+  - Tool calls/concurrency: 8
+  - Fakes: 39
+  - Pydantic agent: 20
+  - Discovery: 16
+  - Session registration: 16
+  - CLI: 19
+  - HTTP: 6
+  - Dual protocol: 2
+  - MLX model: 26
+  - Local client: 24
+  - **Agent config: 13** (new)
+  - **Workspace safety: 10** (new)
+  - **Memory monitoring: 8** (new)
+  - Examples: 11
+
+- **Total tests:** 244 (as of Phase 6.4-6.6)
+- **Coverage:** 81%+ (exceeds 80% requirement)
+
+### Package Structure Updates
+
+```
+src/punie/
+├── agent/
+│   ├── config.py          # NEW: AgentConfig + PUNIE_INSTRUCTIONS + PUNIE_LOCAL_INSTRUCTIONS
+│   └── factory.py         # MODIFIED: Accept AgentConfig, add _validate_python_code_blocks()
+├── local/
+│   ├── safety.py          # NEW: WorkspaceBoundaryError + resolve_workspace_path()
+│   ├── client.py          # MODIFIED: Use resolve_workspace_path() in _resolve_path()
+│   └── __init__.py        # MODIFIED: Export safety types
+├── models/
+│   ├── memory.py          # NEW: MemorySnapshot, get_memory_snapshot(), check_memory_available()
+│   └── mlx.py             # MODIFIED: Memory check before load, log actual usage
+└── cli.py                 # MODIFIED: Add resolve_mode() function
+
+tests/
+├── test_agent_config.py   # NEW: 13 tests
+├── test_workspace_safety.py  # NEW: 10 tests
+└── test_memory.py         # NEW: 8 tests
+
+agent-os/specs/2026-02-08-local-model-integration/
+├── plan.md
+├── shape.md
+├── standards.md
+└── references.md
+```
+
+### Configuration Flow
+
+```
+User invocation:
+  punie serve                    → resolve_mode() → "acp"  → PUNIE_INSTRUCTIONS
+  PUNIE_MODE=local punie serve   → resolve_mode() → "local" → PUNIE_LOCAL_INSTRUCTIONS
+  punie serve --mode local       → resolve_mode() → "local" → PUNIE_LOCAL_INSTRUCTIONS
+
+Mode characteristics:
+  "acp" mode (default):
+    - PUNIE_INSTRUCTIONS (PyCharm-centric)
+    - No workspace safety (PyCharm handles paths)
+    - No memory monitoring (PyCharm environment)
+    - validate_python_syntax=False
+
+  "local" mode:
+    - PUNIE_LOCAL_INSTRUCTIONS (standalone-centric)
+    - resolve_workspace_path() enforced on all paths
+    - Memory check before MLX model load
+    - validate_python_syntax=True
+```
+
 ### Tool Coverage
 
 | Tool                     | ACP Client Method                                                                  | Permission Required |
@@ -1837,3 +2017,4 @@ def create_local_agent(
 | 2026-02-08 | 6.1     | Local MLX model (port pydantic-ai-mlx, tool calling, cross-platform support, 26 tests)       |
 | 2026-02-08 | 6.2     | Model download CLI + Python 3.14 (download-model command, model validation, remove free-threading)  |
 | 2026-02-08 | 6.3     | Local tools (LocalClient with real filesystem/subprocess, reuses Client protocol, 24 tests)  |
+| 2026-02-08 | 6.4-6.6 | Agent configuration, workspace safety, memory optimization (31 tests)                        |

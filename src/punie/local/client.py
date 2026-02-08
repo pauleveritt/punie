@@ -29,6 +29,7 @@ from punie.acp.schema import (
     WaitForTerminalExitResponse,
     WriteTextFileResponse,
 )
+from punie.local.safety import resolve_workspace_path
 
 __all__ = ["LocalClient"]
 
@@ -53,18 +54,18 @@ class LocalClient:
     _agent: Any | None = field(default=None, init=False)
 
     def _resolve_path(self, path: str) -> Path:
-        """Resolve path relative to workspace.
+        """Resolve path relative to workspace with boundary enforcement.
 
         Args:
             path: File path (absolute or relative to workspace)
 
         Returns:
-            Resolved absolute path
+            Resolved absolute path within workspace
+
+        Raises:
+            WorkspaceBoundaryError: If resolved path is outside workspace
         """
-        path_obj = Path(path)
-        if path_obj.is_absolute():
-            return path_obj
-        return self.workspace / path_obj
+        return resolve_workspace_path(self.workspace, path)
 
     async def read_text_file(
         self,

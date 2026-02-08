@@ -8,8 +8,6 @@ import asyncio
 
 from punie.agent import PunieAgent
 from punie.http.app import create_app
-from punie.http.runner import run_dual
-from punie.http.types import Host, Port
 
 
 async def main():

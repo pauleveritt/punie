@@ -11,12 +11,13 @@ Test groups:
 - Factory integration tests: model='local' handling
 """
 
+import builtins
 from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 
-from punie.models.mlx import AsyncStream, parse_tool_calls
+from punie.models.mlx import AsyncStream, GenerateParams, SamplerParams, parse_tool_calls
 
 
 # ============================================================================
@@ -119,8 +120,18 @@ def test_mlx_model_import_without_mlx_lm(monkeypatch):
     assert parse_tool_calls is not None
 
 
-def test_mlx_model_from_pretrained_without_mlx_lm():
+def test_mlx_model_from_pretrained_without_mlx_lm(monkeypatch):
     """MLXModel.from_pretrained() raises ImportError without mlx-lm."""
+    # Mock mlx_lm import to simulate it not being installed
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "mlx_lm.utils" or name.startswith("mlx_lm"):
+            raise ImportError(f"No module named '{name}'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
     from punie.models.mlx import MLXModel
 
     with pytest.raises(ImportError, match="mlx-lm is required"):
@@ -386,16 +397,36 @@ async def test_request_with_mixed_text_and_tools():
 # ============================================================================
 
 
-def test_factory_local_model_raises_import_error():
+def test_factory_local_model_raises_import_error(monkeypatch):
     """Test create_pydantic_agent(model='local') raises ImportError without mlx-lm."""
+    # Mock mlx_lm import to simulate it not being installed
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "mlx_lm.utils" or name.startswith("mlx_lm"):
+            raise ImportError(f"No module named '{name}'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
     from punie.agent.factory import create_pydantic_agent
 
     with pytest.raises(ImportError, match="mlx-lm is required"):
         create_pydantic_agent(model="local")
 
 
-def test_factory_local_with_model_name_raises_import_error():
+def test_factory_local_with_model_name_raises_import_error(monkeypatch):
     """Test create_pydantic_agent(model='local:name') raises ImportError without mlx-lm."""
+    # Mock mlx_lm import to simulate it not being installed
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "mlx_lm.utils" or name.startswith("mlx_lm"):
+            raise ImportError(f"No module named '{name}'")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
     from punie.agent.factory import create_pydantic_agent
 
     with pytest.raises(ImportError, match="mlx-lm is required"):
@@ -442,3 +473,146 @@ def test_factory_local_default_model_name(monkeypatch):
 
     _ = factory._create_local_model()
     assert created_model_name == "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+
+
+# ============================================================================
+# Parameter building tests
+# ============================================================================
+
+
+def test_build_generate_params_defaults():
+    """Test _build_generate_params with None settings returns defaults."""
+    from punie.models.mlx import MLXModel
+
+    sampler_params, gen_params = MLXModel._build_generate_params(None)
+
+    assert sampler_params.temp == 0.0
+    assert sampler_params.top_p == 0.0
+    assert gen_params.max_tokens == 256
+    assert gen_params.sampler is None
+
+
+def test_build_generate_params_with_temperature():
+    """Test _build_generate_params extracts temperature, top_p, max_tokens correctly."""
+    from punie.models.mlx import MLXModel
+
+    settings = {"temperature": 0.7, "top_p": 0.9, "max_tokens": 512}
+    sampler_params, gen_params = MLXModel._build_generate_params(settings)
+
+    assert sampler_params.temp == 0.7
+    assert sampler_params.top_p == 0.9
+    assert gen_params.max_tokens == 512
+    assert gen_params.sampler is None
+
+
+def test_build_generate_params_partial_settings():
+    """Test _build_generate_params with only temperature set, others default."""
+    from punie.models.mlx import MLXModel
+
+    settings = {"temperature": 0.5}
+    sampler_params, gen_params = MLXModel._build_generate_params(settings)
+
+    assert sampler_params.temp == 0.5
+    assert sampler_params.top_p == 0.0  # default
+    assert gen_params.max_tokens == 256  # default
+    assert gen_params.sampler is None
+
+
+def test_sampler_params_rejects_typo():
+    """Test SamplerParams raises TypeError for misspelled field name."""
+    with pytest.raises(TypeError, match="__init__.*unexpected keyword argument"):
+        # Note: frozen dataclasses raise TypeError for unexpected kwargs
+        SamplerParams(temperature=0.7)  # Wrong: should be 'temp'
+
+
+def test_generate_params_rejects_typo():
+    """Test GenerateParams raises TypeError for misspelled field name."""
+    with pytest.raises(TypeError, match="__init__.*unexpected keyword argument"):
+        GenerateParams(temp=0.7)  # Wrong: should be 'sampler'
+
+
+def test_generate_params_to_kwargs():
+    """Test GenerateParams.to_kwargs() produces correct dict, None sampler excluded."""
+    gen_params = GenerateParams(max_tokens=512)
+    kwargs = gen_params.to_kwargs()
+
+    assert kwargs == {"max_tokens": 512}
+    assert "sampler" not in kwargs
+
+
+def test_generate_params_to_kwargs_with_sampler():
+    """Test GenerateParams.to_kwargs() includes sampler when set."""
+    fake_sampler = MagicMock()
+    gen_params = GenerateParams(max_tokens=256, sampler=fake_sampler)
+    kwargs = gen_params.to_kwargs()
+
+    assert kwargs["max_tokens"] == 256
+    assert kwargs["sampler"] is fake_sampler
+
+
+# ============================================================================
+# Streaming fix test
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_streamed_response_handles_generation_response():
+    """Test MLXStreamedResponse handles GenerationResponse objects (not dicts)."""
+    from punie.models.mlx import MLXStreamedResponse
+    from dataclasses import dataclass
+
+    # Create a fake GenerationResponse class (mimics mlx_lm.generate.GenerationResponse)
+    @dataclass
+    class FakeGenerationResponse:
+        text: str
+
+    # Create a generator that yields GenerationResponse objects
+    def fake_stream_generator():
+        yield FakeGenerationResponse(text="Hello")
+        yield FakeGenerationResponse(text=" world")
+        yield FakeGenerationResponse(text="!")
+
+    from pydantic_ai.models import ModelRequestParameters
+
+    response = MLXStreamedResponse(
+        model_request_parameters=ModelRequestParameters(),
+        _model_name="test-model",
+        _stream_iterator=fake_stream_generator(),
+    )
+
+    # Collect all events and extract text
+    from pydantic_ai.messages import PartDeltaEvent, PartStartEvent, TextPart, TextPartDelta
+
+    text_content = []
+    async for event in response._get_event_iterator():
+        # First token comes via PartStartEvent with a TextPart containing initial content
+        if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+            if event.part.content:
+                text_content.append(event.part.content)
+        # Subsequent tokens come via PartDeltaEvent with TextPartDelta
+        elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+            text_content.append(event.delta.content_delta)
+
+    # Should have streamed all tokens
+    assert "".join(text_content) == "Hello world!"
+
+
+# ============================================================================
+# Runtime guard test
+# ============================================================================
+
+
+def test_generate_raises_without_model_loaded():
+    """Test _generate() raises RuntimeError when model_data is None."""
+    from punie.models.mlx import MLXModel
+
+    # Create model without loading (model_data=None)
+    model = MLXModel("fake-model", model_data=None, tokenizer=None)
+
+    with pytest.raises(RuntimeError, match="Model not loaded"):
+        model._generate(
+            messages=[{"role": "user", "content": "test"}],
+            tools=None,
+            settings=None,
+            stream=False,
+        )

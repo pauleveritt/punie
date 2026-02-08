@@ -233,7 +233,7 @@ def test_merge_does_not_mutate_original():
 
 
 def test_cli_init_creates_file(tmp_path, monkeypatch):
-    """punie init writes acp.json with test model by default."""
+    """punie init writes acp.json with local model by default."""
     monkeypatch.setattr(shutil, "which", lambda x: "/usr/local/bin/punie")
     monkeypatch.delenv("VIRTUAL_ENV", raising=False)  # No venv for clean test
     output = tmp_path / "acp.json"
@@ -244,8 +244,8 @@ def test_cli_init_creates_file(tmp_path, monkeypatch):
     assert "agent_servers" in data
     assert "punie" in data["agent_servers"]
     assert data["agent_servers"]["punie"]["command"] == "/usr/local/bin/punie"
-    # Verify test model is default
-    assert data["agent_servers"]["punie"]["env"]["PUNIE_MODEL"] == "test"
+    # Verify local model is default
+    assert data["agent_servers"]["punie"]["env"]["PUNIE_MODEL"] == "local"
 
 
 def test_cli_init_with_model(tmp_path, monkeypatch):

@@ -219,21 +219,32 @@ coverage/quality improvements which provide more immediate value.
     - Auto-approves permissions (no IDE to prompt), session_update is no-op
     - Created spec documentation in agent-os/specs/2026-02-08-local-tools/
     - All 24 tests pass with real tmp_path filesystem operations
-- [ ] 6.4 Agent Configuration
-    - Define structured output models for code analysis/refactoring
-    - Create coding-specific system prompts/instructions
-    - Configure temperature=0.0 for deterministic code generation
-    - Add output validation for code syntax correctness
-- [ ] 6.5 Safety Constraints (workspace-only isolation)
-    - Implement workspace boundary checking in LocalToolset
-    - Prevent file access outside project directory
-    - Add path validation before read/write operations
-    - Test safety with malicious path attempts (../../../etc/passwd)
-- [ ] 6.6 Memory Optimization
-    - Profile M1 memory usage during model inference
-    - Optimize model loading and quantization settings
-    - Target: 6-7GB runtime footprint (model + agent + OS)
-    - Add memory monitoring and graceful degradation
+- [x] 6.4 Agent Configuration ✅ 2026-02-08
+    - Created AgentConfig frozen dataclass with instructions, temperature, max_tokens, retries, output_retries, validate_python_syntax
+    - Two instruction sets: PUNIE_INSTRUCTIONS (PyCharm/ACP default) and PUNIE_LOCAL_INSTRUCTIONS (standalone local)
+    - Added resolve_mode() function following resolve_model() pattern (CLI flag > PUNIE_MODE env var > "acp" default)
+    - Updated create_pydantic_agent() to accept optional AgentConfig parameter (backward compatible)
+    - Added Python syntax validation using ast.parse() on fenced code blocks (only when validate_python_syntax=True)
+    - create_local_agent() defaults to local config with PUNIE_LOCAL_INSTRUCTIONS and syntax validation enabled
+    - Created spec documentation in agent-os/specs/2026-02-08-local-model-integration/
+    - All 13 new tests pass (test_agent_config.py)
+- [x] 6.5 Safety Constraints (workspace-only isolation) ✅ 2026-02-08
+    - Created WorkspaceBoundaryError custom exception with path and workspace attributes
+    - Implemented resolve_workspace_path() pure function using Path.resolve() + is_relative_to() check
+    - Updated LocalClient._resolve_path() to call resolve_workspace_path() for all file/directory operations
+    - Blocks path traversal (../../etc/passwd), absolute paths outside workspace, symlink escapes
+    - Terminal cwd also enforced through _resolve_path() — commands can't escape workspace
+    - Exported WorkspaceBoundaryError and resolve_workspace_path from punie.local
+    - All 10 new tests pass (test_workspace_safety.py)
+- [x] 6.6 Memory Optimization ✅ 2026-02-08
+    - Created MemorySnapshot frozen dataclass with RSS and peak RSS measurements
+    - Implemented get_memory_snapshot() using resource.getrusage() (stdlib, no extra dependency)
+    - Implemented check_memory_available() with simple heuristic (current + model + margin < total RAM)
+    - Added MODEL_SIZES_MB dict with estimates for 3B-4bit, 7B-4bit, 14B-4bit models
+    - Added estimate_model_size() function to map model names to size estimates
+    - Updated MLXModel.from_pretrained() to check memory before loading and log actual usage after
+    - Memory check warns but doesn't block (user may know their system)
+    - All 8 new tests pass (test_memory.py)
 
 ## 7. Web UI Development
 

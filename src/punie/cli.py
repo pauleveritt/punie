@@ -113,6 +113,16 @@ def resolve_model(model_flag: str | None) -> str:
     return os.getenv("PUNIE_MODEL", "test")
 
 
+def resolve_mode(mode_flag: str | None) -> str:
+    """Resolve mode from CLI flag, env var, or default.
+
+    Priority: CLI flag > PUNIE_MODE env var > "acp" default.
+    """
+    if mode_flag:
+        return mode_flag
+    return os.getenv("PUNIE_MODE", "acp")
+
+
 def setup_logging(log_dir: Path, log_level: str) -> None:
     """Configure file-only logging with RotatingFileHandler.
 
@@ -127,6 +137,9 @@ def setup_logging(log_dir: Path, log_level: str) -> None:
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level.upper())
+
+    # Clear existing handlers to prevent duplicates
+    root_logger.handlers.clear()
 
     # File handler with rotation (10MB max, 3 backups)
     log_file = log_dir / "punie.log"
@@ -158,8 +171,24 @@ async def run_acp_agent(model: str, name: str) -> None:
         model: Model name for agent
         name: Agent name for identification
     """
-    agent = PunieAgent(model=model, name=name)
-    await run_agent(agent)
+    logger = logging.getLogger(__name__)
+    try:
+        logger.info("=== run_acp_agent() starting ===")
+        logger.info(f"Model: {model}")
+        logger.info(f"Name: {name}")
+
+        logger.info("Creating PunieAgent instance...")
+        agent = PunieAgent(model=model, name=name)
+        logger.info("PunieAgent created successfully")
+
+        logger.info("Starting ACP agent via run_agent()...")
+        await run_agent(agent)
+        logger.info("=== run_acp_agent() complete ===")
+    except Exception as exc:
+        logger.exception("CRITICAL: run_acp_agent() failed")
+        logger.error(f"Exception type: {type(exc).__name__}")
+        logger.error(f"Exception message: {str(exc)}")
+        raise
 
 
 async def run_serve_agent(
@@ -257,9 +286,9 @@ def main(
 @app.command()
 def init(
     model: str | None = typer.Option(
-        "test",
+        "local",
         "--model",
-        help="Model to use (default: test for debugging, or specify claude-sonnet-4-5-20250929)",
+        help="Model to use (default: local for offline development, or test/claude-sonnet-4-5-20250929)",
     ),
     output: Path = typer.Option(
         Path.home() / ".jetbrains" / "acp.json",
@@ -277,8 +306,8 @@ def init(
     Creates ~/.jetbrains/acp.json to enable PyCharm agent discovery.
     Merges with existing config to preserve other agents.
 
-    By default, sets PUNIE_MODEL=test for easier debugging with enhanced logging.
-    Use --model to specify a real model like claude-sonnet-4-5-20250929.
+    By default, sets PUNIE_MODEL=local for offline development with MLX models.
+    Use --model to specify test or a cloud model like claude-sonnet-4-5-20250929.
     """
     # Resolve Punie executable
     command, args = resolve_punie_command()
@@ -472,3 +501,98 @@ def serve(
             typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from e
         raise
+
+
+@app.command("stop-all")
+def stop_all(
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force kill processes (SIGKILL) if graceful shutdown fails",
+    ),
+    timeout: int = typer.Option(
+        5,
+        "--timeout",
+        "-t",
+        help="Seconds to wait for graceful shutdown before force kill",
+    ),
+) -> None:
+    """Stop all running Punie agent processes.
+
+    Finds all Punie processes and terminates them gracefully (SIGTERM).
+    Use --force to send SIGKILL if processes don't stop within timeout.
+
+    Cross-platform: Works on Linux, macOS, and Windows.
+    """
+    import psutil
+
+    # Find all Punie processes
+    punie_processes = []
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            cmdline = proc.info["cmdline"]
+            if cmdline and any("punie" in arg.lower() for arg in cmdline):
+                # Skip the current stop-all command process
+                if "stop-all" not in " ".join(cmdline):
+                    punie_processes.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    if not punie_processes:
+        typer.echo("No Punie processes found.")
+        return
+
+    typer.echo(f"Found {len(punie_processes)} Punie process(es):")
+    for proc in punie_processes:
+        try:
+            cmdline = " ".join(proc.cmdline())
+            typer.echo(f"  PID {proc.pid}: {cmdline[:80]}...")
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    # Terminate processes gracefully
+    typer.echo("\nTerminating processes gracefully (SIGTERM)...")
+    for proc in punie_processes:
+        try:
+            proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+            typer.secho(
+                f"  Warning: Could not terminate PID {proc.pid}: {e}",
+                fg=typer.colors.YELLOW,
+            )
+
+    # Wait for processes to exit
+    gone, alive = psutil.wait_procs(punie_processes, timeout=timeout)
+
+    # Report results
+    if gone:
+        typer.secho(
+            f"\n✓ Stopped {len(gone)} process(es) successfully",
+            fg=typer.colors.GREEN,
+        )
+
+    if alive:
+        if force:
+            typer.echo(f"\n{len(alive)} process(es) did not stop. Force killing...")
+            for proc in alive:
+                try:
+                    proc.kill()
+                    typer.secho(f"  Killed PID {proc.pid}", fg=typer.colors.YELLOW)
+                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                    typer.secho(
+                        f"  Failed to kill PID {proc.pid}: {e}",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
+        else:
+            typer.secho(
+                f"\n⚠ {len(alive)} process(es) did not stop within {timeout}s",
+                fg=typer.colors.YELLOW,
+            )
+            typer.echo("Use --force to force kill them:")
+            for proc in alive:
+                try:
+                    typer.echo(f"  PID {proc.pid}")
+                except psutil.NoSuchProcess:
+                    continue

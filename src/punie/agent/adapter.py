@@ -31,8 +31,6 @@ from punie.acp import (
     ResumeSessionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
-    text_block,
-    update_agent_message,
 )
 from punie.acp.contrib.tool_calls import ToolCallTracker
 from punie.acp.interfaces import Client
@@ -89,11 +87,18 @@ class PunieAgent:
         name: str = "punie-agent",
         usage_limits: UsageLimits | None = None,
     ) -> None:
+        logger.info("=== PunieAgent.__init__() called ===")
+        logger.info(f"Model: {model}")
+        logger.info(f"Name: {name}")
+        logger.info(f"Usage limits: {usage_limits}")
+
         # Backward compatibility: support passing PydanticAgent instance
         if isinstance(model, PydanticAgent):
+            logger.info("Legacy mode: PydanticAgent instance provided")
             self._model = "test"  # Default model for legacy usage
             self._legacy_agent = model  # Store for legacy tests
         else:
+            logger.info(f"Normal mode: model={model}")
             self._model = model
             self._legacy_agent = None
 
@@ -104,10 +109,19 @@ class PunieAgent:
         self._client_capabilities: ClientCapabilities | None = None
         self._client_info: Implementation | None = None
         self._sessions: dict[str, SessionState] = {}
+        self._greeted_sessions: set[str] = set()  # Track which sessions got greeting
+        self._pending_errors: dict[str, str] = {}  # Store errors to send during first prompt
+        logger.info("=== PunieAgent.__init__() complete ===")
+
 
     def on_connect(self, conn: Client) -> None:
         """Called when client connects."""
+        logger.info("=== on_connect() called ===")
+        logger.info(f"Connection type: {type(conn).__name__}")
+        logger.info(f"Connection object: {conn}")
         self._conn = conn
+        logger.info("=== on_connect() complete ===")
+
 
     async def _discover_and_build_toolset(self, session_id: str) -> SessionState:
         """Discover tools and build session state.
@@ -122,58 +136,126 @@ class PunieAgent:
         >>> # This is an internal helper, called from new_session()
         >>> # See examples/10_session_registration.py for usage
         """
-        if not self._conn:
-            # No connection: return Tier 3 default
-            toolset = create_toolset()
-            model_value = cast(KnownModelName | Model, self._model)
-            pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
-            return SessionState(catalog=None, agent=pydantic_agent, discovery_tier=3)
-
-        catalog: ToolCatalog | None = None
-        toolset = None
-        discovery_tier = 3
-
         try:
-            # Tier 1: Try discovery
-            if hasattr(self._conn, "discover_tools"):
-                catalog_dict = await self._conn.discover_tools(session_id=session_id)
-                if catalog_dict and catalog_dict.get("tools"):
-                    catalog = parse_tool_catalog(catalog_dict)
-                    toolset = create_toolset_from_catalog(catalog)
-                    discovery_tier = 1
-                    tool_names = [t.name for t in catalog.tools]
-                    logger.info(
-                        f"Built toolset from catalog: {len(catalog.tools)} tools - {tool_names}"
-                    )
-        except Exception as exc:
-            logger.warning(f"Tool discovery failed, falling back: {exc}")
+            logger.info(f"=== _discover_and_build_toolset() for session {session_id} ===")
+            logger.info(f"Connection available: {self._conn is not None}")
+            logger.info(f"Model: {self._model}")
 
-        # Tier 2: Capabilities fallback
-        if toolset is None and self._client_capabilities:
-            toolset = create_toolset_from_capabilities(self._client_capabilities)
-            discovery_tier = 2
-            tool_names = list(toolset.tools.keys())
-            logger.info(
-                f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
-            )
+            if not self._conn:
+                # No connection: return Tier 3 default
+                logger.info("No connection, using Tier 3 default toolset")
+                toolset = create_toolset()
+                model_value = cast(KnownModelName | Model, self._model)
+                pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+                logger.info("Tier 3 agent created successfully")
+                return SessionState(catalog=None, agent=pydantic_agent, discovery_tier=3)
 
-        # Tier 3: Default fallback
-        if toolset is None:
-            toolset = create_toolset()
+            catalog: ToolCatalog | None = None
+            toolset = None
             discovery_tier = 3
-            tool_names = list(toolset.tools.keys())
-            logger.info(
-                f"Using default toolset: {len(tool_names)} tools - {tool_names}"
+
+            try:
+                # Tier 1: Try discovery
+                logger.info("Checking for discover_tools method...")
+                if hasattr(self._conn, "discover_tools"):
+                    logger.info("discover_tools method found, calling it...")
+                    catalog_dict = await self._conn.discover_tools(session_id=session_id)
+                    logger.info(f"discover_tools returned: {catalog_dict}")
+                    if catalog_dict and catalog_dict.get("tools"):
+                        logger.info("Parsing tool catalog...")
+                        catalog = parse_tool_catalog(catalog_dict)
+                        logger.info("Creating toolset from catalog...")
+                        toolset = create_toolset_from_catalog(catalog)
+                        discovery_tier = 1
+                        tool_names = [t.name for t in catalog.tools]
+                        logger.info(
+                            f"Built toolset from catalog: {len(catalog.tools)} tools - {tool_names}"
+                        )
+                    else:
+                        logger.info("discover_tools returned empty or invalid catalog")
+                else:
+                    logger.info("discover_tools method not available")
+            except Exception as exc:
+                logger.warning(f"Tool discovery failed, falling back: {exc}")
+                logger.exception("Full discovery exception:")
+
+            # Tier 2: Capabilities fallback
+            if toolset is None and self._client_capabilities:
+                logger.info("Using Tier 2: capabilities-based toolset")
+                toolset = create_toolset_from_capabilities(self._client_capabilities)
+                discovery_tier = 2
+                tool_names = list(toolset.tools.keys())
+                logger.info(
+                    f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
+                )
+
+            # Tier 3: Default fallback
+            if toolset is None:
+                logger.info("Using Tier 3: default toolset")
+                toolset = create_toolset()
+                discovery_tier = 3
+                tool_names = list(toolset.tools.keys())
+                logger.info(
+                    f"Using default toolset: {len(tool_names)} tools - {tool_names}"
+                )
+
+            # Construct per-session Pydantic AI agent
+            logger.info(f"Creating Pydantic AI agent with model: {self._model}")
+            # Cast is safe: __init__ ensures self._model is KnownModelName | Model when not legacy
+            model_value = cast(KnownModelName | Model, self._model)
+
+            try:
+                pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+                logger.info("Pydantic AI agent created successfully")
+            except ImportError as exc:
+                # Handle missing mlx-lm gracefully
+                if "mlx-lm" in str(exc):
+                    error_msg = (
+                        "⚠️ **Local model support not available**\n\n"
+                        f"Your configuration is set to use model `{self._model}`, but the required "
+                        "`mlx-lm` package is not installed.\n\n"
+                        "**To fix this, choose one of these options:**\n\n"
+                        "1. **Use the test model (recommended for development):**\n"
+                        "   ```bash\n"
+                        "   uv run punie init --model test\n"
+                        "   ```\n"
+                        "   Then restart PyCharm's agent connection.\n\n"
+                        "2. **Install local model support:**\n"
+                        "   ```bash\n"
+                        "   uv pip install 'punie[local]'\n"
+                        "   punie download-model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit\n"
+                        "   ```\n\n"
+                        "3. **Use a cloud model:**\n"
+                        "   ```bash\n"
+                        "   uv run punie init --model openai:gpt-4o\n"
+                        "   ```\n"
+                        "   (Requires OPENAI_API_KEY environment variable)\n\n"
+                        "Falling back to test model for this session..."
+                    )
+                    logger.error(error_msg)
+
+                    # Store error to send during first prompt (avoids protocol issues)
+                    self._pending_errors[session_id] = error_msg
+                    logger.info("Stored mlx-lm error to send during first prompt")
+
+                    # Fall back to test model
+                    logger.info("Falling back to test model...")
+                    pydantic_agent = create_pydantic_agent(model="test", toolset=toolset)
+                    logger.info("Fallback to test model successful")
+                else:
+                    # Other ImportError, re-raise
+                    raise
+
+            state = SessionState(
+                catalog=catalog, agent=pydantic_agent, discovery_tier=discovery_tier
             )
-
-        # Construct per-session Pydantic AI agent
-        # Cast is safe: __init__ ensures self._model is KnownModelName | Model when not legacy
-        model_value = cast(KnownModelName | Model, self._model)
-        pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
-
-        return SessionState(
-            catalog=catalog, agent=pydantic_agent, discovery_tier=discovery_tier
-        )
+            logger.info(f"=== _discover_and_build_toolset() complete, tier={discovery_tier} ===")
+            return state
+        except Exception as exc:
+            logger.exception("CRITICAL: _discover_and_build_toolset() failed")
+            logger.error(f"Exception type: {type(exc).__name__}")
+            logger.error(f"Exception message: {str(exc)}")
+            raise
 
     async def initialize(
         self,
@@ -186,17 +268,33 @@ class PunieAgent:
 
         Stores client capabilities and info for later use in dynamic tool discovery.
         """
-        self._client_capabilities = client_capabilities
-        self._client_info = client_info
-        return InitializeResponse(
-            protocol_version=PROTOCOL_VERSION,
-            agent_capabilities=AgentCapabilities(),
-            agent_info=Implementation(
-                name=self._name,
-                title="Punie AI Coding Agent",
-                version="0.1.0",
-            ),
-        )
+        try:
+            logger.info("=== initialize() called ===")
+            logger.info(f"Protocol version: {protocol_version}")
+            logger.info(f"Client capabilities: {client_capabilities}")
+            logger.info(f"Client info: {client_info}")
+            logger.info(f"Additional kwargs: {kwargs}")
+
+            self._client_capabilities = client_capabilities
+            self._client_info = client_info
+
+            response = InitializeResponse(
+                protocol_version=PROTOCOL_VERSION,
+                agent_capabilities=AgentCapabilities(),
+                agent_info=Implementation(
+                    name=self._name,
+                    title="Punie AI Coding Agent",
+                    version="0.1.0",
+                ),
+            )
+            logger.info(f"initialize() successful, returning: {response}")
+            logger.info("=== initialize() complete ===")
+            return response
+        except Exception as exc:
+            logger.exception("CRITICAL: initialize() failed with exception")
+            logger.error(f"Exception type: {type(exc).__name__}")
+            logger.error(f"Exception message: {str(exc)}")
+            raise
 
     async def new_session(
         self,
@@ -209,24 +307,45 @@ class PunieAgent:
         Discovers tools once and caches the result for the session lifetime.
         Skips registration if legacy agent mode is active or no connection.
         """
-        session_id = f"punie-session-{self._next_session_id}"
-        self._next_session_id += 1
+        try:
+            logger.info("=== new_session() called ===")
+            logger.info(f"Current working directory: {cwd}")
+            logger.info(f"MCP servers count: {len(mcp_servers)}")
+            logger.info(f"Legacy agent mode: {self._legacy_agent is not None}")
+            logger.info(f"Connection established: {self._conn is not None}")
 
-        # Register tools if not in legacy mode and connection exists
-        if not self._legacy_agent and self._conn:
-            state = await self._discover_and_build_toolset(session_id)
-            self._sessions[session_id] = state
-            tool_count = (
-                len(state.agent._function_toolset.tools)
-                if state.agent._function_toolset
-                else 0
-            )
-            logger.info(
-                f"Registered session {session_id}: Tier {state.discovery_tier}, "
-                f"{tool_count} tools"
-            )
+            session_id = f"punie-session-{self._next_session_id}"
+            self._next_session_id += 1
+            logger.info(f"Generated session_id: {session_id}")
 
-        return NewSessionResponse(session_id=session_id)
+            # Greeting is now sent during first prompt() call to avoid protocol issues
+
+            # Register tools if not in legacy mode and connection exists
+            if not self._legacy_agent and self._conn:
+                logger.info("Starting tool registration...")
+                state = await self._discover_and_build_toolset(session_id)
+                self._sessions[session_id] = state
+                tool_count = (
+                    len(state.agent._function_toolset.tools)
+                    if state.agent._function_toolset
+                    else 0
+                )
+                logger.info(
+                    f"Registered session {session_id}: Tier {state.discovery_tier}, "
+                    f"{tool_count} tools"
+                )
+            else:
+                logger.info("Skipping tool registration (legacy mode or no connection)")
+
+            response = NewSessionResponse(session_id=session_id)
+            logger.info(f"new_session() successful, returning: {response}")
+            logger.info("=== new_session() complete ===")
+            return response
+        except Exception as exc:
+            logger.exception("CRITICAL: new_session() failed with exception")
+            logger.error(f"Exception type: {type(exc).__name__}")
+            logger.error(f"Exception message: {str(exc)}")
+            raise
 
     async def load_session(
         self,
@@ -304,6 +423,8 @@ class PunieAgent:
         2. Use client_capabilities if no discovery (capability flags)
         3. Use all 7 static tools if no capabilities (backward compat)
         """
+        from punie.acp.helpers import text_block, update_agent_message, update_agent_message_text
+
         logger.info(f"=== prompt() called for session {session_id} ===")
 
         # Extract text from prompt blocks
@@ -315,6 +436,38 @@ class PunieAgent:
         logger.info(
             f"Extracted prompt text ({len(prompt_text)} chars): {prompt_text[:200]}..."
         )
+
+        # Send any pending errors and greeting for first prompt in session
+        if session_id not in self._greeted_sessions and self._conn:
+            # Send pending errors first (e.g., mlx-lm missing)
+            if session_id in self._pending_errors:
+                error_msg = self._pending_errors[session_id]
+                logger.info("Sending pending error message to client")
+                try:
+                    await self._conn.session_update(
+                        session_id, update_agent_message(text_block(error_msg))
+                    )
+                    logger.info("Pending error sent successfully")
+                    del self._pending_errors[session_id]
+                except Exception as error_exc:
+                    logger.warning(f"Failed to send pending error: {error_exc}")
+
+            # Send greeting
+            logger.info(f"Sending greeting for first prompt in session {session_id}")
+            try:
+                greeting = (
+                    "👋 **Punie Agent Connected**\n\n"
+                    f"Model: `{self._model}`\n"
+                    "Ready to assist with your coding tasks!\n\n"
+                    "---\n\n"
+                )
+                await self._conn.session_update(
+                    session_id, update_agent_message_text(greeting)
+                )
+                self._greeted_sessions.add(session_id)
+                logger.info("Greeting sent successfully")
+            except Exception as greeting_exc:
+                logger.warning(f"Failed to send greeting: {greeting_exc}")
 
         # Construct dependencies for Pydantic AI
         conn = self._conn

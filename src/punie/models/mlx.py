@@ -11,11 +11,12 @@ actually run models. Use TYPE_CHECKING guards for imports.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Generator, TypedDict
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -40,10 +41,52 @@ from pydantic_ai.models import (
 from pydantic_ai.result import RunContext
 
 if TYPE_CHECKING:
-    pass
+    import mlx.nn as nn
+    from mlx_lm.generate import GenerationResponse
+    from mlx_lm.tokenizer_utils import TokenizerWrapper
+    from transformers import PreTrainedTokenizer
+
+    MLXTokenizer = PreTrainedTokenizer | TokenizerWrapper
+
+logger = logging.getLogger(__name__)
 
 
-def parse_tool_calls(text: str) -> tuple[str, list[dict[str, Any]]]:
+class ToolCallDict(TypedDict):
+    """A parsed tool call extracted from model output."""
+
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class SamplerParams:
+    """Parameters for mlx-lm's make_sampler().
+    Field names match make_sampler()'s parameter names exactly.
+    Frozen so typos raise TypeError at construction time.
+    """
+
+    temp: float = 0.0
+    top_p: float = 0.0
+
+
+@dataclass(frozen=True)
+class GenerateParams:
+    """Parameters for mlx-lm's generate/stream_generate.
+    Field names match generate_step()'s keyword arguments.
+    """
+
+    max_tokens: int = 256
+    sampler: Callable | None = None
+
+    def to_kwargs(self) -> dict[str, Any]:
+        """Convert to kwargs dict for mlx-lm functions."""
+        d: dict[str, Any] = {"max_tokens": self.max_tokens}
+        if self.sampler is not None:
+            d["sampler"] = self.sampler
+        return d
+
+
+def parse_tool_calls(text: str) -> tuple[str, list[ToolCallDict]]:
     """Extract tool calls from model output.
 
     MLX models output tool calls as:
@@ -77,7 +120,9 @@ def parse_tool_calls(text: str) -> tuple[str, list[dict[str, Any]]]:
 class AsyncStream:
     """Wraps a synchronous iterator in an async interface."""
 
-    def __init__(self, sync_iterator: Any) -> None:
+    def __init__(
+        self, sync_iterator: "Generator[GenerationResponse, None, None]"
+    ) -> None:
         """Initialize with a sync iterator.
 
         Args:
@@ -89,7 +134,7 @@ class AsyncStream:
         """Return self as async iterator."""
         return self
 
-    async def __anext__(self) -> Any:
+    async def __anext__(self) -> "GenerationResponse":
         """Get next item from sync iterator asynchronously."""
         try:
             return next(self.sync_iterator)
@@ -106,7 +151,7 @@ class MLXStreamedResponse(StreamedResponse):
     """
 
     _model_name: str = field(repr=False)
-    _stream_iterator: Any = field(repr=False)
+    _stream_iterator: "Generator[GenerationResponse, None, None]" = field(repr=False)
     _timestamp: datetime = field(default_factory=datetime.now, repr=False)
 
     @property
@@ -140,9 +185,9 @@ class MLXStreamedResponse(StreamedResponse):
         yield PartStartEvent(index=0, part=text_part)
 
         # Stream text tokens
-        async for token_dict in AsyncStream(self._stream_iterator):
-            if isinstance(token_dict, dict) and "text" in token_dict:
-                token = token_dict["text"]
+        async for response in AsyncStream(self._stream_iterator):
+            token = response.text
+            if token:
                 for event in self._parts_manager.handle_text_delta(
                     vendor_part_id=0, content=token
                 ):
@@ -179,8 +224,8 @@ class MLXModel(Model):
         self,
         model_name: str,
         *,
-        model_data: Any | None = None,
-        tokenizer: Any | None = None,
+        model_data: "nn.Module | None" = None,
+        tokenizer: "MLXTokenizer | None" = None,
         settings: ModelSettings | None = None,
         profile: Any = None,
     ) -> None:
@@ -231,8 +276,41 @@ class MLXModel(Model):
             )
             raise ImportError(msg) from e
 
+        # Check memory before loading
+        from punie.models.memory import (
+            check_memory_available,
+            estimate_model_size,
+            get_memory_snapshot,
+        )
+
+        model_size_mb = estimate_model_size(model_name)
+        available, snapshot = check_memory_available(model_size_mb)
+
+        logger.info(
+            "Memory check before loading %s (estimated %d MB): current RSS = %.1f MB",
+            model_name,
+            model_size_mb,
+            snapshot.rss_mb,
+        )
+
+        if not available:
+            logger.warning(
+                "Insufficient memory for model %s (estimated %d MB, current RSS %.1f MB). "
+                "Loading anyway — user may know their system can handle it.",
+                model_name,
+                model_size_mb,
+                snapshot.rss_mb,
+            )
+
         try:
-            model_data, tokenizer = mlx_load(model_name)
+            logger.info(
+                "Loading model %s (will use HuggingFace cache if available)...",
+                model_name,
+            )
+            result = mlx_load(model_name)
+            # mlx_load returns (model, tokenizer) by default
+            model_data, tokenizer = result[0], result[1]
+            logger.info("Model %s loaded from mlx_load()", model_name)
         except Exception as e:
             # Check if error indicates model not downloaded
             error_msg = str(e).lower()
@@ -247,6 +325,15 @@ class MLXModel(Model):
                 )
                 raise RuntimeError(msg) from e
             raise
+
+        # Log actual memory usage after loading
+        snapshot_after = get_memory_snapshot()
+        logger.info(
+            "Model loaded successfully. RSS after load: %.1f MB (delta: %.1f MB)",
+            snapshot_after.rss_mb,
+            snapshot_after.rss_mb - snapshot.rss_mb,
+        )
+
         return cls(
             model_name,
             model_data=model_data,
@@ -296,6 +383,8 @@ class MLXModel(Model):
             settings=model_settings,
             stream=False,
         )
+        # Type narrowing: stream=False returns str
+        assert isinstance(output, str)
 
         # Parse for tool calls
         text, tool_calls = parse_tool_calls(output)
@@ -357,6 +446,8 @@ class MLXModel(Model):
             settings=model_settings,
             stream=True,
         )
+        # Type narrowing: stream=True returns Generator
+        assert not isinstance(stream_iterator, str)
 
         yield MLXStreamedResponse(
             model_request_parameters=model_request_parameters,
@@ -469,13 +560,27 @@ class MLXModel(Model):
 
         return chat_messages
 
+    @staticmethod
+    def _build_generate_params(
+        settings: ModelSettings | None,
+    ) -> tuple[SamplerParams, GenerateParams]:
+        """Extract typed generation parameters from ModelSettings."""
+        sampler_params = SamplerParams(
+            temp=settings.get("temperature", 0.0) if settings else 0.0,
+            top_p=settings.get("top_p", 0.0) if settings else 0.0,
+        )
+        max_tokens = 256
+        if settings and "max_tokens" in settings:
+            max_tokens = settings["max_tokens"]
+        return sampler_params, GenerateParams(max_tokens=max_tokens)
+
     def _generate(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None,
         settings: ModelSettings | None,
         stream: bool,
-    ) -> Any:
+    ) -> "str | Generator[GenerationResponse, None, None]":
         """Generate response using MLX.
 
         Args:
@@ -489,6 +594,12 @@ class MLXModel(Model):
         """
         # Import at runtime to avoid issues on non-macOS platforms
         from mlx_lm import generate, stream_generate
+        from mlx_lm.sample_utils import make_sampler
+
+        # Verify model and tokenizer are loaded
+        if self.model_data is None or self.tokenizer is None:
+            msg = "Model not loaded. Use from_pretrained() to load the model."
+            raise RuntimeError(msg)
 
         # Apply chat template
         prompt = self.tokenizer.apply_chat_template(
@@ -498,15 +609,11 @@ class MLXModel(Model):
             add_generation_prompt=True,
         )
 
-        # Prepare generation kwargs
-        gen_kwargs: dict[str, Any] = {}
-        if settings:
-            if "temperature" in settings:
-                gen_kwargs["temp"] = settings["temperature"]
-            if "max_tokens" in settings:
-                gen_kwargs["max_tokens"] = settings["max_tokens"]
-            if "top_p" in settings:
-                gen_kwargs["top_p"] = settings["top_p"]
+        # Build typed generation parameters
+        sampler_params, gen_params = self._build_generate_params(settings)
+        sampler = make_sampler(temp=sampler_params.temp, top_p=sampler_params.top_p)
+        gen_kwargs = gen_params.to_kwargs()
+        gen_kwargs["sampler"] = sampler
 
         # Generate
         if stream:

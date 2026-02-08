@@ -4,33 +4,24 @@ Provides create_pydantic_agent() for constructing Pydantic AI Agent instances
 configured with ACPDeps and toolset (static or dynamic).
 """
 
+import ast
 import logging
+import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.models.test import TestModel
 
+from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS, AgentConfig
 from punie.agent.deps import ACPDeps
 from punie.agent.toolset import create_toolset
 
+if TYPE_CHECKING:
+    from punie.local import LocalClient
+
 logger = logging.getLogger(__name__)
-
-PUNIE_INSTRUCTIONS = """\
-You are Punie, an AI coding assistant that works inside PyCharm.
-
-You have access to the user's workspace through the IDE. You can read files,
-write files (with permission), and run commands (with permission) in the
-user's project.
-
-Guidelines:
-- Read files before modifying them to understand context.
-- Explain what you plan to do before making changes.
-- When writing files, provide complete file contents.
-- When running commands, prefer standard tools (pytest, ruff, git).
-- If a tool call fails, explain the error and suggest alternatives.
-- Keep responses focused and actionable.
-"""
 
 
 def _create_enhanced_test_model() -> TestModel:
@@ -44,6 +35,33 @@ def _create_enhanced_test_model() -> TestModel:
         custom_output_text="I understand the request. Let me help with that task.",
         call_tools=[],  # Don't call tools - would cause deadlock in ACP request-response
     )
+
+
+def _validate_python_code_blocks(text: str) -> None:
+    """Validate Python syntax in fenced code blocks.
+
+    Extracts ```python code blocks and validates each with ast.parse().
+    Raises ModelRetry if any block has invalid syntax.
+
+    Args:
+        text: Output text to validate
+
+    Raises:
+        ModelRetry: If any Python code block has invalid syntax
+    """
+    # Match ```python ... ``` blocks
+    pattern = r"```python\n(.*?)```"
+    code_blocks = re.findall(pattern, text, re.DOTALL)
+
+    for i, code in enumerate(code_blocks, 1):
+        try:
+            ast.parse(code)
+        except SyntaxError as e:
+            logger.warning("Python syntax error in code block %d: %s", i, e)
+            raise ModelRetry(
+                f"Code block {i} has invalid Python syntax: {e}. "
+                "Please fix the syntax and try again."
+            ) from e
 
 
 def _create_local_model(model_name: str | None = None) -> Model:
@@ -71,6 +89,7 @@ def _create_local_model(model_name: str | None = None) -> Model:
 def create_pydantic_agent(
     model: KnownModelName | Model = "test",
     toolset: FunctionToolset[ACPDeps] | None = None,
+    config: AgentConfig | None = None,
 ) -> Agent[ACPDeps, str]:
     """Create a Pydantic AI agent configured for Punie.
 
@@ -85,12 +104,16 @@ def create_pydantic_agent(
         toolset: Optional toolset to use. If None, uses create_toolset() (all 7 static tools).
                  For dynamic discovery, pass create_toolset_from_catalog() or
                  create_toolset_from_capabilities() result.
+        config: Optional AgentConfig. If None, uses AgentConfig() defaults (PyCharm/ACP mode).
 
     Returns:
         Pydantic AI Agent configured with ACPDeps and toolset
     """
     if toolset is None:
         toolset = create_toolset()
+
+    if config is None:
+        config = AgentConfig()
 
     # Use enhanced test model if "test" string is passed
     if model == "test":
@@ -104,10 +127,12 @@ def create_pydantic_agent(
     agent = Agent[ACPDeps, str](
         model,
         deps_type=ACPDeps,
-        instructions=PUNIE_INSTRUCTIONS,
-        model_settings=ModelSettings(temperature=0.0, max_tokens=4096),
-        retries=3,
-        output_retries=2,
+        instructions=config.instructions,
+        model_settings=ModelSettings(
+            temperature=config.temperature, max_tokens=config.max_tokens
+        ),
+        retries=config.retries,
+        output_retries=config.output_retries,
         toolsets=[toolset],
     )
 
@@ -115,6 +140,11 @@ def create_pydantic_agent(
     def validate_response(ctx: RunContext[ACPDeps], output: str) -> str:
         if not output.strip():
             raise ModelRetry("Response was empty, please provide a substantive answer.")
+
+        # Validate Python syntax in code blocks if enabled
+        if config.validate_python_syntax:
+            _validate_python_code_blocks(output)
+
         return output
 
     return agent
@@ -123,7 +153,8 @@ def create_pydantic_agent(
 def create_local_agent(
     model: KnownModelName | Model = "local",
     workspace: Path | None = None,
-):
+    config: AgentConfig | None = None,
+) -> tuple[Agent[ACPDeps, str], LocalClient]:
     """Create a Pydantic AI agent with local filesystem tools.
 
     This creates an agent that uses LocalClient for filesystem and subprocess
@@ -134,15 +165,23 @@ def create_local_agent(
         model: Model name (default: "local" for MLX model).
                Can use "test" for enhanced TestModel or any other model.
         workspace: Root directory for file operations. Defaults to current directory.
+        config: Optional AgentConfig. If None, defaults to local-mode config with
+                PUNIE_LOCAL_INSTRUCTIONS and validate_python_syntax=True.
 
     Returns:
-        tuple: (agent, client) tuple. Callers construct ACPDeps per prompt using:
-               ACPDeps(client_conn=client, session_id=..., tracker=...)
+        Tuple of (agent, client). Callers construct ACPDeps per prompt using:
+        ACPDeps(client_conn=client, session_id=..., tracker=...)
     """
     from punie.local import LocalClient
 
+    if config is None:
+        config = AgentConfig(
+            instructions=PUNIE_LOCAL_INSTRUCTIONS,
+            validate_python_syntax=True,
+        )
+
     workspace = workspace or Path.cwd()
     client = LocalClient(workspace=workspace)
-    agent = create_pydantic_agent(model=model)
+    agent = create_pydantic_agent(model=model, config=config)
 
     return agent, client
