@@ -7,8 +7,8 @@ configured with ACPDeps and toolset (static or dynamic).
 from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
 
-from .deps import ACPDeps
-from .toolset import create_toolset
+from punie.agent.deps import ACPDeps
+from punie.agent.toolset import create_toolset
 
 PUNIE_INSTRUCTIONS = """\
 You are Punie, an AI coding assistant that works inside PyCharm.

@@ -94,7 +94,7 @@ coverage/quality improvements which provide more immediate value.
 
 ## 4. Dynamic Tool Discovery
 
-**Status:** ✅ Phase 4.1 Completed (2026-02-08)
+**Status:** ✅ Phase 4.1-4.2 Completed (2026-02-08)
 
 - [x] 4.1 Implement dynamic tool discovery via ACP - Completed 2026-02-08
     - Extended Client protocol with `discover_tools()` method (Punie extension, not upstream)
@@ -114,35 +114,74 @@ coverage/quality improvements which provide more immediate value.
     - Type checking passes (ty), linting passes (ruff), all 143 tests pass
     - Created spec documentation in agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/
     - Updated docs/research/evolution.md with Phase 4.1 details
-- [ ] 4.2 Register IDE tools automatically
+- [x] 4.2 Register IDE tools automatically - Completed 2026-02-08
+    - Created SessionState frozen dataclass for immutable session-scoped caching
+    - Moved tool discovery from per-prompt to session lifecycle (new_session())
+    - Extracted _discover_and_build_toolset() helper from prompt()
+    - Added _sessions dict mapping session_id → SessionState
+    - Simplified prompt() to use cached agent from _sessions (no re-discovery)
+    - Implemented lazy fallback for unknown session IDs (backward compatibility)
+    - Extended FakeClient with discover_tools_calls tracking for tests
+    - Legacy agent mode skips registration (preserves existing behavior)
+    - Full test coverage: 16 new session registration tests (frozen dataclass, registration in new_session, cached state usage, lazy fallback, legacy compatibility)
+    - Created working example: examples/10_session_registration.py
+    - Type checking passes (ty), linting passes (ruff), all 123 tests pass
+    - Created spec documentation in agent-os/specs/2026-02-08-1400-session-registration/
+    - Updated docs/research/evolution.md with Phase 4.2 details
 - [ ] 4.3 Enable agent awareness of PyCharm capabilities
 
-## 5. Web UI Development
+## 5. CLI Development
 
 **Status:** Not Started
 
-- [ ] 5.1 Design multi-agent tracking interface
-- [ ] 5.2 Build browser-based monitoring dashboard
-- [ ] 5.3 Implement agent interaction controls
-- [ ] 5.4 Add simultaneous agent management features
+**References:**
+- [JetBrains acp.json documentation](https://www.jetbrains.com/help/ai-assistant/acp.html#add-custom-agent)
 
-## 6. Performance
+- [ ] 5.1 Implement Typer-based CLI with uvx support
+    - Create `punie` command (default stdio/ACP mode)
+    - Enable `uvx punie` invocation without package installation
+    - Add `--model` flag for model name configuration
+    - CLI flags override acp.json settings
+    - Write logs to ~/.punie/ directory
+- [ ] 5.2 Add config generation command
+    - Implement `punie init` command
+    - Generate acp.json at ~/.jetbrains/acp.json
+    - Include model path, server settings, tool discovery settings
+- [ ] 5.3 Add model download command
+    - Implement `punie download-model` command
+    - Store models in ~/.punie/models/
+    - Recommended model selection (TBD)
+- [ ] 5.4 Add HTTP/WebSocket server mode
+    - Implement `punie serve` command
+    - Support HTTP and WebSocket protocols
+    - Add `--port`, `--host` configuration flags
+
+## 6. Web UI Development
 
 **Status:** Not Started
 
-- [ ] 6.1 Measure agent performance using ACP tools vs. native tools
-- [ ] 6.2 Benchmark tool execution latency across protocols
-- [ ] 6.3 Profile memory usage and token consumption patterns
-- [ ] 6.4 Identify bottlenecks in IDE tool delegation
+- [ ] 6.1 Design multi-agent tracking interface
+- [ ] 6.2 Build browser-based monitoring dashboard
+- [ ] 6.3 Implement agent interaction controls
+- [ ] 6.4 Add simultaneous agent management features
 
-## 7. Advanced Features
+## 7. Performance
 
 **Status:** Not Started
 
-- [ ] 7.1 Create domain-specific skills and policies framework
-- [ ] 7.2 Implement custom deterministic policies for project-specific rules
-- [ ] 7.3 Add support for free-threaded Python (PEP 703)
-- [ ] 7.4 Optimize for parallel agent operations across multiple cores
+- [ ] 7.1 Measure agent performance using ACP tools vs. native tools
+- [ ] 7.2 Benchmark tool execution latency across protocols
+- [ ] 7.3 Profile memory usage and token consumption patterns
+- [ ] 7.4 Identify bottlenecks in IDE tool delegation
+
+## 8. Advanced Features
+
+**Status:** Not Started
+
+- [ ] 8.1 Create domain-specific skills and policies framework
+- [ ] 8.2 Implement custom deterministic policies for project-specific rules
+- [ ] 8.3 Add support for free-threaded Python (PEP 703)
+- [ ] 8.4 Optimize for parallel agent operations across multiple cores
 
 ## Research
 

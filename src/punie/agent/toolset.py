@@ -17,8 +17,8 @@ from punie.acp.contrib.permissions import default_permission_options
 from punie.acp.helpers import text_block, tool_content, tool_terminal_ref
 from punie.acp.schema import ClientCapabilities, ToolCallLocation
 
-from .deps import ACPDeps
-from .discovery import ToolCatalog, ToolDescriptor
+from punie.agent.deps import ACPDeps
+from punie.agent.discovery import ToolCatalog, ToolDescriptor
 
 
 async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:

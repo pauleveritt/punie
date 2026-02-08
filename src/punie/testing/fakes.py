@@ -88,6 +88,7 @@ class FakeClient:
     - Notifications are recorded in `notifications` list
     - Tool discovery via `tool_catalog` (dynamic discovery)
     - Client capabilities via `capabilities` (capability-based fallback)
+    - Discovery call tracking via `discover_tools_calls` (session registration tests)
 
     Args:
         files: Initial file system state (path -> content mapping)
@@ -116,6 +117,7 @@ class FakeClient:
         self._next_terminal_id: int = 0
         self.tool_catalog = tool_catalog or []
         self.capabilities = capabilities
+        self.discover_tools_calls: list[str] = []
 
     def on_connect(self, conn) -> None:
         self._agent_conn = conn
@@ -268,7 +270,10 @@ class FakeClient:
 
         Returns the tool_catalog set at construction time. Used to test
         dynamic tool discovery (Tier 1 fallback).
+
+        Tracks session_id in discover_tools_calls for session registration tests.
         """
+        self.discover_tools_calls.append(session_id)
         return {"tools": self.tool_catalog}
 
     async def ext_method(self, method: str, params: dict) -> dict:

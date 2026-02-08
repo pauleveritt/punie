@@ -563,6 +563,182 @@ This phase followed 7 Agent OS standards:
 
 Full spec documentation in `agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/`
 
+## Phase 4.2: Session Registration (2026-02-08)
+
+### Context
+
+Phase 4.1 implemented dynamic tool discovery, but discovery happened **on every `prompt()` call**. This caused:
+
+- Redundant RPC calls to `discover_tools()` within the same session
+- A new `PydanticAgent` constructed per prompt (wasteful — model, instructions, retries identical)
+- No session-scoped caching of discovered tools
+
+Phase 4.2 moves discovery from per-prompt to **session lifecycle** — tools are discovered once during `new_session()`, cached as immutable session state, and reused across all `prompt()` calls for that session.
+
+### Implementation
+
+**New Module: `src/punie/agent/session.py`**
+
+```python
+@dataclass(frozen=True)
+class SessionState:
+    """Immutable session-scoped cached state."""
+    catalog: ToolCatalog | None  # None if Tier 2/3 fallback
+    agent: PydanticAgent[ACPDeps, str]  # Configured agent
+    discovery_tier: int  # 1=catalog, 2=capabilities, 3=default
+```
+
+**Adapter Changes: `src/punie/agent/adapter.py`**
+
+1. Added `_sessions: dict[str, SessionState]` to store per-session state
+2. Extracted `_discover_and_build_toolset(session_id)` helper method (from prompt())
+3. Wired `new_session()` to call discovery and cache result
+4. Simplified `prompt()` to use cached agent from `_sessions[session_id]`
+5. Implemented lazy fallback for unknown session IDs (backward compatibility)
+
+**Before (Phase 4.1):**
+```python
+async def prompt(...):
+    # 35 lines of discovery logic here (Tier 1 → 2 → 3)
+    pydantic_agent = create_pydantic_agent(...)
+    result = await pydantic_agent.run(...)
+```
+
+**After (Phase 4.2):**
+```python
+async def new_session(...):
+    state = await self._discover_and_build_toolset(session_id)
+    self._sessions[session_id] = state
+
+async def prompt(...):
+    if session_id in self._sessions:
+        pydantic_agent = self._sessions[session_id].agent
+    else:
+        # Lazy fallback for tests that skip new_session()
+        state = await self._discover_and_build_toolset(session_id)
+        self._sessions[session_id] = state
+        pydantic_agent = state.agent
+```
+
+**Testing Infrastructure: `src/punie/testing/fakes.py`**
+
+Added `discover_tools_calls: list[str]` to `FakeClient` to track which session_ids triggered discovery. This lets tests assert discovery happens exactly once per session.
+
+### Performance Impact
+
+**Before:** `prompt()` called 3 times → `discover_tools()` called 3 times
+**After:** `new_session()` called once + `prompt()` called 3 times → `discover_tools()` called 1 time
+
+The agent is now constructed once per session, not once per prompt.
+
+### Backward Compatibility
+
+**Lazy Fallback:** Tests calling `prompt()` without `new_session()` still work. Unknown session IDs trigger on-demand discovery and cache the result. No breaking changes.
+
+**Legacy Agent Mode:** Tests passing a pre-constructed `PydanticAgent` to `PunieAgent.__init__()` skip registration entirely (preserves existing behavior).
+
+### Test Coverage
+
+**New Tests: `tests/test_session_registration.py` (16 tests)**
+
+- SessionState dataclass (frozen verification, field storage)
+- Registration in new_session() (discovery called, state cached, tier recorded)
+- Tier 2/3 fallback in new_session()
+- Graceful failure handling
+- prompt() uses cached agent (no re-discovery)
+- Multiple prompt() calls use single discovery
+- Lazy fallback for unknown session IDs
+- Legacy agent compatibility
+- FakeClient tracking verification
+
+**Test Suite:** 124 tests passing (107 → 124, +16 new tests, +1 example test)
+
+### Example
+
+**New Example: `examples/10_session_registration.py`**
+
+Demonstrates:
+- Tools discovered once in `new_session()`
+- Multiple `prompt()` calls reuse cached agent
+- Lazy fallback for sessions without `new_session()`
+- Three-tier fallback behavior (Tier 1/2/3)
+
+### Code Changes
+
+| Action | File | Lines Changed |
+|--------|------|---------------|
+| Create | `src/punie/agent/session.py` | +50 (new module) |
+| Modify | `src/punie/agent/adapter.py` | +70, -35 (extract helper, wire new_session, simplify prompt) |
+| Modify | `src/punie/agent/__init__.py` | +2 (export SessionState) |
+| Modify | `src/punie/testing/fakes.py` | +4 (add discover_tools_calls tracking) |
+| Create | `tests/test_session_registration.py` | +400 (16 new tests) |
+| Create | `examples/10_session_registration.py` | +170 (working demo) |
+
+**Net Impact:** ~660 lines added, 35 lines removed
+
+### Architecture Improvement
+
+Before Phase 4.2, the adapter was **stateless** at the session level. After Phase 4.2, it's **stateful** with immutable session caches:
+
+```text
+PunieAgent (Adapter)
+    _sessions: dict[str, SessionState]  # <-- New
+        SessionState (frozen)
+            catalog: ToolCatalog | None
+            agent: PydanticAgent[ACPDeps, str]  # <-- Cached per session
+            discovery_tier: int
+```
+
+This aligns with ACP's session semantics: once a session is created, its tool capabilities are fixed for the session lifetime.
+
+### Standards Applied
+
+This phase followed 5 Agent OS standards:
+
+1. **frozen-dataclass-services** — SessionState is frozen
+2. **function-based-tests** — All 16 tests are functions, not classes
+3. **fakes-over-mocks** — Extended FakeClient tracking, no mock frameworks
+4. **sybil-doctest** — Docstring examples in SessionState
+5. **agent-verification** — astral:ty + astral:ruff before completion
+
+Full spec documentation in `agent-os/specs/2026-02-08-1400-session-registration/`
+
+### Design Deviations from Plan
+
+**Removed `toolset` field from `SessionState`**
+
+The initial plan included a `toolset` field in `SessionState`:
+
+```python
+# Original plan (not implemented)
+@dataclass(frozen=True)
+class SessionState:
+    catalog: ToolCatalog | None
+    toolset: FunctionToolset[ACPDeps]  # Redundant
+    agent: PydanticAgent[ACPDeps, str]
+    discovery_tier: int
+```
+
+**Design Improvement:** The `toolset` field was removed because it's already encapsulated within the `PydanticAgent`. The agent owns its toolset and there's no need to expose it separately in the session state. This simplifies the API and reduces coupling.
+
+**Final implementation:**
+
+```python
+@dataclass(frozen=True)
+class SessionState:
+    catalog: ToolCatalog | None        # For observability
+    agent: PydanticAgent[ACPDeps, str] # Contains toolset
+    discovery_tier: int                # For logging
+```
+
+**Rationale:**
+- **Single source of truth:** The agent is the authority on which tools are available
+- **Encapsulation:** Toolset is an implementation detail of the agent
+- **Simpler API:** Fewer fields to understand and maintain
+- **No functional loss:** The toolset is still used (via the agent), just not exposed
+
+This deviation aligns with the principle of **information hiding** — SessionState exposes only what callers need (the agent), not how it works internally (the toolset).
+
 ## Current Architecture Summary
 
 ### Three-Layer Bridge
@@ -599,7 +775,7 @@ PyCharm (execution)
 
 ### Test Statistics
 
-- **Total tests:** 91
+- **Total tests:** 124
 - **Coverage:** 81% (exceeds 80% requirement)
 - **Test distribution:**
     - Protocol satisfaction: 2
@@ -607,9 +783,11 @@ PyCharm (execution)
     - Tool calls/concurrency: 8
     - Fakes: 39
     - Pydantic agent: 20
+    - Discovery: 16
+    - Session registration: 16
     - HTTP: 6
     - Dual protocol: 2
-    - Examples: 11
+    - Examples: 10 (including 10_session_registration)
 
 ### Tool Coverage
 
@@ -647,3 +825,4 @@ PyCharm (execution)
 | 2026-02-08 | 3.4     | Adopt Pydantic AI v1 best practices (instructions, ModelRetry, output validation)            |
 | 2026-02-08 | Review  | Architecture review identifying next improvements                                            |
 | 2026-02-08 | 4.1     | Dynamic tool discovery (protocol extension, catalog schema, three-tier fallback, 14 tests)   |
+| 2026-02-08 | 4.2     | Session registration (tool caching, lazy fallback, SessionState frozen dataclass, 16 tests)  |

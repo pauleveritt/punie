@@ -397,6 +397,91 @@ result = await agent.arun(
 )
 ```
 
+## Session State Management (Phase 4.2)
+
+**What:** Session-scoped caching of discovered tools and agent instances
+
+**Why:** Eliminates redundant tool discovery and agent construction on every prompt
+
+### SessionState Design
+
+```python
+@dataclass(frozen=True)
+class SessionState:
+    """Immutable session-scoped cached state."""
+    catalog: ToolCatalog | None        # Discovered tools (None if fallback)
+    agent: PydanticAgent[ACPDeps, str] # Configured agent instance
+    discovery_tier: int                # 1=catalog, 2=capabilities, 3=default
+```
+
+**Key principles:**
+
+- **Frozen dataclass:** Immutable for entire session lifetime
+- **Agent encapsulation:** Toolset is encapsulated in the agent (not exposed separately)
+- **Discovery tier:** For observability and logging
+
+### Registration Flow
+
+**Before Phase 4.2 (inefficient):**
+
+```text
+PyCharm                Punie (PunieAgent)              Pydantic AI
+   │                          │                            │
+   │  new_session()           │                            │
+   │─────────────────────────>│                            │
+   │  SessionID               │                            │
+   │<─────────────────────────│                            │
+   │                          │                            │
+   │  prompt("task 1")        │                            │
+   │─────────────────────────>│                            │
+   │                          │  discover_tools()          │
+   │                          │  create_toolset()          │
+   │                          │  create_pydantic_agent()   │
+   │                          │────────────────────────────>│
+   │                          │                            │
+   │  prompt("task 2")        │                            │
+   │─────────────────────────>│                            │
+   │                          │  discover_tools() [AGAIN]  │
+   │                          │  create_toolset() [AGAIN]  │
+   │                          │  create_pydantic_agent() [AGAIN]
+   │                          │────────────────────────────>│
+```
+
+**After Phase 4.2 (efficient):**
+
+```text
+PyCharm                Punie (PunieAgent)              Pydantic AI
+   │                          │                            │
+   │  new_session()           │                            │
+   │─────────────────────────>│                            │
+   │                          │  discover_tools() [ONCE]   │
+   │                          │  create_toolset()          │
+   │                          │  create_pydantic_agent()   │
+   │                          │  cache in _sessions dict   │
+   │  SessionID               │                            │
+   │<─────────────────────────│                            │
+   │                          │                            │
+   │  prompt("task 1")        │                            │
+   │─────────────────────────>│                            │
+   │                          │  get cached agent          │
+   │                          │────────────────────────────>│
+   │                          │                            │
+   │  prompt("task 2")        │                            │
+   │─────────────────────────>│                            │
+   │                          │  get cached agent [NO RPC] │
+   │                          │────────────────────────────>│
+```
+
+### Performance Impact
+
+- **RPC calls reduced:** 1 `discover_tools()` call per session (not per prompt)
+- **Agent construction:** Once per session (not per prompt)
+- **Memory overhead:** One `SessionState` object per active session (~1KB)
+
+### Backward Compatibility
+
+**Lazy fallback:** Tests or clients calling `prompt()` without `new_session()` trigger on-demand discovery and cache the result. No breaking changes.
+
 ## Roadmap Phase Mapping
 
 How this architecture unfolds across Punie's roadmap:

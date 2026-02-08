@@ -50,10 +50,15 @@ from punie.acp.schema import (
     TextContentBlock,
 )
 
-from .deps import ACPDeps
-from .discovery import parse_tool_catalog
-from .factory import create_pydantic_agent
-from .toolset import create_toolset, create_toolset_from_capabilities, create_toolset_from_catalog
+from punie.agent.deps import ACPDeps
+from punie.agent.discovery import ToolCatalog, parse_tool_catalog
+from punie.agent.factory import create_pydantic_agent
+from punie.agent.session import SessionState
+from punie.agent.toolset import (
+    create_toolset,
+    create_toolset_from_capabilities,
+    create_toolset_from_catalog,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +103,77 @@ class PunieAgent:
         self._conn: Client | None = None
         self._client_capabilities: ClientCapabilities | None = None
         self._client_info: Implementation | None = None
+        self._sessions: dict[str, SessionState] = {}
 
     def on_connect(self, conn: Client) -> None:
         """Called when client connects."""
         self._conn = conn
+
+    async def _discover_and_build_toolset(self, session_id: str) -> SessionState:
+        """Discover tools and build session state.
+
+        Implements three-tier discovery:
+        1. Tier 1: Full catalog from discover_tools()
+        2. Tier 2: Fallback to client capabilities (filesystem-only)
+        3. Tier 3: Default toolset (all 7 static tools)
+
+        Returns immutable SessionState with catalog, agent, and discovery tier.
+
+        >>> # This is an internal helper, called from new_session()
+        >>> # See examples/10_session_registration.py for usage
+        """
+        if not self._conn:
+            # No connection: return Tier 3 default
+            toolset = create_toolset()
+            model_value = cast(KnownModelName | Model, self._model)
+            pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+            return SessionState(catalog=None, agent=pydantic_agent, discovery_tier=3)
+
+        catalog: ToolCatalog | None = None
+        toolset = None
+        discovery_tier = 3
+
+        try:
+            # Tier 1: Try discovery
+            if hasattr(self._conn, "discover_tools"):
+                catalog_dict = await self._conn.discover_tools(session_id=session_id)
+                if catalog_dict and catalog_dict.get("tools"):
+                    catalog = parse_tool_catalog(catalog_dict)
+                    toolset = create_toolset_from_catalog(catalog)
+                    discovery_tier = 1
+                    tool_names = [t.name for t in catalog.tools]
+                    logger.info(
+                        f"Built toolset from catalog: {len(catalog.tools)} tools - {tool_names}"
+                    )
+        except Exception as exc:
+            logger.warning(f"Tool discovery failed, falling back: {exc}")
+
+        # Tier 2: Capabilities fallback
+        if toolset is None and self._client_capabilities:
+            toolset = create_toolset_from_capabilities(self._client_capabilities)
+            discovery_tier = 2
+            tool_names = list(toolset.tools.keys())
+            logger.info(
+                f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
+            )
+
+        # Tier 3: Default fallback
+        if toolset is None:
+            toolset = create_toolset()
+            discovery_tier = 3
+            tool_names = list(toolset.tools.keys())
+            logger.info(
+                f"Using default toolset: {len(tool_names)} tools - {tool_names}"
+            )
+
+        # Construct per-session Pydantic AI agent
+        # Cast is safe: __init__ ensures self._model is KnownModelName | Model when not legacy
+        model_value = cast(KnownModelName | Model, self._model)
+        pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+
+        return SessionState(
+            catalog=catalog, agent=pydantic_agent, discovery_tier=discovery_tier
+        )
 
     async def initialize(
         self,
@@ -132,9 +204,23 @@ class PunieAgent:
         mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
         **kwargs: Any,
     ) -> NewSessionResponse:
-        """Create a new session."""
+        """Create a new session and register tools.
+
+        Discovers tools once and caches the result for the session lifetime.
+        Skips registration if legacy agent mode is active or no connection.
+        """
         session_id = f"punie-session-{self._next_session_id}"
         self._next_session_id += 1
+
+        # Register tools if not in legacy mode and connection exists
+        if not self._legacy_agent and self._conn:
+            state = await self._discover_and_build_toolset(session_id)
+            self._sessions[session_id] = state
+            logger.info(
+                f"Registered session {session_id}: Tier {state.discovery_tier}, "
+                f"{len(state.catalog.tools) if state.catalog else 0} tools"
+            )
+
         return NewSessionResponse(session_id=session_id)
 
     async def load_session(
@@ -230,48 +316,22 @@ class PunieAgent:
             tracker=ToolCallTracker(),
         )
 
-        # Use legacy agent if available (backward compatibility)
+        # Use cached session state or lazy fallback
         pydantic_agent: PydanticAgent[ACPDeps, str]
         if self._legacy_agent:
-            # Type checker can't narrow the union properly, but we know it's correct
+            # Legacy mode: use pre-constructed agent
             pydantic_agent = self._legacy_agent  # ty: ignore[invalid-assignment]
+        elif session_id in self._sessions:
+            # Use cached session state (registered in new_session)
+            pydantic_agent = self._sessions[session_id].agent
         else:
-            # Build session-specific toolset via discovery
-            toolset = None
-            try:
-                # Tier 1: Try discovery
-                if hasattr(conn, "discover_tools"):
-                    catalog_dict = await conn.discover_tools(session_id=session_id)
-                    if catalog_dict and catalog_dict.get("tools"):
-                        catalog = parse_tool_catalog(catalog_dict)
-                        toolset = create_toolset_from_catalog(catalog)
-                        tool_names = [t.name for t in catalog.tools]
-                        logger.info(
-                            f"Built toolset from catalog: {len(catalog.tools)} tools - {tool_names}"
-                        )
-            except Exception as exc:
-                logger.warning(f"Tool discovery failed, falling back: {exc}")
-
-            # Tier 2: Capabilities fallback
-            if toolset is None and self._client_capabilities:
-                toolset = create_toolset_from_capabilities(self._client_capabilities)
-                tool_names = list(toolset.tools.keys())
-                logger.info(
-                    f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
-                )
-
-            # Tier 3: Default fallback
-            if toolset is None:
-                toolset = create_toolset()
-                tool_names = list(toolset.tools.keys())
-                logger.info(
-                    f"Using default toolset: {len(tool_names)} tools - {tool_names}"
-                )
-
-            # Construct per-session Pydantic AI agent
-            # Cast is safe: __init__ ensures self._model is KnownModelName | Model when not legacy
-            model_value = cast(KnownModelName | Model, self._model)
-            pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+            # Lazy fallback for callers that skip new_session()
+            state = await self._discover_and_build_toolset(session_id)
+            self._sessions[session_id] = state
+            pydantic_agent = state.agent
+            logger.info(
+                f"Lazy registration for session {session_id}: Tier {state.discovery_tier}"
+            )
 
         # Delegate to Pydantic AI with error handling
         try:

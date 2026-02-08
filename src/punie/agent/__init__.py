@@ -10,15 +10,17 @@ Main components:
 - create_pydantic_agent: Factory function for Pydantic AI agent instances
 - ToolCatalog: Immutable catalog of available tools (dynamic discovery)
 - ToolDescriptor: Tool metadata and parameter schema
+- SessionState: Immutable session-scoped cached state
 - create_toolset_from_catalog: Build toolset from discovery (Tier 1)
 - create_toolset_from_capabilities: Build toolset from capabilities (Tier 2)
 """
 
-from .adapter import PunieAgent
-from .deps import ACPDeps
-from .discovery import ToolCatalog, ToolDescriptor, parse_tool_catalog
-from .factory import create_pydantic_agent
-from .toolset import (
+from punie.agent.adapter import PunieAgent
+from punie.agent.deps import ACPDeps
+from punie.agent.discovery import ToolCatalog, ToolDescriptor, parse_tool_catalog
+from punie.agent.factory import create_pydantic_agent
+from punie.agent.session import SessionState
+from punie.agent.toolset import (
     ACPToolset,
     create_toolset,
     create_toolset_from_capabilities,
@@ -29,6 +31,7 @@ __all__ = [
     "ACPDeps",
     "ACPToolset",
     "PunieAgent",
+    "SessionState",
     "ToolCatalog",
     "ToolDescriptor",
     "create_pydantic_agent",
