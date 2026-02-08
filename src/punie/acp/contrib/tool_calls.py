@@ -92,8 +92,12 @@ class _TrackedToolCall:
             title=self.title,
             kind=self.kind,
             status=self.status,
-            content=tuple(item.model_copy(deep=True) for item in self.content) if self.content else None,
-            locations=tuple(loc.model_copy(deep=True) for loc in self.locations) if self.locations else None,
+            content=tuple(item.model_copy(deep=True) for item in self.content)
+            if self.content
+            else None,
+            locations=tuple(loc.model_copy(deep=True) for loc in self.locations)
+            if self.locations
+            else None,
             raw_input=self.raw_input,
             raw_output=self.raw_output,
         )
@@ -163,7 +167,9 @@ class _TrackedToolCall:
         if raw_output is not UNSET:
             self.raw_output = raw_output
             kwargs["raw_output"] = raw_output
-        return ToolCallProgress(session_update="tool_call_update", tool_call_id=self.tool_call_id, **kwargs)
+        return ToolCallProgress(
+            session_update="tool_call_update", tool_call_id=self.tool_call_id, **kwargs
+        )
 
     def append_stream_text(
         self,

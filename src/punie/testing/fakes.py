@@ -24,7 +24,12 @@ from punie.acp import (
     WaitForTerminalExitResponse,
     WriteTextFileResponse,
 )
-from punie.acp.schema import ForkSessionResponse, ListSessionsResponse, ResumeSessionResponse, SetSessionModelResponse
+from punie.acp.schema import (
+    ForkSessionResponse,
+    ListSessionsResponse,
+    ResumeSessionResponse,
+    SetSessionModelResponse,
+)
 from punie.acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -227,7 +232,11 @@ class FakeAgent:
         **kwargs: Any,
     ) -> InitializeResponse:
         # Use configured version or echo request
-        version = self._protocol_version if self._protocol_version is not None else protocol_version
+        version = (
+            self._protocol_version
+            if self._protocol_version is not None
+            else protocol_version
+        )
         return InitializeResponse(
             protocol_version=version, agent_capabilities=None, auth_methods=[]
         )

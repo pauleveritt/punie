@@ -57,7 +57,9 @@ async def test_fake_agent_new_session():
 async def test_fake_agent_load_session():
     """FakeAgent.load_session() should return response."""
     agent = FakeAgent()
-    response = await agent.load_session(cwd="/test", mcp_servers=[], session_id="sess-1")
+    response = await agent.load_session(
+        cwd="/test", mcp_servers=[], session_id="sess-1"
+    )
     assert response is not None
 
 
@@ -90,7 +92,9 @@ async def test_fake_agent_set_session_model():
 async def test_fake_agent_fork_session():
     """FakeAgent.fork_session() should return forked session ID."""
     agent = FakeAgent()
-    response = await agent.fork_session(cwd="/test", session_id="original", mcp_servers=[])
+    response = await agent.fork_session(
+        cwd="/test", session_id="original", mcp_servers=[]
+    )
     assert response.session_id == "original-fork"
 
 
@@ -98,7 +102,9 @@ async def test_fake_agent_fork_session():
 async def test_fake_agent_resume_session():
     """FakeAgent.resume_session() should return response."""
     agent = FakeAgent()
-    response = await agent.resume_session(cwd="/test", session_id="sess-1", mcp_servers=[])
+    response = await agent.resume_session(
+        cwd="/test", session_id="sess-1", mcp_servers=[]
+    )
     assert response is not None
 
 

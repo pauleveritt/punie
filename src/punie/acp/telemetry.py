@@ -21,14 +21,18 @@ DEFAULT_TAGS = ["acp"]
 TRACER = otel_get_tracer(__name__) if otel_get_tracer else None
 
 
-def _start_tracer_span(name: str, *, attributes: Mapping[str, Any] | None = None) -> AbstractContextManager[Any]:
+def _start_tracer_span(
+    name: str, *, attributes: Mapping[str, Any] | None = None
+) -> AbstractContextManager[Any]:
     if TRACER is None:
         return nullcontext()
     attrs = dict(attributes or {})
     return TRACER.start_as_current_span(name, attributes=attrs)
 
 
-def span_context(name: str, *, attributes: Mapping[str, Any] | None = None) -> AbstractContextManager[None]:
+def span_context(
+    name: str, *, attributes: Mapping[str, Any] | None = None
+) -> AbstractContextManager[None]:
     if logfire_span is None and TRACER is None:
         return nullcontext()
     stack = ExitStack()

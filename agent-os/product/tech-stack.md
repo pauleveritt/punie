@@ -22,7 +22,8 @@
 
 ## HTTP Server
 
-- To be determined (evaluating aiohttp, Starlette, etc.)
+- Starlette (ASGI framework, chosen for seamless Pydantic AI integration)
+- uvicorn (ASGI server)
 
 ## Testing
 

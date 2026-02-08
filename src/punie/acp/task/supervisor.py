@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from contextlib import suppress
 from typing import Any
 
@@ -30,7 +30,7 @@ class TaskSupervisor:
 
     def create(
         self,
-        coroutine: Awaitable[Any],
+        coroutine: Coroutine[Any, Any, Any],
         *,
         name: str | None = None,
         on_error: ErrorHandler | None = None,
@@ -56,14 +56,18 @@ class TaskSupervisor:
                     on_error(task, exc)
                     handled = True
                 except Exception:
-                    logging.exception("Error in %s task-specific error handler", self._source)
+                    logging.exception(
+                        "Error in %s task-specific error handler", self._source
+                    )
             if not handled:
                 for handler in self._error_handlers:
                     try:
                         handler(task, exc)
                         handled = True
                     except Exception:
-                        logging.exception("Error in %s supervisor error handler", self._source)
+                        logging.exception(
+                            "Error in %s supervisor error handler", self._source
+                        )
             if not handled:
                 logging.exception("Unhandled error in %s task", self._source)
 

@@ -29,7 +29,9 @@ class IncomingMessage:
 
 
 class MessageStateStore(Protocol):
-    def register_outgoing(self, request_id: int, method: str) -> asyncio.Future[Any]: ...
+    def register_outgoing(
+        self, request_id: int, method: str
+    ) -> asyncio.Future[Any]: ...
 
     def resolve_outgoing(self, request_id: int, result: Any) -> None: ...
 

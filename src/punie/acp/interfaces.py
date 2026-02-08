@@ -74,7 +74,11 @@ __all__ = ["Agent", "Client"]
 class Client(Protocol):
     @param_model(RequestPermissionRequest)
     async def request_permission(
-        self, options: list[PermissionOption], session_id: str, tool_call: ToolCallUpdate, **kwargs: Any
+        self,
+        options: list[PermissionOption],
+        session_id: str,
+        tool_call: ToolCallUpdate,
+        **kwargs: Any,
     ) -> RequestPermissionResponse: ...
 
     @param_model(SessionNotification)
@@ -101,7 +105,12 @@ class Client(Protocol):
 
     @param_model(ReadTextFileRequest)
     async def read_text_file(
-        self, path: str, session_id: str, limit: int | None = None, line: int | None = None, **kwargs: Any
+        self,
+        path: str,
+        session_id: str,
+        limit: int | None = None,
+        line: int | None = None,
+        **kwargs: Any,
     ) -> ReadTextFileResponse: ...
 
     @param_model(CreateTerminalRequest)
@@ -117,7 +126,9 @@ class Client(Protocol):
     ) -> CreateTerminalResponse: ...
 
     @param_model(TerminalOutputRequest)
-    async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> TerminalOutputResponse: ...
+    async def terminal_output(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> TerminalOutputResponse: ...
 
     @param_model(ReleaseTerminalRequest)
     async def release_terminal(
@@ -134,7 +145,9 @@ class Client(Protocol):
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalCommandResponse | None: ...
 
-    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]: ...
+    async def ext_method(
+        self, method: str, params: dict[str, Any]
+    ) -> dict[str, Any]: ...
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None: ...
 
@@ -154,12 +167,19 @@ class Agent(Protocol):
 
     @param_model(NewSessionRequest)
     async def new_session(
-        self, cwd: str, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio], **kwargs: Any
+        self,
+        cwd: str,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
+        **kwargs: Any,
     ) -> NewSessionResponse: ...
 
     @param_model(LoadSessionRequest)
     async def load_session(
-        self, cwd: str, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio], session_id: str, **kwargs: Any
+        self,
+        cwd: str,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
+        session_id: str,
+        **kwargs: Any,
     ) -> LoadSessionResponse | None: ...
 
     @param_model(ListSessionsRequest)
@@ -168,7 +188,9 @@ class Agent(Protocol):
     ) -> ListSessionsResponse: ...
 
     @param_model(SetSessionModeRequest)
-    async def set_session_mode(self, mode_id: str, session_id: str, **kwargs: Any) -> SetSessionModeResponse | None: ...
+    async def set_session_mode(
+        self, mode_id: str, session_id: str, **kwargs: Any
+    ) -> SetSessionModeResponse | None: ...
 
     @param_model(SetSessionModelRequest)
     async def set_session_model(
@@ -176,7 +198,9 @@ class Agent(Protocol):
     ) -> SetSessionModelResponse | None: ...
 
     @param_model(AuthenticateRequest)
-    async def authenticate(self, method_id: str, **kwargs: Any) -> AuthenticateResponse | None: ...
+    async def authenticate(
+        self, method_id: str, **kwargs: Any
+    ) -> AuthenticateResponse | None: ...
 
     @param_model(PromptRequest)
     async def prompt(
@@ -213,7 +237,9 @@ class Agent(Protocol):
     @param_model(CancelNotification)
     async def cancel(self, session_id: str, **kwargs: Any) -> None: ...
 
-    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]: ...
+    async def ext_method(
+        self, method: str, params: dict[str, Any]
+    ) -> dict[str, Any]: ...
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None: ...
 

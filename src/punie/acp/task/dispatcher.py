@@ -74,7 +74,9 @@ class DefaultMessageDispatcher(MessageDispatcher):
             self._task = None
 
     async def _dispatch_request(self, message: dict[str, Any]) -> None:
-        record = self._store.begin_incoming(message.get("method", ""), message.get("params"))
+        record = self._store.begin_incoming(
+            message.get("method", ""), message.get("params")
+        )
 
         async def runner() -> None:
             try:

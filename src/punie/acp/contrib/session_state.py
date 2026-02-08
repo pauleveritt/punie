@@ -87,8 +87,12 @@ class _MutableToolCallState:
             title=self.title,
             kind=self.kind,
             status=self.status,
-            content=tuple(item.model_copy(deep=True) for item in self.content) if self.content else None,
-            locations=tuple(loc.model_copy(deep=True) for loc in self.locations) if self.locations else None,
+            content=tuple(item.model_copy(deep=True) for item in self.content)
+            if self.content
+            else None,
+            locations=tuple(loc.model_copy(deep=True) for loc in self.locations)
+            if self.locations
+            else None,
             raw_input=self.raw_input,
             raw_output=self.raw_output,
         )
@@ -147,7 +151,9 @@ class SessionAccumulator:
         self._user_messages: list[UserMessageChunk] = []
         self._agent_messages: list[AgentMessageChunk] = []
         self._agent_thoughts: list[AgentThoughtChunk] = []
-        self._subscribers: list[Callable[[SessionSnapshot, SessionNotification], None]] = []
+        self._subscribers: list[
+            Callable[[SessionSnapshot, SessionNotification], None]
+        ] = []
 
     def reset(self) -> None:
         """Clear all accumulated state."""
@@ -160,7 +166,9 @@ class SessionAccumulator:
         self._agent_messages.clear()
         self._agent_thoughts.clear()
 
-    def subscribe(self, callback: Callable[[SessionSnapshot, SessionNotification], None]) -> Callable[[], None]:
+    def subscribe(
+        self, callback: Callable[[SessionSnapshot, SessionNotification], None]
+    ) -> Callable[[], None]:
         """Register a callback that receives every new snapshot.
 
         The callback is invoked immediately after :meth:`apply` finishes. The
@@ -206,14 +214,16 @@ class SessionAccumulator:
     def _apply_update(self, update: Any) -> None:
         if isinstance(update, ToolCallStart):
             state = self._tool_calls.setdefault(
-                update.tool_call_id, _MutableToolCallState(tool_call_id=update.tool_call_id)
+                update.tool_call_id,
+                _MutableToolCallState(tool_call_id=update.tool_call_id),
             )
             state.apply_start(update)
             return
 
         if isinstance(update, ToolCallProgress):
             state = self._tool_calls.setdefault(
-                update.tool_call_id, _MutableToolCallState(tool_call_id=update.tool_call_id)
+                update.tool_call_id,
+                _MutableToolCallState(tool_call_id=update.tool_call_id),
             )
             state.apply_progress(update)
             return
@@ -254,12 +264,25 @@ class SessionAccumulator:
         if self.session_id is None:
             raise SessionSnapshotUnavailableError()
 
-        tool_calls = {tool_call_id: state.snapshot() for tool_call_id, state in self._tool_calls.items()}
-        plan_entries = tuple(entry.model_copy(deep=True) for entry in self._plan_entries)
-        available_commands = tuple(command.model_copy(deep=True) for command in self._available_commands)
-        user_messages = tuple(message.model_copy(deep=True) for message in self._user_messages)
-        agent_messages = tuple(message.model_copy(deep=True) for message in self._agent_messages)
-        agent_thoughts = tuple(message.model_copy(deep=True) for message in self._agent_thoughts)
+        tool_calls = {
+            tool_call_id: state.snapshot()
+            for tool_call_id, state in self._tool_calls.items()
+        }
+        plan_entries = tuple(
+            entry.model_copy(deep=True) for entry in self._plan_entries
+        )
+        available_commands = tuple(
+            command.model_copy(deep=True) for command in self._available_commands
+        )
+        user_messages = tuple(
+            message.model_copy(deep=True) for message in self._user_messages
+        )
+        agent_messages = tuple(
+            message.model_copy(deep=True) for message in self._agent_messages
+        )
+        agent_thoughts = tuple(
+            message.model_copy(deep=True) for message in self._agent_thoughts
+        )
 
         return SessionSnapshot(
             session_id=self.session_id,

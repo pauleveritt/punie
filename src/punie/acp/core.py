@@ -87,5 +87,9 @@ def connect_to_agent(
         A :class:`ClientSideConnection` instance connected to the agent.
     """
     return ClientSideConnection(
-        client, input_stream, output_stream, use_unstable_protocol=use_unstable_protocol, **connection_kwargs
+        client,
+        input_stream,
+        output_stream,
+        use_unstable_protocol=use_unstable_protocol,
+        **connection_kwargs,
     )

@@ -120,7 +120,9 @@ def to_camel_case(snake_str: str) -> str:
     return components[0] + "".join(x.title() for x in components[1:])
 
 
-def _make_legacy_func(func: Callable[..., T], model: type[BaseModel]) -> Callable[[Any, BaseModel], T]:
+def _make_legacy_func(
+    func: Callable[..., T], model: type[BaseModel]
+) -> Callable[[Any, BaseModel], T]:
     @functools.wraps(func)
     def wrapped(self, params: BaseModel) -> T:
         warnings.warn(
@@ -129,7 +131,9 @@ def _make_legacy_func(func: Callable[..., T], model: type[BaseModel]) -> Callabl
             DeprecationWarning,
             stacklevel=3,
         )
-        kwargs = {k: getattr(params, k) for k in model.model_fields if k != "field_meta"}
+        kwargs = {
+            k: getattr(params, k) for k in model.model_fields if k != "field_meta"
+        }
         if meta := getattr(params, "field_meta", None):
             kwargs.update(meta)
         return func(self, **kwargs)
@@ -137,7 +141,9 @@ def _make_legacy_func(func: Callable[..., T], model: type[BaseModel]) -> Callabl
     return wrapped
 
 
-def _make_compatible_func(func: Callable[..., T], model: type[BaseModel]) -> Callable[..., T]:
+def _make_compatible_func(
+    func: Callable[..., T], model: type[BaseModel]
+) -> Callable[..., T]:
     @functools.wraps(func)
     def wrapped(self, *args: Any, **kwargs: Any) -> T:
         param = None
@@ -152,7 +158,9 @@ def _make_compatible_func(func: Callable[..., T], model: type[BaseModel]) -> Cal
                 DeprecationWarning,
                 stacklevel=3,
             )
-            kwargs = {k: getattr(param, k) for k in model.model_fields if k != "field_meta"}
+            kwargs = {
+                k: getattr(param, k) for k in model.model_fields if k != "field_meta"
+            }
             if meta := getattr(param, "field_meta", None):
                 kwargs.update(meta)
             return func(self, **kwargs)
@@ -165,7 +173,10 @@ def compatible_class(cls: ClassT) -> ClassT:
     """Mark a class as backward compatible with old API style."""
     for attr in dir(cls):
         func = getattr(cls, attr)
-        if not callable(func) or (model := getattr(func, "__param_model__", None)) is None:
+        if (
+            not callable(func)
+            or (model := getattr(func, "__param_model__", None)) is None
+        ):
             continue
         if "_" in attr:
             setattr(cls, to_camel_case(attr), _make_legacy_func(func, model))

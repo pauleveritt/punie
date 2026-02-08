@@ -50,7 +50,7 @@ class MinimalAgent(Agent):
     async def initialize(
         self,
         protocol_version: int,
-        client_capabilities: ClientCapabilities,
+        client_capabilities: ClientCapabilities | None = None,
         client_info: Implementation | None = None,
         **kwargs: Any,
     ) -> InitializeResponse:
@@ -146,7 +146,6 @@ class MinimalAgent(Agent):
 
         return PromptResponse(
             stop_reason="end_turn",
-            usage=None,
         )
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:

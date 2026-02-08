@@ -45,9 +45,15 @@
 **Note:** Original task 2.4 (ModelResponder infrastructure) deferred to Phase 3 as enhancement. Replaced with general coverage/quality improvements which provide more immediate value.
 
 ## 3. Pydantic AI Migration
-**Status:** Not Started
+**Status:** In Progress (Phase 3.1 Complete)
 
-- [ ] 3.1 Introduce HTTP server into asyncio loop
+- [x] 3.1 HTTP server alongside ACP (dual-protocol foundation) - Completed 2026-02-07
+  - Added Starlette + uvicorn HTTP server running concurrently with ACP stdio
+  - Created `run_dual()` function using asyncio.wait(FIRST_COMPLETED)
+  - Implemented `/health` and `/echo` endpoints for architecture validation
+  - Full test coverage: 6 unit tests (TestClient) + 2 integration tests (subprocess)
+  - No changes to vendored ACP code - clean separation of concerns
+  - Proven architecture: both protocols work simultaneously in same event loop
 - [ ] 3.2 Perform minimal transition to Pydantic AI project structure
 - [ ] 3.3 Gradually port python-sdk "tools" into Pydantic AI tools
 - [ ] 3.4 Convert to best-practices Pydantic AI project

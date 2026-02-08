@@ -33,7 +33,11 @@ from .schema import (
 )
 
 ContentBlock = (
-    TextContentBlock | ImageContentBlock | AudioContentBlock | ResourceContentBlock | EmbeddedResourceContentBlock
+    TextContentBlock
+    | ImageContentBlock
+    | AudioContentBlock
+    | ResourceContentBlock
+    | EmbeddedResourceContentBlock
 )
 
 SessionUpdate = (
@@ -47,7 +51,9 @@ SessionUpdate = (
     | ToolCallProgress
 )
 
-ToolCallContentVariant = ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent
+ToolCallContentVariant = (
+    ContentToolCallContent | FileEditToolCallContent | TerminalToolCallContent
+)
 
 __all__ = [
     "audio_block",
@@ -82,7 +88,9 @@ def text_block(text: str) -> TextContentBlock:
     return TextContentBlock(type="text", text=text)
 
 
-def image_block(data: str, mime_type: str, *, uri: str | None = None) -> ImageContentBlock:
+def image_block(
+    data: str, mime_type: str, *, uri: str | None = None
+) -> ImageContentBlock:
     return ImageContentBlock(type="image", data=data, mime_type=mime_type, uri=uri)
 
 
@@ -110,11 +118,15 @@ def resource_link_block(
     )
 
 
-def embedded_text_resource(uri: str, text: str, *, mime_type: str | None = None) -> TextResourceContents:
+def embedded_text_resource(
+    uri: str, text: str, *, mime_type: str | None = None
+) -> TextResourceContents:
     return TextResourceContents(uri=uri, text=text, mime_type=mime_type)
 
 
-def embedded_blob_resource(uri: str, blob: str, *, mime_type: str | None = None) -> BlobResourceContents:
+def embedded_blob_resource(
+    uri: str, blob: str, *, mime_type: str | None = None
+) -> BlobResourceContents:
     return BlobResourceContents(uri=uri, blob=blob, mime_type=mime_type)
 
 
@@ -128,8 +140,12 @@ def tool_content(block: ContentBlock) -> ContentToolCallContent:
     return ContentToolCallContent(type="content", content=block)
 
 
-def tool_diff_content(path: str, new_text: str, old_text: str | None = None) -> FileEditToolCallContent:
-    return FileEditToolCallContent(type="diff", path=path, new_text=new_text, old_text=old_text)
+def tool_diff_content(
+    path: str, new_text: str, old_text: str | None = None
+) -> FileEditToolCallContent:
+    return FileEditToolCallContent(
+        type="diff", path=path, new_text=new_text, old_text=old_text
+    )
 
 
 def tool_terminal_ref(terminal_id: str) -> TerminalToolCallContent:
@@ -173,7 +189,9 @@ def update_agent_thought_text(text: str) -> AgentThoughtChunk:
     return update_agent_thought(text_block(text))
 
 
-def update_available_commands(commands: Iterable[AvailableCommand]) -> AvailableCommandsUpdate:
+def update_available_commands(
+    commands: Iterable[AvailableCommand],
+) -> AvailableCommandsUpdate:
     return AvailableCommandsUpdate(
         session_update="available_commands_update",
         available_commands=list(commands),
@@ -181,7 +199,9 @@ def update_available_commands(commands: Iterable[AvailableCommand]) -> Available
 
 
 def update_current_mode(current_mode_id: str) -> CurrentModeUpdate:
-    return CurrentModeUpdate(session_update="current_mode_update", current_mode_id=current_mode_id)
+    return CurrentModeUpdate(
+        session_update="current_mode_update", current_mode_id=current_mode_id
+    )
 
 
 def session_notification(session_id: str, update: SessionUpdate) -> SessionNotification:

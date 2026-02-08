@@ -39,11 +39,19 @@ from ..schema import (
     WriteTextFileRequest,
     WriteTextFileResponse,
 )
-from ..utils import compatible_class, notify_model, param_model, request_model, request_optional_model
+from ..utils import (
+    compatible_class,
+    notify_model,
+    param_model,
+    request_model,
+    request_optional_model,
+)
 from .router import build_agent_router
 
 __all__ = ["AgentSideConnection"]
-_AGENT_CONNECTION_ERROR = "AgentSideConnection requires asyncio StreamWriter/StreamReader"
+_AGENT_CONNECTION_ERROR = (
+    "AgentSideConnection requires asyncio StreamWriter/StreamReader"
+)
 
 
 @final
@@ -64,10 +72,20 @@ class AgentSideConnection:
         **connection_kwargs: Any,
     ) -> None:
         agent = to_agent(self) if callable(to_agent) else to_agent
-        if not isinstance(input_stream, asyncio.StreamWriter) or not isinstance(output_stream, asyncio.StreamReader):
+        if not isinstance(input_stream, asyncio.StreamWriter) or not isinstance(
+            output_stream, asyncio.StreamReader
+        ):
             raise TypeError(_AGENT_CONNECTION_ERROR)
-        handler = build_agent_router(cast(Agent, agent), use_unstable_protocol=use_unstable_protocol)
-        self._conn = Connection(handler, input_stream, output_stream, listening=listening, **connection_kwargs)
+        handler = build_agent_router(
+            cast(Agent, agent), use_unstable_protocol=use_unstable_protocol
+        )
+        self._conn = Connection(
+            handler,
+            input_stream,
+            output_stream,
+            listening=listening,
+            **connection_kwargs,
+        )
         if on_connect := getattr(agent, "on_connect", None):
             on_connect(self)
 
@@ -94,30 +112,50 @@ class AgentSideConnection:
         await notify_model(
             self._conn,
             CLIENT_METHODS["session_update"],
-            SessionNotification(session_id=session_id, update=update, field_meta=kwargs or None),
+            SessionNotification(
+                session_id=session_id, update=update, field_meta=kwargs or None
+            ),
         )
 
     @param_model(RequestPermissionRequest)
     async def request_permission(
-        self, options: list[PermissionOption], session_id: str, tool_call: ToolCallUpdate, **kwargs: Any
+        self,
+        options: list[PermissionOption],
+        session_id: str,
+        tool_call: ToolCallUpdate,
+        **kwargs: Any,
     ) -> RequestPermissionResponse:
         return await request_model(
             self._conn,
             CLIENT_METHODS["session_request_permission"],
             RequestPermissionRequest(
-                options=options, session_id=session_id, tool_call=tool_call, field_meta=kwargs or None
+                options=options,
+                session_id=session_id,
+                tool_call=tool_call,
+                field_meta=kwargs or None,
             ),
             RequestPermissionResponse,
         )
 
     @param_model(ReadTextFileRequest)
     async def read_text_file(
-        self, path: str, session_id: str, limit: int | None = None, line: int | None = None, **kwargs: Any
+        self,
+        path: str,
+        session_id: str,
+        limit: int | None = None,
+        line: int | None = None,
+        **kwargs: Any,
     ) -> ReadTextFileResponse:
         return await request_model(
             self._conn,
             CLIENT_METHODS["fs_read_text_file"],
-            ReadTextFileRequest(path=path, session_id=session_id, limit=limit, line=line, field_meta=kwargs or None),
+            ReadTextFileRequest(
+                path=path,
+                session_id=session_id,
+                limit=limit,
+                line=line,
+                field_meta=kwargs or None,
+            ),
             ReadTextFileResponse,
         )
 
@@ -128,7 +166,12 @@ class AgentSideConnection:
         return await request_optional_model(
             self._conn,
             CLIENT_METHODS["fs_write_text_file"],
-            WriteTextFileRequest(content=content, path=path, session_id=session_id, field_meta=kwargs or None),
+            WriteTextFileRequest(
+                content=content,
+                path=path,
+                session_id=session_id,
+                field_meta=kwargs or None,
+            ),
             WriteTextFileResponse,
         )
 
@@ -159,11 +202,17 @@ class AgentSideConnection:
         )
 
     @param_model(TerminalOutputRequest)
-    async def terminal_output(self, session_id: str, terminal_id: str, **kwargs: Any) -> TerminalOutputResponse:
+    async def terminal_output(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> TerminalOutputResponse:
         return await request_model(
             self._conn,
             CLIENT_METHODS["terminal_output"],
-            TerminalOutputRequest(session_id=session_id, terminal_id=terminal_id, field_meta=kwargs or None),
+            TerminalOutputRequest(
+                session_id=session_id,
+                terminal_id=terminal_id,
+                field_meta=kwargs or None,
+            ),
             TerminalOutputResponse,
         )
 
@@ -174,7 +223,11 @@ class AgentSideConnection:
         return await request_optional_model(
             self._conn,
             CLIENT_METHODS["terminal_release"],
-            ReleaseTerminalRequest(session_id=session_id, terminal_id=terminal_id, field_meta=kwargs or None),
+            ReleaseTerminalRequest(
+                session_id=session_id,
+                terminal_id=terminal_id,
+                field_meta=kwargs or None,
+            ),
             ReleaseTerminalResponse,
         )
 
@@ -185,7 +238,11 @@ class AgentSideConnection:
         return await request_model(
             self._conn,
             CLIENT_METHODS["terminal_wait_for_exit"],
-            WaitForTerminalExitRequest(session_id=session_id, terminal_id=terminal_id, field_meta=kwargs or None),
+            WaitForTerminalExitRequest(
+                session_id=session_id,
+                terminal_id=terminal_id,
+                field_meta=kwargs or None,
+            ),
             WaitForTerminalExitResponse,
         )
 
@@ -196,7 +253,11 @@ class AgentSideConnection:
         return await request_optional_model(
             self._conn,
             CLIENT_METHODS["terminal_kill"],
-            KillTerminalCommandRequest(session_id=session_id, terminal_id=terminal_id, field_meta=kwargs or None),
+            KillTerminalCommandRequest(
+                session_id=session_id,
+                terminal_id=terminal_id,
+                field_meta=kwargs or None,
+            ),
             KillTerminalCommandResponse,
         )
 

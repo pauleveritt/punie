@@ -77,7 +77,12 @@ from .schema import (
     WriteTextFileRequest,
     WriteTextFileResponse,
 )
-from .stdio import spawn_agent_process, spawn_client_process, spawn_stdio_connection, stdio_streams
+from .stdio import (
+    spawn_agent_process,
+    spawn_client_process,
+    spawn_stdio_connection,
+    stdio_streams,
+)
 from .transports import default_environment, spawn_stdio_transport
 
 _DEPRECATED_NAMES = [

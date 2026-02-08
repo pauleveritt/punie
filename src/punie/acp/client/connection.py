@@ -40,11 +40,19 @@ from ..schema import (
     SseMcpServer,
     TextContentBlock,
 )
-from ..utils import compatible_class, notify_model, param_model, request_model, request_model_from_dict
+from ..utils import (
+    compatible_class,
+    notify_model,
+    param_model,
+    request_model,
+    request_model_from_dict,
+)
 from .router import build_client_router
 
 __all__ = ["ClientSideConnection"]
-_CLIENT_CONNECTION_ERROR = "ClientSideConnection requires asyncio StreamWriter/StreamReader"
+_CLIENT_CONNECTION_ERROR = (
+    "ClientSideConnection requires asyncio StreamWriter/StreamReader"
+)
 
 
 @final
@@ -63,11 +71,17 @@ class ClientSideConnection:
         use_unstable_protocol: bool = False,
         **connection_kwargs: Any,
     ) -> None:
-        if not isinstance(input_stream, asyncio.StreamWriter) or not isinstance(output_stream, asyncio.StreamReader):
+        if not isinstance(input_stream, asyncio.StreamWriter) or not isinstance(
+            output_stream, asyncio.StreamReader
+        ):
             raise TypeError(_CLIENT_CONNECTION_ERROR)
         client = to_client(self) if callable(to_client) else to_client
-        handler = build_client_router(cast(Client, client), use_unstable_protocol=use_unstable_protocol)
-        self._conn = Connection(handler, input_stream, output_stream, **connection_kwargs)
+        handler = build_client_router(
+            cast(Client, client), use_unstable_protocol=use_unstable_protocol
+        )
+        self._conn = Connection(
+            handler, input_stream, output_stream, **connection_kwargs
+        )
         if on_connect := getattr(client, "on_connect", None):
             on_connect(self)
 
@@ -93,23 +107,37 @@ class ClientSideConnection:
 
     @param_model(NewSessionRequest)
     async def new_session(
-        self, cwd: str, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio], **kwargs: Any
+        self,
+        cwd: str,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
+        **kwargs: Any,
     ) -> NewSessionResponse:
         return await request_model(
             self._conn,
             AGENT_METHODS["session_new"],
-            NewSessionRequest(cwd=cwd, mcp_servers=mcp_servers, field_meta=kwargs or None),
+            NewSessionRequest(
+                cwd=cwd, mcp_servers=mcp_servers, field_meta=kwargs or None
+            ),
             NewSessionResponse,
         )
 
     @param_model(LoadSessionRequest)
     async def load_session(
-        self, cwd: str, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio], session_id: str, **kwargs: Any
+        self,
+        cwd: str,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
+        session_id: str,
+        **kwargs: Any,
     ) -> LoadSessionResponse:
         return await request_model_from_dict(
             self._conn,
             AGENT_METHODS["session_load"],
-            LoadSessionRequest(cwd=cwd, mcp_servers=mcp_servers, session_id=session_id, field_meta=kwargs or None),
+            LoadSessionRequest(
+                cwd=cwd,
+                mcp_servers=mcp_servers,
+                session_id=session_id,
+                field_meta=kwargs or None,
+            ),
             LoadSessionResponse,
         )
 
@@ -125,20 +153,28 @@ class ClientSideConnection:
         )
 
     @param_model(SetSessionModeRequest)
-    async def set_session_mode(self, mode_id: str, session_id: str, **kwargs: Any) -> SetSessionModeResponse:
+    async def set_session_mode(
+        self, mode_id: str, session_id: str, **kwargs: Any
+    ) -> SetSessionModeResponse:
         return await request_model_from_dict(
             self._conn,
             AGENT_METHODS["session_set_mode"],
-            SetSessionModeRequest(mode_id=mode_id, session_id=session_id, field_meta=kwargs or None),
+            SetSessionModeRequest(
+                mode_id=mode_id, session_id=session_id, field_meta=kwargs or None
+            ),
             SetSessionModeResponse,
         )
 
     @param_model(SetSessionModelRequest)
-    async def set_session_model(self, model_id: str, session_id: str, **kwargs: Any) -> SetSessionModelResponse:
+    async def set_session_model(
+        self, model_id: str, session_id: str, **kwargs: Any
+    ) -> SetSessionModelResponse:
         return await request_model_from_dict(
             self._conn,
             AGENT_METHODS["session_set_model"],
-            SetSessionModelRequest(model_id=model_id, session_id=session_id, field_meta=kwargs or None),
+            SetSessionModelRequest(
+                model_id=model_id, session_id=session_id, field_meta=kwargs or None
+            ),
             SetSessionModelResponse,
         )
 
@@ -167,7 +203,9 @@ class ClientSideConnection:
         return await request_model(
             self._conn,
             AGENT_METHODS["session_prompt"],
-            PromptRequest(prompt=prompt, session_id=session_id, field_meta=kwargs or None),
+            PromptRequest(
+                prompt=prompt, session_id=session_id, field_meta=kwargs or None
+            ),
             PromptResponse,
         )
 
@@ -182,7 +220,12 @@ class ClientSideConnection:
         return await request_model(
             self._conn,
             AGENT_METHODS["session_fork"],
-            ForkSessionRequest(session_id=session_id, cwd=cwd, mcp_servers=mcp_servers, field_meta=kwargs or None),
+            ForkSessionRequest(
+                session_id=session_id,
+                cwd=cwd,
+                mcp_servers=mcp_servers,
+                field_meta=kwargs or None,
+            ),
             ForkSessionResponse,
         )
 
@@ -197,7 +240,12 @@ class ClientSideConnection:
         return await request_model(
             self._conn,
             AGENT_METHODS["session_resume"],
-            ResumeSessionRequest(session_id=session_id, cwd=cwd, mcp_servers=mcp_servers, field_meta=kwargs or None),
+            ResumeSessionRequest(
+                session_id=session_id,
+                cwd=cwd,
+                mcp_servers=mcp_servers,
+                field_meta=kwargs or None,
+            ),
             ResumeSessionResponse,
         )
 

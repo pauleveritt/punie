@@ -61,7 +61,9 @@ class MessageRouter:
         else:
             self._notifications[route.method] = route
 
-    def _make_func(self, model: type[BaseModel], obj: Any, attr: str) -> AsyncHandler | None:
+    def _make_func(
+        self, model: type[BaseModel], obj: Any, attr: str
+    ) -> AsyncHandler | None:
         legacy_api = False
         func = getattr(obj, attr, None)
         if func is None and "_" in attr:
@@ -89,11 +91,15 @@ class MessageRouter:
                 )
             model_obj = model.model_validate(params)
             if legacy_api:
-                return await func(model_obj)  # type: ignore[arg-type]
-            params = {k: getattr(model_obj, k) for k in model.model_fields if k != "field_meta"}
+                return await func(model_obj)
+            params = {
+                k: getattr(model_obj, k)
+                for k in model.model_fields
+                if k != "field_meta"
+            }
             if meta := getattr(model_obj, "field_meta", None):
                 params.update(meta)
-            return await func(**params)  # type: ignore[arg-type]
+            return await func(**params)
 
         return wrapper
 
@@ -151,7 +157,9 @@ class MessageRouter:
         self._notification_extensions = handler
         return handler
 
-    async def __call__(self, method: str, params: Any | None, is_notification: bool) -> Any:
+    async def __call__(
+        self, method: str, params: Any | None, is_notification: bool
+    ) -> Any:
         """The main router call to handle a request or notification."""
         if is_notification:
             ext_handler = self._notification_extensions

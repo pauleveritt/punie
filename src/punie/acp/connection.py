@@ -39,7 +39,13 @@ __all__ = ["Connection", "JsonValue", "MethodHandler", "StreamDirection", "Strea
 
 
 DispatcherFactory = Callable[
-    [MessageQueue, TaskSupervisor, MessageStateStore, RequestRunner, NotificationRunner],
+    [
+        MessageQueue,
+        TaskSupervisor,
+        MessageStateStore,
+        RequestRunner,
+        NotificationRunner,
+    ],
     MessageDispatcher,
 ]
 
@@ -83,7 +89,9 @@ class Connection:
         self._tasks.add_error_handler(self._on_task_error)
         self._queue = queue or InMemoryMessageQueue()
         self._closed = False
-        self._sender = (sender_factory or self._default_sender_factory)(self._writer, self._tasks)
+        self._sender = (sender_factory or self._default_sender_factory)(
+            self._writer, self._tasks
+        )
         if listening:
             self._recv_task = self._tasks.create(
                 self._receive_loop(),
@@ -135,12 +143,19 @@ class Connection:
         request_id = self._next_request_id
         self._next_request_id += 1
         future = self._state.register_outgoing(request_id, method)
-        payload = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
+        payload = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": method,
+            "params": params,
+        }
         await self._sender.send(payload)
         self._notify_observers(StreamDirection.OUTGOING, payload)
         return await future
 
-    async def send_notification(self, method: str, params: JsonValue | None = None) -> None:
+    async def send_notification(
+        self, method: str, params: JsonValue | None = None
+    ) -> None:
         payload = {"jsonrpc": "2.0", "method": method, "params": params}
         await self._sender.send(payload)
         self._notify_observers(StreamDirection.OUTGOING, payload)
@@ -173,7 +188,9 @@ class Connection:
         if has_id:
             await self._handle_response(message)
 
-    def _notify_observers(self, direction: StreamDirection, message: dict[str, Any]) -> None:
+    def _notify_observers(
+        self, direction: StreamDirection, message: dict[str, Any]
+    ) -> None:
         if not self._observers:
             return
         snapshot = copy.deepcopy(message)
@@ -238,7 +255,10 @@ class Connection:
 
     async def _run_notification(self, message: dict[str, Any]) -> None:
         method = message["method"]
-        with span_context("acp.notification", attributes={"method": method}), contextlib.suppress(Exception):
+        with (
+            span_context("acp.notification", attributes={"method": method}),
+            contextlib.suppress(Exception),
+        ):
             await self._handler(method, message.get("params"), True)
 
     async def _handle_response(self, message: dict[str, Any]) -> None:
@@ -283,5 +303,7 @@ class Connection:
             notification_runner=notification_runner,
         )
 
-    def _default_sender_factory(self, writer: asyncio.StreamWriter, supervisor: TaskSupervisor) -> MessageSender:
+    def _default_sender_factory(
+        self, writer: asyncio.StreamWriter, supervisor: TaskSupervisor
+    ) -> MessageSender:
         return MessageSender(writer, supervisor)

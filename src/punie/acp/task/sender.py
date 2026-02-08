@@ -23,11 +23,15 @@ class _PendingSend:
 
 
 class MessageSender:
-    def __init__(self, writer: asyncio.StreamWriter, supervisor: TaskSupervisor) -> None:
+    def __init__(
+        self, writer: asyncio.StreamWriter, supervisor: TaskSupervisor
+    ) -> None:
         self._writer = writer
         self._queue: asyncio.Queue[_PendingSend | None] = asyncio.Queue()
         self._closed = False
-        self._task = supervisor.create(self._loop(), name="acp.Sender.loop", on_error=self._on_error)
+        self._task = supervisor.create(
+            self._loop(), name="acp.Sender.loop", on_error=self._on_error
+        )
 
     async def send(self, payload: dict[str, Any]) -> None:
         data = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")

@@ -24,11 +24,17 @@ from ..utils import normalize_result
 __all__ = ["build_agent_router"]
 
 
-def build_agent_router(agent: Agent, use_unstable_protocol: bool = False) -> MessageRouter:
+def build_agent_router(
+    agent: Agent, use_unstable_protocol: bool = False
+) -> MessageRouter:
     router = MessageRouter(use_unstable_protocol=use_unstable_protocol)
 
-    router.route_request(AGENT_METHODS["initialize"], InitializeRequest, agent, "initialize")
-    router.route_request(AGENT_METHODS["session_new"], NewSessionRequest, agent, "new_session")
+    router.route_request(
+        AGENT_METHODS["initialize"], InitializeRequest, agent, "initialize"
+    )
+    router.route_request(
+        AGENT_METHODS["session_new"], NewSessionRequest, agent, "new_session"
+    )
     router.route_request(
         AGENT_METHODS["session_load"],
         LoadSessionRequest,
@@ -36,7 +42,13 @@ def build_agent_router(agent: Agent, use_unstable_protocol: bool = False) -> Mes
         "load_session",
         adapt_result=normalize_result,
     )
-    router.route_request(AGENT_METHODS["session_list"], ListSessionsRequest, agent, "list_sessions", unstable=True)
+    router.route_request(
+        AGENT_METHODS["session_list"],
+        ListSessionsRequest,
+        agent,
+        "list_sessions",
+        unstable=True,
+    )
     router.route_request(
         AGENT_METHODS["session_set_mode"],
         SetSessionModeRequest,
@@ -44,7 +56,9 @@ def build_agent_router(agent: Agent, use_unstable_protocol: bool = False) -> Mes
         "set_session_mode",
         adapt_result=normalize_result,
     )
-    router.route_request(AGENT_METHODS["session_prompt"], PromptRequest, agent, "prompt")
+    router.route_request(
+        AGENT_METHODS["session_prompt"], PromptRequest, agent, "prompt"
+    )
     router.route_request(
         AGENT_METHODS["session_set_model"],
         SetSessionModelRequest,
@@ -60,10 +74,24 @@ def build_agent_router(agent: Agent, use_unstable_protocol: bool = False) -> Mes
         "authenticate",
         adapt_result=normalize_result,
     )
-    router.route_request(AGENT_METHODS["session_fork"], ForkSessionRequest, agent, "fork_session", unstable=True)
-    router.route_request(AGENT_METHODS["session_resume"], ResumeSessionRequest, agent, "resume_session", unstable=True)
+    router.route_request(
+        AGENT_METHODS["session_fork"],
+        ForkSessionRequest,
+        agent,
+        "fork_session",
+        unstable=True,
+    )
+    router.route_request(
+        AGENT_METHODS["session_resume"],
+        ResumeSessionRequest,
+        agent,
+        "resume_session",
+        unstable=True,
+    )
 
-    router.route_notification(AGENT_METHODS["session_cancel"], CancelNotification, agent, "cancel")
+    router.route_notification(
+        AGENT_METHODS["session_cancel"], CancelNotification, agent, "cancel"
+    )
 
     @router.handle_extension_request
     async def _handle_extension_request(name: str, payload: dict[str, Any]) -> Any:
@@ -73,7 +101,9 @@ def build_agent_router(agent: Agent, use_unstable_protocol: bool = False) -> Mes
         return await ext(name, payload)
 
     @router.handle_extension_notification
-    async def _handle_extension_notification(name: str, payload: dict[str, Any]) -> None:
+    async def _handle_extension_notification(
+        name: str, payload: dict[str, Any]
+    ) -> None:
         ext = getattr(agent, "ext_notification", None)
         if ext is None:
             return

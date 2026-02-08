@@ -32,12 +32,12 @@ class _WritePipeProtocol(asyncio.BaseProtocol):
         self._paused = False
         self._drain_waiter: asyncio.Future[None] | None = None
 
-    def pause_writing(self) -> None:  # type: ignore[override]
+    def pause_writing(self) -> None:
         self._paused = True
         if self._drain_waiter is None:
             self._drain_waiter = self._loop.create_future()
 
-    def resume_writing(self) -> None:  # type: ignore[override]
+    def resume_writing(self) -> None:
         self._paused = False
         if self._drain_waiter is not None and not self._drain_waiter.done():
             self._drain_waiter.set_result(None)
@@ -48,7 +48,9 @@ class _WritePipeProtocol(asyncio.BaseProtocol):
             await self._drain_waiter
 
 
-def _start_stdin_feeder(loop: asyncio.AbstractEventLoop, reader: asyncio.StreamReader) -> None:
+def _start_stdin_feeder(
+    loop: asyncio.AbstractEventLoop, reader: asyncio.StreamReader
+) -> None:
     # Feed stdin from a background thread line-by-line
     def blocking_read() -> None:
         try:
@@ -69,7 +71,7 @@ class _StdoutTransport(asyncio.BaseTransport):
     def __init__(self) -> None:
         self._is_closing = False
 
-    def write(self, data: bytes) -> None:  # type: ignore[override]
+    def write(self, data: bytes) -> None:
         if self._is_closing:
             return
         try:
@@ -78,21 +80,21 @@ class _StdoutTransport(asyncio.BaseTransport):
         except Exception:
             logging.exception("Error writing to stdout")
 
-    def can_write_eof(self) -> bool:  # type: ignore[override]
+    def can_write_eof(self) -> bool:
         return False
 
-    def is_closing(self) -> bool:  # type: ignore[override]
+    def is_closing(self) -> bool:
         return self._is_closing
 
-    def close(self) -> None:  # type: ignore[override]
+    def close(self) -> None:
         self._is_closing = True
         with contextlib.suppress(Exception):
             sys.stdout.flush()
 
-    def abort(self) -> None:  # type: ignore[override]
+    def abort(self) -> None:
         self.close()
 
-    def get_extra_info(self, name: str, default=None):  # type: ignore[override]
+    def get_extra_info(self, name: str, default=None):
         return default
 
 
@@ -100,14 +102,20 @@ async def _windows_stdio_streams(
     loop: asyncio.AbstractEventLoop,
     limit: int | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    reader = asyncio.StreamReader(limit=limit) if limit is not None else asyncio.StreamReader()
+    reader = (
+        asyncio.StreamReader(limit=limit)
+        if limit is not None
+        else asyncio.StreamReader()
+    )
     _ = asyncio.StreamReaderProtocol(reader)
 
     _start_stdin_feeder(loop, reader)
 
     write_protocol = _WritePipeProtocol()
     transport = _StdoutTransport()
-    writer = asyncio.StreamWriter(cast(aio_transports.WriteTransport, transport), write_protocol, None, loop)
+    writer = asyncio.StreamWriter(
+        cast(aio_transports.WriteTransport, transport), write_protocol, None, loop
+    )
     return reader, writer
 
 
@@ -116,7 +124,11 @@ async def _posix_stdio_streams(
     limit: int | None = None,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     # Reader from stdin
-    reader = asyncio.StreamReader(limit=limit) if limit is not None else asyncio.StreamReader()
+    reader = (
+        asyncio.StreamReader(limit=limit)
+        if limit is not None
+        else asyncio.StreamReader()
+    )
     reader_protocol = asyncio.StreamReaderProtocol(reader)
     await loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
 
@@ -127,7 +139,9 @@ async def _posix_stdio_streams(
     return reader, writer
 
 
-async def stdio_streams(limit: int | None = None) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+async def stdio_streams(
+    limit: int | None = None,
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """Create stdio asyncio streams; on Windows use a thread feeder + custom stdout transport.
 
     Args:
@@ -150,7 +164,9 @@ async def spawn_stdio_connection(
     **transport_kwargs: Any,
 ) -> AsyncIterator[tuple[Connection, aio_subprocess.Process]]:
     """Spawn a subprocess and bind its stdio to a low-level Connection."""
-    async with spawn_stdio_transport(command, *args, env=env, cwd=cwd, **transport_kwargs) as (reader, writer, process):
+    async with spawn_stdio_transport(
+        command, *args, env=env, cwd=cwd, **transport_kwargs
+    ) as (reader, writer, process):
         conn = Connection(handler, writer, reader, observers=observers)
         try:
             yield conn, process
