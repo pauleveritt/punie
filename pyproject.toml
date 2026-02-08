@@ -3,7 +3,9 @@ name = "punie"
 version = "0.1.0"
 description = "AI coding agent that delegates tool execution to PyCharm via ACP"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "agent-client-protocol>=0.7.1",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -24,6 +26,7 @@ dev = [
     "pyrefly>=0.46.1",
     "pyright>=1.1.407",
     "pytest>=8.4.2",
+    "pytest-asyncio>=0.24.0",
     "pytest-cov>=4.1.0",
     "pytest-run-parallel>=0.8.1",
     "pytest-timeout>=2.4.0",
@@ -40,9 +43,14 @@ testpaths = ["tests", "src", "examples"]
 python_files = ["test_*.py"]
 addopts = "-p no:doctest -m \"not slow\""
 pythonpath = ["examples"]
+asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "freethreaded: marks tests that verify free-threading compatibility",
+]
+thread_unsafe_fixtures = [
+    "server",
+    "connect",
 ]
 # Free-threading safety: timeout tests to detect hangs/deadlocks
 timeout = 60

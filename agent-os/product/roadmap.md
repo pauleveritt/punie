@@ -4,9 +4,9 @@
 **Status:** In Progress
 
 - [x] 1.1 Set up project structure matching existing projects (svcs-di, tdom-svcs)
-- [ ] 1.2 Create comprehensive examples
-- [ ] 1.3 Add documentation with deep research on python-sdk and Pydantic AI
-- [ ] 1.4 Configure pytest setup proving python-sdk works correctly
+- [x] 1.2 Create comprehensive examples
+- [x] 1.3 Add documentation with deep research on python-sdk and Pydantic AI
+- [x] 1.4 Configure pytest setup proving python-sdk works correctly
 
 ## 2. Test-Driven Refactoring
 **Status:** Not Started
