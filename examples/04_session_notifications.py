@@ -12,15 +12,15 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp import (
+from punie.acp import (
     plan_entry,
     session_notification,
     start_tool_call,
     update_agent_message_text,
     update_plan,
 )
-from acp.contrib import SessionAccumulator
-from acp.schema import ToolCallLocation
+from punie.acp.contrib import SessionAccumulator
+from punie.acp.schema import ToolCallLocation
 
 
 def main() -> None:

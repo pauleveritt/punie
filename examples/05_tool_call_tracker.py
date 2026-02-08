@@ -13,8 +13,8 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp.contrib import ToolCallTracker
-from acp.schema import ToolCallLocation
+from punie.acp.contrib import ToolCallTracker
+from punie.acp.schema import ToolCallLocation
 
 
 def main() -> None:
@@ -48,6 +48,7 @@ def main() -> None:
     assert view.tool_call_id == "tool-1"
     assert view.kind == "read"
     assert view.status == "in_progress"
+    assert view.locations is not None
     assert len(view.locations) == 1
 
     # Create ToolCallUpdate for permission request

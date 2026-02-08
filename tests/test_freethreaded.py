@@ -22,7 +22,7 @@ from typing import Callable
 
 import pytest
 
-from acp.schema import InitializeResponse, ToolCallLocation
+from punie.acp.schema import InitializeResponse, ToolCallLocation
 
 
 def _run_threaded(fn: Callable[[int], None], num_threads: int = 10) -> None:

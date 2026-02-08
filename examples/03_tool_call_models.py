@@ -12,14 +12,14 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp import (
+from punie.acp import (
     start_edit_tool_call,
     start_read_tool_call,
     start_tool_call,
     tool_diff_content,
     update_tool_call,
 )
-from acp.schema import ToolCallLocation
+from punie.acp.schema import ToolCallLocation
 
 
 def main() -> None:
@@ -39,6 +39,7 @@ def main() -> None:
     assert tool_call_start.title == "Reading file"
     assert tool_call_start.kind == "read"
     assert tool_call_start.status == "in_progress"
+    assert tool_call_start.locations is not None
     assert len(tool_call_start.locations) == 1
     assert tool_call_start.locations[0].path == "/path/to/file.py"
     assert tool_call_start.raw_input == '{"file_path": "/path/to/file.py"}'
@@ -48,6 +49,7 @@ def main() -> None:
     read_call = start_read_tool_call("call-2", "Reading readme", "/path/to/readme.md")
     assert read_call.kind == "read"
     assert read_call.status == "pending"
+    assert read_call.locations is not None
     assert len(read_call.locations) == 1
     assert read_call.locations[0].path == "/path/to/readme.md"
 
@@ -60,6 +62,7 @@ def main() -> None:
     )
     assert edit_call.kind == "edit"
     assert edit_call.status == "pending"
+    assert edit_call.locations is not None
     assert edit_call.locations[0].path == "/path/to/source.py"
 
     # update_tool_call() to transition status

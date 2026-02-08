@@ -11,7 +11,7 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp.schema import InitializeResponse, TextContentBlock
+from punie.acp.schema import InitializeResponse, TextContentBlock
 
 
 def main() -> None:

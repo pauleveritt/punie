@@ -19,8 +19,8 @@ For implementation reference, see:
 Tier: 3 (Aspirational)
 """
 
-from acp import start_tool_call
-from acp.schema import ToolCallLocation
+from punie.acp import start_tool_call
+from punie.acp.schema import ToolCallLocation
 
 
 def main() -> None:
@@ -59,7 +59,7 @@ def main() -> None:
         tool_call = start_tool_call(
             f"call-{idx}",
             f"Using {tool_kind}",
-            kind=tool_kind,
+            kind=tool_kind,  # ty: ignore[invalid-argument-type]  # tool_kind is string from literal list
             status="in_progress",
             locations=[ToolCallLocation(path="/example/file.py")],
             raw_input=f'{{"kind": "{tool_kind}"}}',

@@ -26,8 +26,7 @@ Punie aims to be fast even on lower-end hardware. How? We'd like to investigate:
 ## Research
 
 - The [Agent Client Protocol](https://agentclientprotocol.com/get-started/introduction) home page describes ACP
-- [python-sdk](~/PycharmProjects/python-acp-sdk) is a local checkout of the ACP Python SDK including the docs
-  directory for documentation
+- The ACP Python SDK has been vendored into `src/punie/acp/` for modification and Pydantic AI integration
 - [Pydantic AI](~/PycharmProjects/pydantic-ai) is a local checkout of the Pydantic AI project, including a docs
   directory
 

@@ -3,7 +3,7 @@
 Demonstrates full ACP agent-client connection over TCP loopback.
 
 This example shows:
-- Setting up _Server as async context manager
+- Setting up LoopbackServer as async context manager
 - Wiring AgentSideConnection and ClientSideConnection to server streams
 - Initialize handshake (protocol_version=1)
 - Creating new session via new_session()
@@ -11,14 +11,9 @@ This example shows:
 - Full bidirectional ACP protocol flow in-process
 
 Tier: 2 (Async, self-contained TCP loopback)
-
-NOTE: This example imports from tests.acp_helpers. When running standalone,
-the __main__ guard adds the project root to sys.path to make tests importable.
 """
 
 import asyncio
-import sys
-from pathlib import Path
 
 
 def main() -> None:
@@ -32,13 +27,11 @@ async def async_main() -> None:
     This example shows connection setup using _Server, FakeAgent, and FakeClient.
     Full protocol handshake and file operations are demonstrated in integration tests.
     """
-    # Import after sys.path adjustment (in __main__ guard)
-    from acp.core import AgentSideConnection, ClientSideConnection
-
-    from tests.acp_helpers import FakeAgent, FakeClient, _Server
+    from punie.acp.core import AgentSideConnection, ClientSideConnection
+    from punie.testing import FakeAgent, FakeClient, LoopbackServer
 
     # Set up TCP loopback server
-    async with _Server() as server:
+    async with LoopbackServer() as server:
         # Create fake agent and client
         agent = FakeAgent()
         client = FakeClient()
@@ -69,15 +62,9 @@ async def async_main() -> None:
         # Full protocol flow (initialize, new_session, file ops) is shown in tests/test_acp_sdk.py
 
         print(
-            "✓ Connection structure: _Server, FakeAgent, FakeClient, connections verified"
+            "✓ Connection structure: LoopbackServer, FakeAgent, FakeClient, connections verified"
         )
 
 
 if __name__ == "__main__":
-    # Add project root to sys.path for standalone execution
-    # This makes tests.acp_helpers importable
-    project_root = Path(__file__).parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-
     main()

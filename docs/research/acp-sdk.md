@@ -12,10 +12,10 @@ clients (editors, IDEs) to orchestrate AI agents through a standardized communic
 
 **SDK Details:**
 
-- Version: v0.7.1
-- PyPI Package: `agent-client-protocol`
-- Runtime dependency: `pydantic>=2.7`
-- Local checkout: `~/PycharmProjects/python-acp-sdk/`
+- Version: v0.7.1 (vendored from upstream)
+- Vendored location: `src/punie/acp/`
+- Runtime dependency: `pydantic>=2.0`
+- Note: SDK has been vendored into Punie for modification and Pydantic AI integration
 
 **Architecture:**
 

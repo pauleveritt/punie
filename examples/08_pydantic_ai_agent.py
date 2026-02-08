@@ -18,7 +18,7 @@ For research background, see:
 Tier: 3 (Aspirational)
 """
 
-from acp import start_edit_tool_call, start_read_tool_call, update_tool_call
+from punie.acp import start_edit_tool_call, start_read_tool_call, update_tool_call
 
 
 def main() -> None:

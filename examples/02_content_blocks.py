@@ -11,8 +11,8 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp import text_block, update_agent_message_text, update_user_message_text
-from acp.schema import ImageContentBlock, TextContentBlock
+from punie.acp import text_block, update_agent_message_text, update_user_message_text
+from punie.acp.schema import ImageContentBlock, TextContentBlock
 
 
 def main() -> None:

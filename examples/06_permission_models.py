@@ -11,9 +11,9 @@ This example shows:
 Tier: 1 (Sync, schema-only)
 """
 
-from acp import RequestPermissionRequest
-from acp.contrib import default_permission_options
-from acp.schema import PermissionOption, ToolCallLocation, ToolCallUpdate
+from punie.acp import RequestPermissionRequest
+from punie.acp.contrib import default_permission_options
+from punie.acp.schema import PermissionOption, ToolCallLocation, ToolCallUpdate
 
 
 def main() -> None:

@@ -6,8 +6,11 @@ import pytest_asyncio
 from sybil import Sybil
 from sybil.parsers.myst import PythonCodeBlockParser
 
-from acp.core import AgentSideConnection, ClientSideConnection
-from tests.acp_helpers import FakeAgent, FakeClient, _Server
+from punie.acp.core import AgentSideConnection, ClientSideConnection
+from punie.testing import FakeAgent, FakeClient, LoopbackServer
+
+# Backward compatibility alias
+_Server = LoopbackServer
 
 # Sybil configuration for MyST doctest integration
 pytest_collect_file = Sybil(
@@ -17,9 +20,9 @@ pytest_collect_file = Sybil(
 
 
 @pytest_asyncio.fixture
-async def server() -> AsyncGenerator[_Server, None]:
+async def server() -> AsyncGenerator[LoopbackServer, None]:
     """Provides a server-client connection pair for testing."""
-    async with _Server() as server_instance:
+    async with LoopbackServer() as server_instance:
         yield server_instance
 
 
