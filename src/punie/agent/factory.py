@@ -4,11 +4,16 @@ Provides create_pydantic_agent() for constructing Pydantic AI Agent instances
 configured with ACPDeps and toolset (static or dynamic).
 """
 
+import logging
+
 from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
+from pydantic_ai.models.test import TestModel
 
 from punie.agent.deps import ACPDeps
 from punie.agent.toolset import create_toolset
+
+logger = logging.getLogger(__name__)
 
 PUNIE_INSTRUCTIONS = """\
 You are Punie, an AI coding assistant that works inside PyCharm.
@@ -27,6 +32,19 @@ Guidelines:
 """
 
 
+def _create_enhanced_test_model() -> TestModel:
+    """Create a TestModel with realistic responses for testing.
+
+    Returns a TestModel that provides helpful, realistic responses instead of just "a".
+    Does NOT call tools (would cause deadlock with ACP request-response cycle).
+    """
+    logger.info("Creating enhanced test model with realistic responses (no tool calls)")
+    return TestModel(
+        custom_output_text="I understand the request. Let me help with that task.",
+        call_tools=[],  # Don't call tools - would cause deadlock in ACP request-response
+    )
+
+
 def create_pydantic_agent(
     model: KnownModelName | Model = "test",
     toolset: FunctionToolset[ACPDeps] | None = None,
@@ -34,7 +52,7 @@ def create_pydantic_agent(
     """Create a Pydantic AI agent configured for Punie.
 
     Args:
-        model: Model name (default: "test" for TestModel, no LLM calls).
+        model: Model name (default: "test" for enhanced TestModel, no LLM calls).
                Other options: "openai:gpt-4", "anthropic:claude-3-5-sonnet", etc.
                Can also pass a Model instance directly.
         toolset: Optional toolset to use. If None, uses create_toolset() (all 7 static tools).
@@ -46,6 +64,11 @@ def create_pydantic_agent(
     """
     if toolset is None:
         toolset = create_toolset()
+
+    # Use enhanced test model if "test" string is passed
+    if model == "test":
+        logger.info("Using enhanced test model for better debugging")
+        model = _create_enhanced_test_model()
 
     agent = Agent[ACPDeps, str](
         model,

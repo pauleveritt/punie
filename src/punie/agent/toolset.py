@@ -9,16 +9,17 @@ Provides three toolset factories:
 - create_toolset_from_catalog() — Build from ToolCatalog (Tier 1, dynamic discovery)
 """
 
+import logging
 from typing import Any
 
 from pydantic_ai import FunctionToolset, ModelRetry, RunContext
-
 from punie.acp.contrib.permissions import default_permission_options
 from punie.acp.helpers import text_block, tool_content, tool_terminal_ref
 from punie.acp.schema import ClientCapabilities, ToolCallLocation
-
 from punie.agent.deps import ACPDeps
 from punie.agent.discovery import ToolCatalog, ToolDescriptor
+
+logger = logging.getLogger(__name__)
 
 
 async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:
@@ -36,6 +37,8 @@ async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:
     Returns:
         File contents as string
     """
+    logger.info(f"🔧 TOOL: read_file(path={path})")
+
     # Start tracking this tool call
     tool_call_id = f"read_{path}"
     start = ctx.deps.tracker.start(
@@ -48,10 +51,12 @@ async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:
 
     try:
         # Perform ACP file read
+        logger.debug(f"Calling client_conn.read_text_file({path})")
         response = await ctx.deps.client_conn.read_text_file(
             session_id=ctx.deps.session_id,
             path=path,
         )
+        logger.info(f"✓ Read {len(response.content)} chars from {path}")
 
         # Report completion
         progress = ctx.deps.tracker.progress(
@@ -63,6 +68,7 @@ async def read_file(ctx: RunContext[ACPDeps], path: str) -> str:
 
         return response.content
     except Exception as exc:
+        logger.error(f"✗ Failed to read {path}: {exc}")
         raise ModelRetry(f"Failed to read {path}: {exc}") from exc
     finally:
         # Clean up tracker
@@ -82,6 +88,7 @@ async def write_file(ctx: RunContext[ACPDeps], path: str, content: str) -> str:
     Returns:
         Success or denial message
     """
+    logger.info(f"🔧 TOOL: write_file(path={path}, content={len(content)} chars)")
     tool_call_id = f"write_{path}"
 
     # Start tracking

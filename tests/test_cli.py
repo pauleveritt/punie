@@ -233,24 +233,29 @@ def test_merge_does_not_mutate_original():
 
 
 def test_cli_init_creates_file(tmp_path, monkeypatch):
-    """punie init writes acp.json."""
+    """punie init writes acp.json with test model by default."""
     monkeypatch.setattr(shutil, "which", lambda x: "/usr/local/bin/punie")
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)  # No venv for clean test
     output = tmp_path / "acp.json"
-    result = runner.invoke(app, ["init", "--output", str(output)])
+    result = runner.invoke(app, ["init", "--output", str(output), "--no-venv"])
     assert result.exit_code == 0
     assert output.exists()
     data = json.loads(output.read_text())
     assert "agent_servers" in data
     assert "punie" in data["agent_servers"]
     assert data["agent_servers"]["punie"]["command"] == "/usr/local/bin/punie"
+    # Verify test model is default
+    assert data["agent_servers"]["punie"]["env"]["PUNIE_MODEL"] == "test"
 
 
 def test_cli_init_with_model(tmp_path, monkeypatch):
     """--model flag sets env."""
     monkeypatch.setattr(shutil, "which", lambda x: "/usr/local/bin/punie")
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
     output = tmp_path / "acp.json"
     result = runner.invoke(
-        app, ["init", "--model", "claude-opus-4", "--output", str(output)]
+        app,
+        ["init", "--model", "claude-opus-4", "--output", str(output), "--no-venv"],
     )
     assert result.exit_code == 0
     data = json.loads(output.read_text())
@@ -260,11 +265,12 @@ def test_cli_init_with_model(tmp_path, monkeypatch):
 def test_cli_init_merges_existing(tmp_path, monkeypatch):
     """Merges with existing config."""
     monkeypatch.setattr(shutil, "which", lambda x: "/usr/local/bin/punie")
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
     output = tmp_path / "acp.json"
     existing = {"agent_servers": {"other": {"command": "/bin/other", "args": []}}}
     output.write_text(json.dumps(existing))
 
-    result = runner.invoke(app, ["init", "--output", str(output)])
+    result = runner.invoke(app, ["init", "--output", str(output), "--no-venv"])
     assert result.exit_code == 0
     data = json.loads(output.read_text())
     assert "other" in data["agent_servers"]

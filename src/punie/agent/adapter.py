@@ -216,9 +216,14 @@ class PunieAgent:
         if not self._legacy_agent and self._conn:
             state = await self._discover_and_build_toolset(session_id)
             self._sessions[session_id] = state
+            tool_count = (
+                len(state.agent._function_toolset.tools)
+                if state.agent._function_toolset
+                else 0
+            )
             logger.info(
                 f"Registered session {session_id}: Tier {state.discovery_tier}, "
-                f"{len(state.catalog.tools) if state.catalog else 0} tools"
+                f"{tool_count} tools"
             )
 
         return NewSessionResponse(session_id=session_id)
@@ -299,15 +304,20 @@ class PunieAgent:
         2. Use client_capabilities if no discovery (capability flags)
         3. Use all 7 static tools if no capabilities (backward compat)
         """
+        logger.info(f"=== prompt() called for session {session_id} ===")
+
         # Extract text from prompt blocks
         prompt_text = ""
         for block in prompt:
             if isinstance(block, TextContentBlock):
                 prompt_text += block.text
 
+        logger.info(f"Extracted prompt text ({len(prompt_text)} chars): {prompt_text[:200]}...")
+
         # Construct dependencies for Pydantic AI
         conn = self._conn
         if not conn:
+            logger.error("No client connection established")
             raise RuntimeError("No client connection established")
 
         deps = ACPDeps(
@@ -315,17 +325,22 @@ class PunieAgent:
             session_id=session_id,
             tracker=ToolCallTracker(),
         )
+        logger.debug(f"Created ACPDeps for session {session_id}")
 
         # Use cached session state or lazy fallback
         pydantic_agent: PydanticAgent[ACPDeps, str]
         if self._legacy_agent:
             # Legacy mode: use pre-constructed agent
+            logger.info("Using legacy agent mode")
             pydantic_agent = self._legacy_agent  # ty: ignore[invalid-assignment]
         elif session_id in self._sessions:
             # Use cached session state (registered in new_session)
-            pydantic_agent = self._sessions[session_id].agent
+            state = self._sessions[session_id]
+            logger.info(f"Using cached session state (Tier {state.discovery_tier})")
+            pydantic_agent = state.agent
         else:
             # Lazy fallback for callers that skip new_session()
+            logger.info("No cached session, performing lazy registration")
             state = await self._discover_and_build_toolset(session_id)
             self._sessions[session_id] = state
             pydantic_agent = state.agent
@@ -333,24 +348,43 @@ class PunieAgent:
                 f"Lazy registration for session {session_id}: Tier {state.discovery_tier}"
             )
 
+        # Log model and tool information
+        logger.info(f"Agent model: {pydantic_agent.model}")
+        if pydantic_agent._function_toolset:
+            tool_names = list(pydantic_agent._function_toolset.tools.keys())
+            logger.info(f"Agent tools available: {tool_names}")
+        else:
+            logger.info("Agent has no tools")
+
         # Delegate to Pydantic AI with error handling
+        logger.info("Calling pydantic_agent.run()...")
         try:
             result = await pydantic_agent.run(
                 prompt_text, deps=deps, usage_limits=self._usage_limits
             )
             response_text = result.output
+            logger.info(f"Agent run successful, response length: {len(response_text)} chars")
+            logger.info(f"Response preview: {response_text[:200]}...")
+
+            # Log usage info if available
+            if result.usage():
+                usage = result.usage()
+                logger.info(f"Token usage - requests: {usage.requests}, total tokens: {usage.total_tokens}")
 
         except UsageLimitExceeded as exc:
+            logger.error(f"Usage limit exceeded: {exc}")
             response_text = f"Usage limit exceeded: {exc}"
 
         except Exception as exc:
             logger.exception("Agent run failed")
             response_text = f"Agent error: {exc}"
 
+        logger.info("Sending session_update to client...")
         await conn.session_update(
             session_id,
             update_agent_message(text_block(response_text)),
         )
+        logger.info(f"=== prompt() complete for session {session_id} ===")
         return PromptResponse(stop_reason="end_turn")
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:

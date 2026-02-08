@@ -251,20 +251,28 @@ def main(
 @app.command()
 def init(
     model: str | None = typer.Option(
-        None,
+        "test",
         "--model",
-        help="Pre-configure PUNIE_MODEL environment variable",
+        help="Model to use (default: test for debugging, or specify claude-sonnet-4-5-20250929)",
     ),
     output: Path = typer.Option(
         Path.home() / ".jetbrains" / "acp.json",
         "--output",
         help="Output path for acp.json",
     ),
+    include_venv: bool = typer.Option(
+        True,
+        "--include-venv/--no-venv",
+        help="Include UV_PROJECT_ENVIRONMENT for local development",
+    ),
 ) -> None:
     """Generate JetBrains ACP configuration for Punie.
 
     Creates ~/.jetbrains/acp.json to enable PyCharm agent discovery.
     Merges with existing config to preserve other agents.
+
+    By default, sets PUNIE_MODEL=test for easier debugging with enhanced logging.
+    Use --model to specify a real model like claude-sonnet-4-5-20250929.
     """
     # Resolve Punie executable
     command, args = resolve_punie_command()
@@ -273,6 +281,13 @@ def init(
     env = {}
     if model:
         env["PUNIE_MODEL"] = model
+
+    # Add venv path if requested and we're in a uv project
+    if include_venv:
+        venv_path = os.getenv("VIRTUAL_ENV")
+        if venv_path:
+            env["UV_PROJECT_ENVIRONMENT"] = venv_path
+            typer.echo(f"  Using venv: {venv_path}")
 
     # Generate base config
     punie_config = generate_acp_config(command, args, env)
@@ -300,9 +315,17 @@ def init(
     typer.echo(f"  Command: {command}")
     if args:
         typer.echo(f"  Args: {' '.join(args)}")
+    if model == "test":
+        typer.secho(
+            f"  Model: {model} (enhanced test model with detailed logging)",
+            fg=typer.colors.YELLOW,
+        )
+    elif model:
+        typer.echo(f"  Model: {model}")
     if env:
         for key, value in env.items():
-            typer.echo(f"  {key}: {value}")
+            if key != "PUNIE_MODEL":  # Already shown above
+                typer.echo(f"  {key}: {value}")
 
 
 @app.command()
