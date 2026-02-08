@@ -212,7 +212,10 @@ def test_map_request_with_system_and_user():
     chat_messages = model._map_request(messages)
 
     assert len(chat_messages) == 2
-    assert chat_messages[0] == {"role": "system", "content": "You are a helpful assistant."}
+    assert chat_messages[0] == {
+        "role": "system",
+        "content": "You are a helpful assistant.",
+    }
     assert chat_messages[1] == {"role": "user", "content": "Hello!"}
 
 
@@ -304,7 +307,9 @@ async def test_request_with_text_response():
 
     # Create model with dependency injection and override _generate
     model = MLXModel("fake-model", model_data=MagicMock(), tokenizer=MagicMock())
-    model._generate = lambda messages, tools, settings, stream: "This is a text response."
+    model._generate = lambda messages, tools, settings, stream: (
+        "This is a text response."
+    )
 
     messages = [ModelRequest(parts=[UserPromptPart(content="Hello")], kind="request")]
     params = ModelRequestParameters()
@@ -329,9 +334,13 @@ async def test_request_with_tool_calls():
 
     # Create model with dependency injection and override _generate
     model = MLXModel("fake-model", model_data=MagicMock(), tokenizer=MagicMock())
-    model._generate = lambda messages, tools, settings, stream: '<tool_call>{"name": "read", "arguments": {"path": "test.py"}}</tool_call>'
+    model._generate = lambda messages, tools, settings, stream: (
+        '<tool_call>{"name": "read", "arguments": {"path": "test.py"}}</tool_call>'
+    )
 
-    messages = [ModelRequest(parts=[UserPromptPart(content="Read test.py")], kind="request")]
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content="Read test.py")], kind="request")
+    ]
     params = ModelRequestParameters()
 
     response = await model.request(messages, None, params)
@@ -355,7 +364,9 @@ async def test_request_with_mixed_text_and_tools():
 
     # Create model with dependency injection and override _generate
     model = MLXModel("fake-model", model_data=MagicMock(), tokenizer=MagicMock())
-    model._generate = lambda messages, tools, settings, stream: 'Let me read that<tool_call>{"name": "read", "arguments": {"path": "x.py"}}</tool_call>'
+    model._generate = lambda messages, tools, settings, stream: (
+        'Let me read that<tool_call>{"name": "read", "arguments": {"path": "x.py"}}</tool_call>'
+    )
 
     messages = [ModelRequest(parts=[UserPromptPart(content="Help")], kind="request")]
     params = ModelRequestParameters()

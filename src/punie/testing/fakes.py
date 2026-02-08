@@ -263,9 +263,7 @@ class FakeClient:
             del self.terminals[terminal_id]
         return KillTerminalCommandResponse()
 
-    async def discover_tools(
-        self, session_id: str, **kwargs: Any
-    ) -> dict[str, Any]:
+    async def discover_tools(self, session_id: str, **kwargs: Any) -> dict[str, Any]:
         """Return configured tool catalog for dynamic discovery.
 
         Returns the tool_catalog set at construction time. Used to test

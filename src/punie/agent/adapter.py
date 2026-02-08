@@ -312,7 +312,9 @@ class PunieAgent:
             if isinstance(block, TextContentBlock):
                 prompt_text += block.text
 
-        logger.info(f"Extracted prompt text ({len(prompt_text)} chars): {prompt_text[:200]}...")
+        logger.info(
+            f"Extracted prompt text ({len(prompt_text)} chars): {prompt_text[:200]}..."
+        )
 
         # Construct dependencies for Pydantic AI
         conn = self._conn
@@ -363,13 +365,17 @@ class PunieAgent:
                 prompt_text, deps=deps, usage_limits=self._usage_limits
             )
             response_text = result.output
-            logger.info(f"Agent run successful, response length: {len(response_text)} chars")
+            logger.info(
+                f"Agent run successful, response length: {len(response_text)} chars"
+            )
             logger.info(f"Response preview: {response_text[:200]}...")
 
             # Log usage info if available
             if result.usage():
                 usage = result.usage()
-                logger.info(f"Token usage - requests: {usage.requests}, total tokens: {usage.total_tokens}")
+                logger.info(
+                    f"Token usage - requests: {usage.requests}, total tokens: {usage.total_tokens}"
+                )
 
         except UsageLimitExceeded as exc:
             logger.error(f"Usage limit exceeded: {exc}")

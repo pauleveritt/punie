@@ -231,7 +231,22 @@ class MLXModel(Model):
             )
             raise ImportError(msg) from e
 
-        model_data, tokenizer = mlx_load(model_name)
+        try:
+            model_data, tokenizer = mlx_load(model_name)
+        except Exception as e:
+            # Check if error indicates model not downloaded
+            error_msg = str(e).lower()
+            if (
+                "not found" in error_msg
+                or "does not exist" in error_msg
+                or "no such file" in error_msg
+            ):
+                msg = (
+                    f"Model '{model_name}' is not downloaded.\n"
+                    f"Download it with: punie download-model {model_name}"
+                )
+                raise RuntimeError(msg) from e
+            raise
         return cls(
             model_name,
             model_data=model_data,

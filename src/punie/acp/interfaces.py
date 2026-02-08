@@ -145,9 +145,7 @@ class Client(Protocol):
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalCommandResponse | None: ...
 
-    async def discover_tools(
-        self, session_id: str, **kwargs: Any
-    ) -> dict[str, Any]:
+    async def discover_tools(self, session_id: str, **kwargs: Any) -> dict[str, Any]:
         """Discover available tools from the IDE (Punie extension).
 
         This is a Punie-specific extension to the ACP protocol, not part of upstream.

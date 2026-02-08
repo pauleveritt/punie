@@ -94,12 +94,6 @@ coverage-report:
         echo "Coverage is ${COVERAGE}% which meets the 80% threshold"
     fi
 
-# Run free-threaded Python tests with pytest-run-parallel
-test-run-parallel:
-    uv run pytest -p no:doctest --parallel-threads=8 --iterations=10 tests/
-
-# Run all CI checks including free-threading tests
-ci-checks-ft: quality test-cov-check test-run-parallel
 
 # Enable pre-push hook to run ci-checks before pushing - installs git hook
 # Automatically runs full quality checks before every git push

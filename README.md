@@ -27,7 +27,10 @@ uv pip install 'punie[local]'
 Run Punie completely offline using local MLX models on Apple Silicon:
 
 ```bash
-# Use default local model (Qwen2.5-Coder-7B-Instruct-4bit)
+# 1. Download a model (one-time setup, stored in ~/.cache/punie/models/)
+punie download-model
+
+# 2. Use the default local model
 punie serve --model local
 
 # Or set via environment variable
@@ -35,6 +38,9 @@ PUNIE_MODEL=local punie serve
 
 # Use a specific model
 punie serve --model local:mlx-community/Qwen2.5-Coder-3B-Instruct-4bit
+
+# List available models
+punie download-model --list
 ```
 
 **Recommended models:**
@@ -153,7 +159,6 @@ Punie aims to be fast even on lower-end hardware. How? We'd like to investigate:
     - Extensive use of Python linters, formatters, and type checkers
     - Perhaps extend *those* by making it easy to add custom policies as "skills" but on the deterministic side
     - Explore Pydantic Monty for tool-running
-- Use free-threaded Python (if possible) to tap into more cores
 
 ## Research
 

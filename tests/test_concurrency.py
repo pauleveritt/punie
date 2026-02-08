@@ -1,6 +1,6 @@
 """ACP concurrency tests.
 
-Tests for concurrent operations and free-threading safety.
+Tests for concurrent async operations.
 """
 
 import asyncio
@@ -12,7 +12,7 @@ import pytest
 async def test_concurrent_file_reads(connect, client):
     """Test 7: Concurrent file operations via asyncio.gather.
 
-    Proves free-threading safety: parallel reads should not interfere.
+    Tests async concurrency: parallel reads should not interfere.
     """
     # Pre-populate files
     for i in range(5):

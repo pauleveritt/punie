@@ -201,12 +201,17 @@ coverage/quality improvements which provide more immediate value.
     - Type checking passes (ty), linting passes (ruff), all tests pass
     - Created spec documentation in agent-os/specs/2026-02-08-mlx-model/
     - Created working example: examples/15_mlx_local_model.py
-- [ ] 6.2 Model Download CLI (revives Phase 5.3)
-    - Add `punie download-model` command to download Qwen2.5-Coder-7B-Instruct-4bit
-    - Store models in ~/.punie/models/ directory
-    - Support Hugging Face authentication for model access
-    - Show download progress and verify model integrity
-    - Add --list flag to show available/downloaded models
+- [x] 6.2 Model Download CLI + Switch to Python 3.14 - Completed 2026-02-08
+    - Switched from Python 3.14.2t (free-threaded) to Python 3.14.2 (regular) to unblock mlx-lm installation
+    - Added `punie download-model` command with huggingface_hub.snapshot_download()
+    - Store models in ~/.cache/punie/models/ directory with --models-dir option
+    - Added --list flag to show recommended Qwen2.5-Coder models
+    - Added model validation in MLXModel.from_pretrained() with clear error messages
+    - Added validation in CLI main() and serve() commands to catch missing models
+    - Removed free-threading tests, markers, and CI infrastructure
+    - All 178 tests pass (minus deleted free-threading tests), coverage >80%
+    - Created spec documentation in agent-os/specs/2026-02-08-model-download/
+    - Deferred Phase 9.3 (free-threaded Python) until ecosystem matures
 - [ ] 6.3 Local Tools (adapts ACP tools from Phase 3.3)
     - Create LocalToolset wrapping existing read_file/write_file tools
     - Implement in-memory agent that uses LocalDeps instead of ACPDeps
@@ -252,7 +257,7 @@ coverage/quality improvements which provide more immediate value.
 
 - [ ] 9.1 Create domain-specific skills and policies framework
 - [ ] 9.2 Implement custom deterministic policies for project-specific rules
-- [ ] 9.3 Add support for free-threaded Python (PEP 703)
+- [ ] 9.3 Add support for free-threaded Python (PEP 703) — **Deferred: mlx-lm lacks cp314t wheels (as of 2026-02-08). Project switched to Python 3.14 (regular) to unblock local model installation. May revisit when free-threaded ecosystem matures.**
 - [ ] 9.4 Optimize for parallel agent operations across multiple cores
 
 ## Research

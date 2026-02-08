@@ -245,7 +245,13 @@ def main(
     resolved_model = resolve_model(model)
 
     # Run ACP agent
-    asyncio.run(run_acp_agent(resolved_model, name))
+    try:
+        asyncio.run(run_acp_agent(resolved_model, name))
+    except RuntimeError as e:
+        if "not downloaded" in str(e):
+            typer.secho(str(e), fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from e
+        raise
 
 
 @app.command()
@@ -328,6 +334,85 @@ def init(
                 typer.echo(f"  {key}: {value}")
 
 
+@app.command("download-model")
+def download_model(
+    model_name: str = typer.Argument(
+        "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+        help="HuggingFace model name to download",
+    ),
+    models_dir: Path = typer.Option(
+        Path("~/.cache/punie/models"),
+        "--models-dir",
+        help="Directory to store downloaded models (cached, re-downloadable)",
+    ),
+    list_models: bool = typer.Option(
+        False,
+        "--list",
+        help="List recommended models",
+    ),
+) -> None:
+    """Download MLX models for local inference.
+
+    Downloads quantized MLX models from HuggingFace for offline development.
+    Models are stored in ~/.punie/models/ by default.
+
+    Recommended models:
+    - mlx-community/Qwen2.5-Coder-7B-Instruct-4bit (~4GB, best balance)
+    - mlx-community/Qwen2.5-Coder-3B-Instruct-4bit (~2GB, faster)
+    - mlx-community/Qwen2.5-Coder-14B-Instruct-4bit (~8GB, highest quality)
+    """
+    # Handle --list flag
+    if list_models:
+        typer.echo("Available models:\n")
+        typer.echo(
+            "Name                                            Size    Description"
+        )
+        typer.echo("─" * 78)
+        typer.echo(
+            "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit   ~4GB    Default (best balance)"
+        )
+        typer.echo(
+            "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit   ~2GB    Faster, simpler tasks"
+        )
+        typer.echo(
+            "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit  ~8GB    Highest quality"
+        )
+        typer.echo("\nDownload with: punie download-model <model-name>")
+        raise typer.Exit(0)
+
+    # Check if mlx-lm is installed
+    try:
+        from huggingface_hub import snapshot_download  # type: ignore[import-untyped]
+    except ImportError as e:
+        msg = (
+            "Local model support requires mlx-lm.\n"
+            "Install with: uv pip install 'punie[local]'"
+        )
+        typer.secho(msg, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from e
+
+    # Expand models directory
+    models_dir = models_dir.expanduser()
+    models_dir.mkdir(parents=True, exist_ok=True)
+
+    # Download model
+    typer.echo(f"Downloading {model_name}...")
+    typer.echo(f"Target directory: {models_dir}")
+    typer.echo("")
+
+    try:
+        snapshot_download(
+            repo_id=model_name,
+            local_dir=models_dir / model_name.replace("/", "--"),
+        )
+        typer.secho("✓ Model downloaded successfully!", fg=typer.colors.GREEN)
+        typer.echo(f"  Location: {models_dir / model_name.replace('/', '--')}")
+        typer.echo(f"\nUse with: punie serve --model local:{model_name}")
+    except Exception as e:
+        typer.secho(f"Error downloading model: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from e
+
+
 @app.command()
 def serve(
     host: str = typer.Option(
@@ -380,4 +465,10 @@ def serve(
     typer.echo("")
 
     # Run agent
-    asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
+    try:
+        asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
+    except RuntimeError as e:
+        if "not downloaded" in str(e):
+            typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from e
+        raise

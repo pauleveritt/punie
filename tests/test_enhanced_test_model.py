@@ -26,7 +26,10 @@ def test_enhanced_test_model_config():
 
     # Verify it's a TestModel with correct config
     assert isinstance(model, TestModel)
-    assert model.custom_output_text == "I understand the request. Let me help with that task."
+    assert (
+        model.custom_output_text
+        == "I understand the request. Let me help with that task."
+    )
     assert model.call_tools == []  # Critical: empty list prevents deadlock
 
 
@@ -88,7 +91,7 @@ async def test_agent_with_test_model_completes_without_hanging():
     try:
         result = await asyncio.wait_for(
             agent.run("Test prompt", deps=deps),
-            timeout=2.0  # 2 second timeout
+            timeout=2.0,  # 2 second timeout
         )
         assert result.output == "I understand the request. Let me help with that task."
     except asyncio.TimeoutError:
@@ -137,4 +140,6 @@ def test_call_tools_empty_vs_none():
 
     # None would cause iteration error (don't use)
     # This is what we initially tried and it failed
-    assert TestModel.__init__.__annotations__["call_tools"] == "list[str] | Literal['all']"
+    assert (
+        TestModel.__init__.__annotations__["call_tools"] == "list[str] | Literal['all']"
+    )

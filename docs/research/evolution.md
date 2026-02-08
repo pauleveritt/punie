@@ -1736,4 +1736,4 @@ TYPE_CHECKING guards allow import on any platform. Runtime import in `__init__` 
 | 2026-02-08 | 5.2     | Config generation (punie init, acp.json, pure functions, 13 tests)                           |
 | 2026-02-08 | 5.4     | Server mode (punie serve, dual-protocol HTTP+ACP, 6 tests)                                   |
 | 2026-02-08 | 6.1     | Local MLX model (port pydantic-ai-mlx, tool calling, cross-platform support, 26 tests)       |
-| 2026-02-08 | 5.4     | Dual-protocol serve (punie serve, HTTP + ACP stdio, 6 tests)                                 |
+| 2026-02-08 | 6.2     | Model download CLI + Python 3.14 (download-model command, model validation, remove free-threading)  |

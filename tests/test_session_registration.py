@@ -165,9 +165,7 @@ async def test_new_session_graceful_failure():
         async def discover_tools(self, session_id: str, **kwargs):
             raise RuntimeError("Discovery failed")
 
-    fake = FailingClient(
-        capabilities=ClientCapabilities(fs=FileSystemCapability())
-    )
+    fake = FailingClient(capabilities=ClientCapabilities(fs=FileSystemCapability()))
     agent = PunieAgent(model="test")
     agent.on_connect(fake)
     await agent.initialize(

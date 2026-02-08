@@ -39,7 +39,6 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=4.1.0",
-    "pytest-run-parallel>=0.8.1",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.14.10",
@@ -57,13 +56,8 @@ pythonpath = ["examples"]
 asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "freethreaded: marks tests that verify free-threading compatibility",
+    "thread_unsafe: marks tests with shared state that should not run in parallel",
 ]
-thread_unsafe_fixtures = [
-    "server",
-    "connect",
-]
-# Free-threading safety: timeout tests to detect hangs/deadlocks
 timeout = 60
 faulthandler_timeout = 120
 

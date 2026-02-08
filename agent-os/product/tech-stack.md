@@ -2,7 +2,7 @@
 
 ## Language
 
-- Python (targeting modern Python, with an eye toward free-threaded Python in the future)
+- Python 3.14+
 
 ## Agent Framework
 

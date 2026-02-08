@@ -26,4 +26,4 @@ This project uses Agent OS for standards, skills, and commands:
 
 ## Python Version
 
-This project uses Python 3.14.2t (free-threaded) for cutting-edge features and future concurrency support.
+This project uses Python 3.14 for modern language features.
