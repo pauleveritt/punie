@@ -26,6 +26,7 @@ The bridge enables:
 :maxdepth: 2
 :caption: Research
 
+research/evolution
 research/architecture
 research/acp-sdk
 research/pydantic-ai
