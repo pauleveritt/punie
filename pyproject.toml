@@ -5,6 +5,7 @@ description = "AI coding agent that delegates tool execution to PyCharm via ACP"
 requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.0",
+    "pydantic-ai-slim>=0.1.0",
     "starlette>=0.45.0",
     "uvicorn>=0.34.0",
 ]

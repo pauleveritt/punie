@@ -127,7 +127,7 @@ async def test_dual_protocol_stdio_and_http() -> None:
             cwd=str(Path.cwd()),
             mcp_servers=[],
         )
-        assert session.session_id.startswith("test-session-")
+        assert session.session_id.startswith("punie-session-")
 
         # Send prompt
         from punie.acp import text_block

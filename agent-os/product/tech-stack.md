@@ -6,7 +6,10 @@
 
 ## Agent Framework
 
-- Pydantic AI
+- Pydantic AI (pydantic-ai-slim>=0.1.0)
+  - Used for internal agent engine (as of Phase 3.2)
+  - Provides type-safe agent framework with tool support
+  - TestModel for testing without LLM calls
 
 ## Protocol
 

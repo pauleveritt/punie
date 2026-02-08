@@ -45,7 +45,7 @@
 **Note:** Original task 2.4 (ModelResponder infrastructure) deferred to Phase 3 as enhancement. Replaced with general coverage/quality improvements which provide more immediate value.
 
 ## 3. Pydantic AI Migration
-**Status:** In Progress (Phase 3.1 Complete)
+**Status:** In Progress (Phase 3.2 Complete)
 
 - [x] 3.1 HTTP server alongside ACP (dual-protocol foundation) - Completed 2026-02-07
   - Added Starlette + uvicorn HTTP server running concurrently with ACP stdio
@@ -54,7 +54,15 @@
   - Full test coverage: 6 unit tests (TestClient) + 2 integration tests (subprocess)
   - No changes to vendored ACP code - clean separation of concerns
   - Proven architecture: both protocols work simultaneously in same event loop
-- [ ] 3.2 Perform minimal transition to Pydantic AI project structure
+- [x] 3.2 Minimal transition to Pydantic AI project structure - Completed 2026-02-07
+  - Added pydantic-ai-slim>=0.1.0 as dependency
+  - Created `src/punie/agent/` package with ACPDeps, ACPToolset, PunieAgent, and factory
+  - PunieAgent adapter bridges ACP Agent protocol to Pydantic AI Agent.run()
+  - ACPToolset provides read_file tool (wraps Client.read_text_file)
+  - Replaced MinimalAgent with PunieAgent in test fixtures
+  - Full test coverage: 8 unit tests + all integration tests pass (84 tests total)
+  - Type checking passes (ty), linting passes (ruff), coverage >80%
+  - Session IDs changed from "test-session-N" to "punie-session-N"
 - [ ] 3.3 Gradually port python-sdk "tools" into Pydantic AI tools
 - [ ] 3.4 Convert to best-practices Pydantic AI project
 

@@ -75,7 +75,7 @@ async def test_stdio_connection_to_agent():
         )
 
         assert session.session_id is not None
-        assert session.session_id.startswith("test-session-")
+        assert session.session_id.startswith("punie-session-")
 
         # Step 3: Send a prompt and get response
         from punie.acp import text_block
@@ -142,11 +142,11 @@ async def test_stdio_connection_lifecycle():
 
         # Create first session
         session1 = await conn.new_session(mcp_servers=[], cwd=".")
-        assert "test-session-0" in session1.session_id
+        assert "punie-session-0" in session1.session_id
 
         # Create second session (proves subprocess maintains state)
         session2 = await conn.new_session(mcp_servers=[], cwd=".")
-        assert "test-session-1" in session2.session_id
+        assert "punie-session-1" in session2.session_id
         assert session1.session_id != session2.session_id
 
         # Test prompting both sessions to prove they work independently

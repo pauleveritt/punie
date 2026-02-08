@@ -6,13 +6,10 @@ as a subprocess for testing dual-protocol operation.
 
 import asyncio
 import sys
-from pathlib import Path
 
-# Add project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
+from punie.acp import Agent
+from punie.agent import PunieAgent, create_pydantic_agent
 from punie.http import Port, create_app, run_dual
-from tests.fixtures.minimal_agent import MinimalAgent
 
 
 async def main() -> None:
@@ -24,8 +21,13 @@ async def main() -> None:
         print("Usage: python -m tests.fixtures.dual_agent <port>", file=sys.stderr)
         sys.exit(1)
 
-    port = Port(int(sys.argv[1]))
-    agent = MinimalAgent()
+    port: Port = Port(int(sys.argv[1]))
+
+    # Create Pydantic AI agent with TestModel
+    pydantic_agent = create_pydantic_agent(model="test")
+    # Wrap in PunieAgent adapter for ACP protocol
+    agent: Agent = PunieAgent(pydantic_agent, name="minimal-test-agent")
+
     app = create_app()
 
     await run_dual(agent, app, port=port, log_level="error")
