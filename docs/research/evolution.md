@@ -739,6 +739,595 @@ class SessionState:
 
 This deviation aligns with the principle of **information hiding** — SessionState exposes only what callers need (the agent), not how it works internally (the toolset).
 
+## Phase 5.1: CLI Development (2026-02-08)
+
+### Context
+
+Punie had no CLI entry point — no `[project.scripts]`, no `__main__.py`. The only way to run the agent was programmatically via test fixtures (`tests/fixtures/minimal_agent.py`). PyCharm needs to launch Punie as a subprocess via `acp.json`, which requires a `punie` command that starts the ACP stdio agent.
+
+Phase 5.1 adds a Typer-based CLI with a critical constraint: **stdout is reserved for ACP JSON-RPC.** The ACP stdio transport writes raw bytes to `sys.stdout.buffer` (see `src/punie/acp/stdio.py`). Any logging or output to stdout corrupts the protocol. All logging MUST go to files only. Even `--version` must write to stderr.
+
+### Implementation
+
+**New Module: `src/punie/cli.py`**
+
+Structure:
+- `app = typer.Typer()` — The Typer app instance (also the entry point)
+- `resolve_model(model_flag) -> str` — Pure function: CLI flag > `PUNIE_MODEL` env var > `"test"` default
+- `setup_logging(log_dir, log_level)` — Pure function: configures `RotatingFileHandler` to `~/.punie/logs/punie.log`, never touches stdout
+- `run_acp_agent(model, name)` — Async function: creates `PunieAgent(model=model, name=name)`, calls `run_agent(agent)` from `punie.acp`
+- `main()` — Typer callback (`@app.callback(invoke_without_command=True)`): parses flags, calls `setup_logging()`, calls `asyncio.run(run_acp_agent(...))`
+
+**CLI Flags:**
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--model` | `str \| None` | None (resolves via env/default) | Model name, overrides PUNIE_MODEL env var |
+| `--name` | `str` | `"punie-agent"` | Agent name for identification |
+| `--log-dir` | `Path` | `~/.punie/logs/` | Directory for log files |
+| `--log-level` | `str` | `"info"` | Logging level |
+| `--version` | `bool` | False | Print version to **stderr** and exit |
+
+**Logging Strategy:**
+- `RotatingFileHandler` with 10MB max, 3 backups
+- Stderr handler at CRITICAL level only (for startup failures)
+- **No stdout handler** — ACP requires exclusive stdout access
+
+**Version Flag:**
+```python
+if version:
+    typer.echo(f"punie {__version__}", err=True)  # stderr, not stdout
+    raise typer.Exit(0)
+```
+
+**Entry Point: `pyproject.toml`**
+
+```toml
+[project.scripts]
+punie = "punie.cli:app"
+```
+
+Points to the Typer app instance, not a function. Typer's runtime handles invocation.
+
+**Python Module Support: `src/punie/__main__.py`**
+
+```python
+"""Support for `python -m punie` invocation."""
+from punie.cli import app
+app()
+```
+
+Enables `python -m punie` alongside `punie` script.
+
+**Modern Agent Construction:**
+
+```python
+agent = PunieAgent(model=model, name=name)  # Not PydanticAgent(agent=...)
+await run_agent(agent)
+```
+
+Uses the modern constructor from Phase 3.4, not the legacy `PydanticAgent` wrapping.
+
+### Test Coverage
+
+**New Tests: `tests/test_cli.py` (10 function-based tests)**
+
+**Pure function tests (no Typer, no async):**
+- `test_resolve_model_flag_takes_priority` — CLI flag wins
+- `test_resolve_model_env_var_fallback` — PUNIE_MODEL env var used when no flag
+- `test_resolve_model_default` — returns "test" when nothing set
+- `test_setup_logging_creates_directory` — creates log_dir and punie.log
+- `test_setup_logging_configures_file_handler` — root logger gets RotatingFileHandler
+- `test_setup_logging_no_stdout_handler` — no handler points to stdout
+- `test_setup_logging_sets_level` — root logger level matches config
+- `test_setup_logging_expands_user_path` — tilde paths are expanded
+
+**Typer CliRunner tests:**
+- `test_cli_version` — `--version` prints version to stderr, exits 0
+- `test_cli_help` — `--help` shows help text
+
+**Fixture:** `clean_root_logger` — removes all handlers after tests that call `setup_logging()` to prevent leaks.
+
+**Test Suite:** 144 tests passing (134 existing + 10 new CLI tests)
+
+### Example
+
+**New Example: `examples/11_cli_usage.py`**
+
+Demonstrates `resolve_model()` and `setup_logging()` programmatically. Shows model resolution order and logging setup. Can be used outside the CLI context.
+
+### Verification
+
+```bash
+# Python module invocation
+uv run python -m punie --version
+# Output to stderr: punie 0.1.0
+
+# Script entry point
+uv run punie --version
+# Output to stderr: punie 0.1.0
+
+# Help text
+uv run punie --help
+# Shows all flags with descriptions
+
+# uvx invocation (future)
+uvx punie --version
+# Works once published to PyPI
+```
+
+### Code Changes
+
+| Action | File | Lines |
+|--------|------|-------|
+| Create | `src/punie/cli.py` | +137 (CLI module) |
+| Create | `src/punie/__main__.py` | +5 (python -m support) |
+| Create | `tests/test_cli.py` | +120 (10 tests) |
+| Create | `examples/11_cli_usage.py` | +50 (CLI demo) |
+| Create | `agent-os/specs/2026-02-08-cli-development/` | +800 (4 spec docs) |
+| Modify | `pyproject.toml` | +4 (typer dep, entry point) |
+
+**Net Impact:** ~1116 lines added
+
+### Architecture Impact
+
+**Before Phase 5.1:**
+- No CLI entry point
+- Agent only usable programmatically in tests
+- PyCharm couldn't launch Punie via `acp.json`
+
+**After Phase 5.1:**
+- `punie` command available as subprocess
+- `python -m punie` works
+- `uvx punie` works (after PyPI publish)
+- All logging goes to files (stdout preserved for ACP)
+- PyCharm can launch Punie via `acp.json` (Phase 5.2)
+
+### Key Design Decisions
+
+**1. Pure Functions First**
+
+Separated pure logic (`resolve_model()`, return value) from side effects (`setup_logging()`, I/O). Makes code testable without mocking async/IO.
+
+**2. File-Only Logging**
+
+No stdout handler. ACP stdio transport owns `sys.stdout.buffer`. Any other output corrupts JSON-RPC messages.
+
+**3. Version to stderr**
+
+```python
+typer.echo(f"punie {__version__}", err=True)  # Not stdout
+```
+
+**4. Entry Point Points to App**
+
+```toml
+punie = "punie.cli:app"  # Typer app instance, not main() function
+```
+
+Idiomatic Typer pattern. Enables future subcommands (`punie init`, `punie serve`).
+
+**5. `@app.callback(invoke_without_command=True)`**
+
+Makes bare `punie` run the ACP agent. Future phases add subcommands:
+- Phase 5.2: `punie init` (config generation)
+- Phase 5.3: `punie tools list` (tool discovery)
+- Phase 5.4: `punie serve` (HTTP + ACP dual server)
+
+### Standards Applied
+
+This phase followed 5 Agent OS standards:
+
+1. **function-based-tests** — All 10 tests are functions, not classes
+2. **agent-verification** — astral:ty + astral:ruff before completion
+3. **sybil-doctest** — Docstring examples in resolve_model()
+4. **no-rich-yet** — Avoided Rich dependency (waits for Phase 5.2 where stdout available)
+5. **single-source-version** — `__version__` in `__init__.py`, imported by CLI
+
+Full spec documentation in `agent-os/specs/2026-02-08-cli-development/`
+
+### Future Phases
+
+**Phase 5.2: Configuration Management**
+- `punie init` — create `~/.punie/config.toml`
+- `punie status` — show config/logs (can use stdout, Rich enabled)
+- Config file parsing
+
+**Phase 5.3: IDE Tool Integration**
+- Dynamic tool discovery via filesystem
+- `punie tools list` command
+
+## Phase 5.2: Config Generation (2026-02-08)
+
+### Context
+
+PyCharm discovers agents via `~/.jetbrains/acp.json` configuration file. Phase 5.1 added `punie` command but no way to generate the discovery config. Users would need to manually create JSON with correct Punie executable path and environment settings.
+
+Phase 5.2 adds `punie init` subcommand to generate acp.json automatically, with intelligent executable detection (system PATH vs uvx fallback) and config merging to preserve other agents.
+
+### Key Insight
+
+**Subcommands can write to stdout freely** — unlike bare `punie` which reserves stdout for ACP JSON-RPC, `punie init` is a normal CLI command that generates files and prints user-facing messages.
+
+### Implementation
+
+**Pure Functions (Testable):**
+
+```python
+def resolve_punie_command() -> tuple[str, list[str]]:
+    """Detect how to invoke Punie executable."""
+    punie_path = shutil.which("punie")
+    if punie_path:
+        return (punie_path, [])
+    return ("uvx", ["punie"])
+
+def generate_acp_config(command: str, args: list[str], env: dict[str, str]) -> dict:
+    """Generate JetBrains ACP configuration for Punie."""
+    return {
+        "default_mcp_settings": {
+            "use_idea_mcp": True,
+            "use_custom_mcp": True,
+        },
+        "agent_servers": {
+            "punie": {"command": command, "args": args, "env": env}
+        },
+    }
+
+def merge_acp_config(existing: dict, punie_config: dict) -> dict:
+    """Merge Punie config into existing ACP config."""
+    # Preserves other agents, does not mutate inputs
+    ...
+```
+
+**Typer Command:**
+
+```python
+@app.command()
+def init(
+    model: str | None = typer.Option(None, "--model", ...),
+    output: Path = typer.Option(Path.home() / ".jetbrains" / "acp.json", "--output", ...),
+) -> None:
+    """Generate JetBrains ACP configuration for Punie."""
+    command, args = resolve_punie_command()
+    env = {"PUNIE_MODEL": model} if model else {}
+    punie_config = generate_acp_config(command, args, env)
+
+    # Merge with existing if present
+    if output.exists():
+        existing = json.loads(output.read_text())
+        final_config = merge_acp_config(existing, punie_config)
+    else:
+        final_config = punie_config
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(final_config, indent=2) + "\n")
+
+    typer.secho(f"✓ Created {output}", fg=typer.colors.GREEN)
+```
+
+### Generated Config Format
+
+```json
+{
+  "default_mcp_settings": {
+    "use_idea_mcp": true,
+    "use_custom_mcp": true
+  },
+  "agent_servers": {
+    "punie": {
+      "command": "/usr/local/bin/punie",
+      "args": [],
+      "env": {"PUNIE_MODEL": "claude-sonnet-4-5-20250929"}
+    }
+  }
+}
+```
+
+### Test Coverage
+
+**New Tests: 13 tests in `tests/test_cli.py`**
+
+**Pure function tests (9):**
+- `test_resolve_punie_command_finds_executable` — shutil.which returns path
+- `test_resolve_punie_command_uvx_fallback` — not on PATH, uses uvx
+- `test_generate_acp_config_basic` — structure correct
+- `test_generate_acp_config_with_env` — PUNIE_MODEL in env
+- `test_generate_acp_config_uvx_args` — uvx invocation
+- `test_merge_acp_config_preserves_other_agents` — other agents kept
+- `test_merge_acp_config_updates_existing_punie` — punie entry updated
+- `test_merge_acp_config_adds_missing_defaults` — adds default_mcp_settings
+- `test_merge_does_not_mutate_original` — no mutation of input
+
+**CLI integration tests (4):**
+- `test_cli_init_creates_file` — writes acp.json
+- `test_cli_init_with_model` — --model sets env
+- `test_cli_init_merges_existing` — merges into existing file
+- `test_cli_init_help` — shows init help text
+
+**Test Suite:** 157 tests passing (144 existing + 13 new init tests)
+
+### Example
+
+**New Example: `examples/12_init_config.py`**
+
+Demonstrates `resolve_punie_command()` and `generate_acp_config()` programmatically:
+- Detecting Punie executable
+- Generating basic config
+- Config with model pre-set
+
+### Usage
+
+```bash
+# Generate default config
+uv run punie init
+
+# With model flag
+uv run punie init --model claude-opus-4
+
+# Custom output path
+uv run punie init --output /tmp/acp.json
+
+# Help text
+uv run punie init --help
+
+# Main help shows subcommands
+uv run punie --help
+```
+
+### Code Changes
+
+| Action | File | Lines |
+|--------|------|-------|
+| Create | `agent-os/specs/2026-02-08-init-command/` | +800 (4 spec docs) |
+| Modify | `src/punie/cli.py` | +80 (3 pure functions + 1 command) |
+| Modify | `tests/test_cli.py` | +150 (13 tests) |
+| Create | `examples/12_init_config.py` | +35 (config demo) |
+
+**Net Impact:** ~1065 lines added
+
+### Architecture Impact
+
+**Before Phase 5.2:**
+- Users manually create acp.json
+- Error-prone executable path configuration
+- Overwrites existing configs accidentally
+
+**After Phase 5.2:**
+- `punie init` generates valid config
+- Auto-detects system vs uvx installation
+- Preserves other agents when merging
+- Optional --model flag for convenience
+
+### Design Decisions
+
+**1. Pure Functions First**
+
+Separated business logic (resolve, generate, merge) from I/O (read/write files). Makes code testable without temp files in most tests.
+
+**2. Intelligent Executable Detection**
+
+```python
+shutil.which("punie") → "/usr/local/bin/punie"  # System install
+shutil.which("punie") → None → ("uvx", ["punie"])  # uvx fallback
+```
+
+**3. Config Merging, Not Overwriting**
+
+```python
+existing = {"agent_servers": {"other": {...}}}
+merged = merge_acp_config(existing, punie_config)
+# Result: both "other" and "punie" present
+```
+
+**4. No Mutation**
+
+```python
+merged = copy.deepcopy(existing)  # New dict, inputs unchanged
+```
+
+### Standards Applied
+
+This phase followed 4 Agent OS standards:
+
+1. **function-based-tests** — All 13 tests are functions, not classes
+2. **agent-verification** — astral:ty + astral:ruff before completion
+3. **pure-functions-first** — Business logic testable without I/O
+4. **no-mutation** — merge_acp_config does not mutate inputs
+
+Full spec documentation in `agent-os/specs/2026-02-08-init-command/`
+
+## Phase 5.4: Dual-Protocol Serve (2026-02-08)
+
+### Context
+
+Phase 3.1 added HTTP server alongside ACP stdio with `run_dual()` infrastructure. Phase 5.1 added CLI with bare `punie` running stdio only. But there was no way to run dual-protocol mode from CLI — users had to write their own scripts.
+
+Phase 5.4 adds `punie serve` subcommand to wrap existing `run_dual()` infrastructure, enabling HTTP + ACP stdio concurrently from command line.
+
+**Note:** Phase 5.3 (model download) **skipped/deferred** — local model strategy TBD.
+
+### Key Insight
+
+**Subcommands can write to stdout freely** — unlike bare `punie` which reserves stdout for ACP JSON-RPC, `punie serve` can print startup messages before the agent starts.
+
+### Implementation
+
+**Async Helper (Separation of Concerns):**
+
+```python
+async def run_serve_agent(
+    model: str,
+    name: str,
+    host: str,
+    port: int,
+    log_level: str,
+) -> None:
+    """Create agent and run dual-protocol mode."""
+    agent = PunieAgent(model=model, name=name)
+    app_instance = create_app()
+    await run_dual(agent, app_instance, Host(host), Port(port), log_level)
+```
+
+**Why separate?** Typer commands must be sync (no `async def`). Extracting async logic into helper function allows testing without CliRunner complexity.
+
+**Typer Command:**
+
+```python
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", ...),
+    port: int = typer.Option(8000, "--port", ...),
+    model: str | None = typer.Option(None, "--model", ...),
+    name: str = typer.Option("punie-agent", "--name", ...),
+    log_dir: Path = typer.Option(Path("~/.punie/logs"), "--log-dir", ...),
+    log_level: str = typer.Option("info", "--log-level", ...),
+) -> None:
+    """Run Punie agent with dual protocol support."""
+    setup_logging(log_dir, log_level)
+    resolved_model = resolve_model(model)
+
+    # Startup message (OK for serve command before agent starts)
+    typer.echo("Starting Punie agent (dual protocol mode)")
+    typer.echo(f"  Model: {resolved_model}")
+    typer.echo(f"  HTTP: http://{host}:{port}")
+    typer.echo(f"  Logs: {log_dir.expanduser() / 'punie.log'}")
+
+    asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
+```
+
+### Reused Infrastructure (No Changes)
+
+**From existing modules:**
+- `PunieAgent(model, name)` — agent adapter (Phase 3.2)
+- `create_app()` — Starlette app factory (Phase 3.1)
+- `run_dual(agent, app, host, port, log_level)` — concurrent stdio + HTTP (Phase 3.1)
+- `Host`, `Port` — NewType wrappers (Phase 3.1)
+
+**No new dependencies** — pure wiring of existing infrastructure.
+
+### Test Coverage
+
+**New Tests: 6 tests in `tests/test_cli.py`**
+
+**Async helper test (1):**
+- `test_run_serve_agent_creates_agent` — async test with monkeypatch verifying agent creation and run_dual call
+
+**CLI integration tests (5):**
+- `test_cli_serve_help` — shows serve-specific flags
+- `test_cli_help_shows_subcommands` — main help lists init and serve
+- `test_serve_sets_up_logging` — logging configured before agent starts
+- `test_serve_resolves_model` — model resolution chain works
+- `test_serve_model_flag_overrides_env` — --model takes priority
+
+**Test Suite:** 163 tests passing (157 existing + 6 new serve tests)
+
+### Example
+
+**New Example: `examples/13_serve_dual.py`**
+
+Demonstrates dual-protocol setup programmatically:
+- Creating agent and HTTP app
+- Showing dual-protocol architecture (stdio + HTTP)
+- Endpoints available (/health, /echo)
+
+### Usage
+
+```bash
+# Basic serve
+uv run punie serve
+
+# Custom host/port
+uv run punie serve --host 0.0.0.0 --port 9000
+
+# With model flag
+uv run punie serve --model claude-sonnet-4-5-20250929
+
+# Help text
+uv run punie serve --help
+
+# Test HTTP endpoints (while serve is running)
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/echo -H "Content-Type: application/json" -d '{"message":"test"}'
+```
+
+### Code Changes
+
+| Action | File | Lines |
+|--------|------|-------|
+| Create | `agent-os/specs/2026-02-08-serve-command/` | +600 (4 spec docs) |
+| Modify | `src/punie/cli.py` | +60 (1 async helper + 1 command + imports) |
+| Modify | `tests/test_cli.py` | +100 (6 tests) |
+| Create | `examples/13_serve_dual.py` | +35 (dual-protocol demo) |
+
+**Net Impact:** ~795 lines added
+
+### Architecture Impact
+
+**Before Phase 5.4:**
+- Dual-protocol requires custom script
+- No CLI access to HTTP + stdio mode
+- Phase 3.1 infrastructure unused from CLI
+
+**After Phase 5.4:**
+- `punie serve` runs dual protocols from CLI
+- Full control via flags (host, port, model, logging)
+- Reuses Phase 3.1 infrastructure cleanly
+- Startup messages show configuration
+
+### Protocol Behavior
+
+**Before agent starts:**
+- stdout available for setup messages
+- User-facing output with `typer.echo()`
+
+**After agent starts:**
+- stdout owned by ACP JSON-RPC
+- HTTP runs on separate port
+- All logs to files
+
+### Design Decisions
+
+**1. Async Helper Separation**
+
+```python
+# Typer command (sync)
+def serve(...):
+    asyncio.run(run_serve_agent(...))
+
+# Async logic (testable)
+async def run_serve_agent(...):
+    ...
+```
+
+**2. Reuse Existing Infrastructure**
+
+No changes to `run_dual()`, `create_app()`, or HTTP endpoints. Pure wiring.
+
+**3. Startup Messages**
+
+```
+Starting Punie agent (dual protocol mode)
+  Model: claude-sonnet-4-5-20250929
+  HTTP: http://127.0.0.1:8000
+  Logs: ~/.punie/logs/punie.log
+```
+
+Clear feedback before stdout reserved for ACP.
+
+**4. Flag Consistency**
+
+Same flags as main command (--model, --name, --log-dir, --log-level) plus HTTP-specific (--host, --port).
+
+### Standards Applied
+
+This phase followed 4 Agent OS standards:
+
+1. **function-based-tests** — All 6 tests are functions, not classes
+2. **agent-verification** — astral:ty + astral:ruff before completion
+3. **separation-of-concerns** — Async helper separate from Typer command
+4. **reuse-infrastructure** — No duplication of Phase 3.1 code
+
+Full spec documentation in `agent-os/specs/2026-02-08-serve-command/`
+
 ## Current Architecture Summary
 
 ### Three-Layer Bridge
@@ -826,3 +1415,6 @@ PyCharm (execution)
 | 2026-02-08 | Review  | Architecture review identifying next improvements                                            |
 | 2026-02-08 | 4.1     | Dynamic tool discovery (protocol extension, catalog schema, three-tier fallback, 14 tests)   |
 | 2026-02-08 | 4.2     | Session registration (tool caching, lazy fallback, SessionState frozen dataclass, 16 tests)  |
+| 2026-02-08 | 5.1     | CLI development (Typer entry point, file-only logging, stdio constraint, 10 tests)           |
+| 2026-02-08 | 5.2     | Config generation (punie init, acp.json, pure functions, 13 tests)                           |
+| 2026-02-08 | 5.4     | Dual-protocol serve (punie serve, HTTP + ACP stdio, 6 tests)                                 |

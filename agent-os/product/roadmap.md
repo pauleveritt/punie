@@ -132,29 +132,50 @@ coverage/quality improvements which provide more immediate value.
 
 ## 5. CLI Development
 
-**Status:** Not Started
+**Status:** Phase 5.1, 5.2, 5.4 Completed (2026-02-08) | Phase 5.3 Deferred
 
 **References:**
 - [JetBrains acp.json documentation](https://www.jetbrains.com/help/ai-assistant/acp.html#add-custom-agent)
 
-- [ ] 5.1 Implement Typer-based CLI with uvx support
-    - Create `punie` command (default stdio/ACP mode)
-    - Enable `uvx punie` invocation without package installation
-    - Add `--model` flag for model name configuration
-    - CLI flags override acp.json settings
-    - Write logs to ~/.punie/ directory
-- [ ] 5.2 Add config generation command
-    - Implement `punie init` command
-    - Generate acp.json at ~/.jetbrains/acp.json
-    - Include model path, server settings, tool discovery settings
-- [ ] 5.3 Add model download command
-    - Implement `punie download-model` command
-    - Store models in ~/.punie/models/
-    - Recommended model selection (TBD)
-- [ ] 5.4 Add HTTP/WebSocket server mode
-    - Implement `punie serve` command
-    - Support HTTP and WebSocket protocols
-    - Add `--port`, `--host` configuration flags
+- [x] 5.1 Implement Typer-based CLI with uvx support - Completed 2026-02-08
+    - Created `punie` command (default stdio/ACP mode) via `[project.scripts]` entry point
+    - Enabled `uvx punie` invocation without package installation
+    - Added CLI flags: `--model` (overrides PUNIE_MODEL env var), `--name`, `--log-dir`, `--log-level`, `--version`
+    - Implemented file-only logging with RotatingFileHandler (~10MB, 3 backups) to `~/.punie/logs/punie.log`
+    - Critical constraint respected: stdout reserved for ACP JSON-RPC, all logging goes to files
+    - Version flag writes to stderr (not stdout) for protocol compatibility
+    - Added `python -m punie` support via `__main__.py`
+    - Modern agent construction: `PunieAgent(model=model, name=name)` with `run_agent()` from `punie.acp`
+    - Full test coverage: 10 function-based tests (resolve_model, setup_logging, CLI flags)
+    - Type checking passes (ty), linting passes (ruff), all 144 tests pass (134 existing + 10 new)
+    - Created spec documentation in agent-os/specs/2026-02-08-cli-development/
+    - Created working example: examples/11_cli_usage.py
+    - Updated docs/research/evolution.md with Phase 5.1 details
+- [x] 5.2 Add config generation command - Completed 2026-02-08
+    - Implemented `punie init` subcommand
+    - Generates acp.json at ~/.jetbrains/acp.json (configurable via --output)
+    - Auto-detects Punie executable (system PATH or uvx fallback)
+    - Merges with existing config to preserve other agents
+    - Optional --model flag to pre-configure PUNIE_MODEL in env
+    - Pure functions for testability: resolve_punie_command(), generate_acp_config(), merge_acp_config()
+    - Full test coverage: 13 tests (9 pure function + 4 CLI integration)
+    - Type checking passes (ty), linting passes (ruff), all tests pass
+    - Created spec documentation in agent-os/specs/2026-02-08-init-command/
+    - Created working example: examples/12_init_config.py
+- [~] 5.3 Add model download command - Deferred
+    - Decision deferred until local model strategy is decided
+    - Will implement when there's clarity on recommended models and storage patterns
+- [x] 5.4 Add HTTP/WebSocket server mode - Completed 2026-02-08
+    - Implemented `punie serve` subcommand
+    - Runs dual-protocol mode: ACP stdio + HTTP server concurrently
+    - Reuses existing infrastructure: PunieAgent, create_app(), run_dual()
+    - Added HTTP-specific flags: --host (default 127.0.0.1), --port (default 8000)
+    - Supports all standard flags: --model, --name, --log-dir, --log-level
+    - Async helper function: run_serve_agent() for clean separation of concerns
+    - Full test coverage: 6 tests (1 async helper + 5 CLI integration)
+    - Type checking passes (ty), linting passes (ruff), all tests pass
+    - Created spec documentation in agent-os/specs/2026-02-08-serve-command/
+    - Created working example: examples/13_serve_dual.py
 
 ## 6. Web UI Development
 
