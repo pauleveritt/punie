@@ -7,6 +7,9 @@ ACP protocol and Pydantic AI.
 from dataclasses import FrozenInstanceError
 
 import pytest
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.models.test import TestModel
+from pydantic_ai.usage import UsageLimits
 
 from punie.acp import Agent, text_block
 from punie.acp.contrib.tool_calls import ToolCallTracker
@@ -125,16 +128,11 @@ async def test_punie_agent_prompt_delegates_to_pydantic_ai():
 
 
 async def test_read_file_tool_via_pydantic_ai():
-    """Pydantic AI agent should be able to call read_file tool."""
-    # Create Pydantic AI agent
+    """Pydantic AI agent should have toolsets configured."""
     pydantic_agent = create_pydantic_agent(model="test")
 
-    # Verify the toolset is configured correctly by checking
-    # that the agent has toolsets attached (Pydantic AI includes internal
-    # toolsets plus our custom ones)
+    # Agent should have at least our custom toolset attached
     assert len(pydantic_agent.toolsets) >= 1
-    # Our toolset should be in there somewhere
-    assert any(toolset for toolset in pydantic_agent.toolsets)
 
 
 async def test_fake_client_terminal_methods():
@@ -221,3 +219,116 @@ def test_toolset_has_all_seven_tools():
         "kill_terminal",
     }
     assert tool_names == expected_tools
+
+
+def test_factory_uses_instructions():
+    """create_pydantic_agent should use instructions= instead of system_prompt=."""
+    agent = create_pydantic_agent(model="test")
+
+    # Agent._instructions is a list[str] internally
+    assert agent._instructions
+    assert len(agent._instructions) > 0
+    # Instructions should mention "Punie"
+    instructions_text = "".join(str(i) for i in agent._instructions)
+    assert "Punie" in instructions_text
+
+
+def test_factory_sets_model_settings():
+    """create_pydantic_agent should set ModelSettings for deterministic coding."""
+    agent = create_pydantic_agent(model="test")
+
+    # agent.model_settings is a property that returns dict
+    settings = agent.model_settings
+    assert settings is not None
+    assert settings["temperature"] == 0.0
+    assert settings["max_tokens"] == 4096
+
+
+def test_factory_sets_retries():
+    """create_pydantic_agent should configure retry policies."""
+    agent = create_pydantic_agent(model="test")
+
+    # These are internal attributes, tested with awareness they may change
+    assert agent._max_tool_retries == 3
+    assert agent._max_result_retries == 2
+
+
+def test_factory_has_output_validator():
+    """create_pydantic_agent should register an output validator."""
+    agent = create_pydantic_agent(model="test")
+
+    # _output_validators is a list of OutputValidator
+    assert len(agent._output_validators) == 1
+
+
+async def test_output_validator_accepts_valid():
+    """Output validator should accept non-empty responses."""
+    # Create agent with TestModel that returns valid output
+    agent = create_pydantic_agent(model=TestModel(custom_output_text="Valid response"))
+
+    # Create fake dependencies
+    fake_client = FakeClient()
+    deps = ACPDeps(
+        client_conn=fake_client,
+        session_id="test-session",
+        tracker=ToolCallTracker(),
+    )
+
+    # Should succeed without raising
+    result = await agent.run("test prompt", deps=deps)
+    assert result.output == "Valid response"
+
+
+async def test_output_validator_rejects_empty():
+    """Output validator should reject empty responses and exhaust retries."""
+    # Create agent with TestModel that returns empty output
+    agent = create_pydantic_agent(model=TestModel(custom_output_text=""))
+
+    # Create fake dependencies
+    fake_client = FakeClient()
+    deps = ACPDeps(
+        client_conn=fake_client,
+        session_id="test-session",
+        tracker=ToolCallTracker(),
+    )
+
+    # Should exhaust retries and raise UnexpectedModelBehavior
+    with pytest.raises(UnexpectedModelBehavior):
+        await agent.run("test prompt", deps=deps)
+
+
+async def test_adapter_handles_agent_error():
+    """PunieAgent should catch agent errors and send via session_update."""
+    # Create agent that will fail validation (empty output)
+    pydantic_agent = create_pydantic_agent(model=TestModel(custom_output_text=""))
+    adapter = PunieAgent(pydantic_agent, name="test-agent")
+
+    # Connect to fake client
+    fake_client = FakeClient()
+    adapter.on_connect(fake_client)
+
+    # Prompt should not raise, should return PromptResponse
+    response = await adapter.prompt(
+        prompt=[text_block("test")],
+        session_id="test-session",
+    )
+
+    assert response.stop_reason == "end_turn"
+
+    # Should have sent error message via session_update
+    assert len(fake_client.notifications) > 0
+    # Last notification should contain error text
+    last_notification = fake_client.notifications[-1]
+    assert last_notification.update.session_update == "agent_message_chunk"
+
+
+def test_adapter_accepts_usage_limits():
+    """PunieAgent should accept usage_limits parameter."""
+    pydantic_agent = create_pydantic_agent(model="test")
+
+    # Should accept usage_limits without error
+    limits = UsageLimits(request_limit=10, total_tokens_limit=1000)
+    adapter = PunieAgent(pydantic_agent, name="test-agent", usage_limits=limits)
+
+    # Should store limits
+    assert adapter._usage_limits is limits

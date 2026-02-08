@@ -6,9 +6,12 @@ speak ACP externally (to PyCharm) while using Pydantic AI internally (for LLM
 interaction).
 """
 
+import logging
 from typing import Any
 
 from pydantic_ai import Agent as PydanticAgent
+from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.usage import UsageLimits
 
 from punie.acp import (
     PROTOCOL_VERSION,
@@ -43,6 +46,8 @@ from punie.acp.schema import (
 
 from .deps import ACPDeps
 
+logger = logging.getLogger(__name__)
+
 
 class PunieAgent:
     """Adapter that bridges ACP Agent protocol to Pydantic AI.
@@ -54,15 +59,18 @@ class PunieAgent:
     Args:
         pydantic_agent: Pydantic AI Agent instance
         name: Agent name for identification
+        usage_limits: Optional usage limits for token/request control
     """
 
     def __init__(
         self,
         pydantic_agent: PydanticAgent[ACPDeps, str],
         name: str = "punie-agent",
+        usage_limits: UsageLimits | None = None,
     ) -> None:
         self._pydantic_agent = pydantic_agent
         self._name = name
+        self._usage_limits = usage_limits
         self._next_session_id = 0
         self._sessions: set[str] = set()
         self._conn: Client | None = None
@@ -169,7 +177,7 @@ class PunieAgent:
         """Process a prompt and return response.
 
         This is the core integration point. Extracts text from ACP prompt blocks,
-        constructs ACPDeps, and delegates to Pydantic AI Agent.arun().
+        constructs ACPDeps, and delegates to Pydantic AI Agent.run().
         """
         # Extract text from prompt blocks
         prompt_text = ""
@@ -178,25 +186,34 @@ class PunieAgent:
                 prompt_text += block.text
 
         # Construct dependencies for Pydantic AI
-        if not self._conn:
+        conn = self._conn
+        if not conn:
             raise RuntimeError("No client connection established")
 
         deps = ACPDeps(
-            client_conn=self._conn,
+            client_conn=conn,
             session_id=session_id,
             tracker=ToolCallTracker(),
         )
 
-        # Delegate to Pydantic AI
-        result = await self._pydantic_agent.run(prompt_text, deps=deps)
-
-        # Send response back to client
-        if self._conn:
-            await self._conn.session_update(
-                session_id,
-                update_agent_message(text_block(result.output)),
+        # Delegate to Pydantic AI with error handling
+        try:
+            result = await self._pydantic_agent.run(
+                prompt_text, deps=deps, usage_limits=self._usage_limits
             )
+            response_text = result.output
 
+        except UsageLimitExceeded as exc:
+            response_text = f"Usage limit exceeded: {exc}"
+
+        except Exception as exc:
+            logger.exception("Agent run failed")
+            response_text = f"Agent error: {exc}"
+
+        await conn.session_update(
+            session_id,
+            update_agent_message(text_block(response_text)),
+        )
         return PromptResponse(stop_reason="end_turn")
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
