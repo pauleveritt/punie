@@ -45,7 +45,7 @@
 **Note:** Original task 2.4 (ModelResponder infrastructure) deferred to Phase 3 as enhancement. Replaced with general coverage/quality improvements which provide more immediate value.
 
 ## 3. Pydantic AI Migration
-**Status:** In Progress (Phase 3.2 Complete)
+**Status:** In Progress (Phase 3.3 Complete)
 
 - [x] 3.1 HTTP server alongside ACP (dual-protocol foundation) - Completed 2026-02-07
   - Added Starlette + uvicorn HTTP server running concurrently with ACP stdio
@@ -63,7 +63,15 @@
   - Full test coverage: 8 unit tests + all integration tests pass (84 tests total)
   - Type checking passes (ty), linting passes (ruff), coverage >80%
   - Session IDs changed from "test-session-N" to "punie-session-N"
-- [ ] 3.3 Gradually port python-sdk "tools" into Pydantic AI tools
+- [x] 3.3 Port all ACP Client tools to Pydantic AI - Completed 2026-02-08
+  - Implemented FakeClient terminal methods with in-memory state (FakeTerminal dataclass)
+  - Added 6 new Pydantic AI tools: write_file, run_command, get_terminal_output, release_terminal, wait_for_terminal_exit, kill_terminal
+  - Implemented permission flow for write_file and run_command using Client.request_permission()
+  - All tools use ToolCallTracker for lifecycle notifications (ToolCallStart → ToolCallProgress)
+  - run_command is a compound tool (create_terminal → wait_for_exit → get_output → release)
+  - Full test coverage: 12 Pydantic agent tests + 5 FakeClient terminal tests (83 tests total pass)
+  - Type checking passes (ty), linting passes (ruff), all tests pass
+  - Created spec documentation in agent-os/specs/2026-02-07-pydantic-ai-tools/
 - [ ] 3.4 Convert to best-practices Pydantic AI project
 
 ## 4. ACP Integration

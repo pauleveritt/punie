@@ -135,3 +135,91 @@ async def test_read_file_tool_via_pydantic_ai():
     assert len(pydantic_agent.toolsets) >= 1
     # Our toolset should be in there somewhere
     assert any(toolset for toolset in pydantic_agent.toolsets)
+
+
+async def test_fake_client_terminal_methods():
+    """FakeClient should implement terminal methods with in-memory state."""
+    fake_client = FakeClient()
+
+    # Test create_terminal
+    response = await fake_client.create_terminal(
+        command="echo", session_id="test", args=["hello"]
+    )
+    assert response.terminal_id == "term-0"
+    assert "term-0" in fake_client.terminals
+
+    # Test terminal_output (default empty)
+    output = await fake_client.terminal_output(
+        session_id="test", terminal_id="term-0"
+    )
+    assert output.output == ""
+
+    # Test wait_for_terminal_exit (default 0)
+    exit_response = await fake_client.wait_for_terminal_exit(
+        session_id="test", terminal_id="term-0"
+    )
+    assert exit_response.exit_code == 0
+
+    # Test release_terminal
+    await fake_client.release_terminal(session_id="test", terminal_id="term-0")
+    assert "term-0" not in fake_client.terminals
+
+
+async def test_fake_client_queue_terminal():
+    """FakeClient.queue_terminal should pre-configure terminal output."""
+    fake_client = FakeClient()
+
+    # Queue a terminal with specific output and exit code
+    terminal_id = fake_client.queue_terminal(
+        command="pytest", output="All tests passed", exit_code=0, args=["--verbose"]
+    )
+
+    assert terminal_id == "term-0"
+    assert terminal_id in fake_client.terminals
+
+    # Verify we can retrieve the configured values
+    output = await fake_client.terminal_output(
+        session_id="test", terminal_id=terminal_id
+    )
+    assert output.output == "All tests passed"
+
+    exit_response = await fake_client.wait_for_terminal_exit(
+        session_id="test", terminal_id=terminal_id
+    )
+    assert exit_response.exit_code == 0
+
+
+async def test_fake_client_kill_terminal():
+    """FakeClient.kill_terminal should remove terminal from state."""
+    fake_client = FakeClient()
+
+    # Create terminal
+    response = await fake_client.create_terminal(
+        command="long-running", session_id="test"
+    )
+    terminal_id = response.terminal_id
+    assert terminal_id in fake_client.terminals
+
+    # Kill it
+    await fake_client.kill_terminal(session_id="test", terminal_id=terminal_id)
+    assert terminal_id not in fake_client.terminals
+
+
+def test_toolset_has_all_seven_tools():
+    """create_toolset() should return toolset with all 7 tools."""
+    toolset = create_toolset()
+
+    # toolset.tools is a dict mapping tool names to Tool objects
+    tool_names = set(toolset.tools.keys())
+
+    # Verify all 7 tools are present
+    expected_tools = {
+        "read_file",
+        "write_file",
+        "run_command",
+        "get_terminal_output",
+        "release_terminal",
+        "wait_for_terminal_exit",
+        "kill_terminal",
+    }
+    assert tool_names == expected_tools

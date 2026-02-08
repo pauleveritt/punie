@@ -3,6 +3,7 @@
 Provides FakeAgent and FakeClient with configurable behavior.
 """
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from punie.acp import (
@@ -58,7 +59,24 @@ from punie.acp.schema import (
     UserMessageChunk,
 )
 
-__all__ = ["FakeAgent", "FakeClient"]
+__all__ = ["FakeAgent", "FakeClient", "FakeTerminal"]
+
+
+@dataclass
+class FakeTerminal:
+    """In-memory terminal state for testing.
+
+    Args:
+        command: The command that was run
+        args: Command arguments
+        output: Terminal output content
+        exit_code: Exit code from command execution
+    """
+
+    command: str
+    args: list[str] = field(default_factory=list)
+    output: str = ""
+    exit_code: int = 0
 
 
 class FakeClient:
@@ -88,6 +106,8 @@ class FakeClient:
         self.ext_calls: list[tuple[str, dict]] = []
         self.ext_notes: list[tuple[str, dict]] = []
         self._agent_conn = None
+        self.terminals: dict[str, FakeTerminal] = {}
+        self._next_terminal_id: int = 0
 
     def on_connect(self, conn) -> None:
         self._agent_conn = conn
@@ -103,6 +123,31 @@ class FakeClient:
                 outcome=AllowedOutcome(option_id=option_id, outcome="selected")
             )
         )
+
+    def queue_terminal(
+        self,
+        command: str,
+        output: str = "",
+        exit_code: int = 0,
+        args: list[str] | None = None,
+    ) -> str:
+        """Pre-configure a terminal for testing.
+
+        Args:
+            command: Command to match on create_terminal()
+            output: Output to return from terminal_output()
+            exit_code: Exit code to return from wait_for_terminal_exit()
+            args: Command arguments to match
+
+        Returns:
+            Terminal ID that will be assigned
+        """
+        terminal_id = f"term-{self._next_terminal_id}"
+        self._next_terminal_id += 1
+        self.terminals[terminal_id] = FakeTerminal(
+            command=command, args=args or [], output=output, exit_code=exit_code
+        )
+        return terminal_id
 
     async def request_permission(
         self,
@@ -153,7 +198,7 @@ class FakeClient:
             )
         )
 
-    # Optional terminal methods (not implemented in this test client)
+    # Terminal methods with in-memory implementation
     async def create_terminal(
         self,
         command: str,
@@ -164,27 +209,49 @@ class FakeClient:
         output_byte_limit: int | None = None,
         **kwargs: Any,
     ) -> CreateTerminalResponse:
-        raise NotImplementedError
+        terminal_id = f"term-{self._next_terminal_id}"
+        self._next_terminal_id += 1
+
+        # If terminal was pre-configured via queue_terminal(), use it
+        # Otherwise create a default terminal
+        if terminal_id not in self.terminals:
+            self.terminals[terminal_id] = FakeTerminal(
+                command=command, args=args or [], output="", exit_code=0
+            )
+
+        return CreateTerminalResponse(terminal_id=terminal_id)
 
     async def terminal_output(
         self, session_id: str, terminal_id: str | None = None, **kwargs: Any
     ) -> TerminalOutputResponse:
-        raise NotImplementedError
+        if terminal_id is None or terminal_id not in self.terminals:
+            return TerminalOutputResponse(output="", truncated=False)
+        return TerminalOutputResponse(
+            output=self.terminals[terminal_id].output, truncated=False
+        )
 
     async def release_terminal(
         self, session_id: str, terminal_id: str | None = None, **kwargs: Any
     ) -> ReleaseTerminalResponse | None:
-        raise NotImplementedError
+        if terminal_id and terminal_id in self.terminals:
+            del self.terminals[terminal_id]
+        return ReleaseTerminalResponse()
 
     async def wait_for_terminal_exit(
         self, session_id: str, terminal_id: str | None = None, **kwargs: Any
     ) -> WaitForTerminalExitResponse:
-        raise NotImplementedError
+        if terminal_id is None or terminal_id not in self.terminals:
+            return WaitForTerminalExitResponse(exit_code=0)
+        return WaitForTerminalExitResponse(
+            exit_code=self.terminals[terminal_id].exit_code
+        )
 
     async def kill_terminal(
         self, session_id: str, terminal_id: str | None = None, **kwargs: Any
     ) -> KillTerminalCommandResponse | None:
-        raise NotImplementedError
+        if terminal_id and terminal_id in self.terminals:
+            del self.terminals[terminal_id]
+        return KillTerminalCommandResponse()
 
     async def ext_method(self, method: str, params: dict) -> dict:
         self.ext_calls.append((method, params))

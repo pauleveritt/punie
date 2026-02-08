@@ -324,40 +324,52 @@ def test_fake_client_on_connect():
 
 
 @pytest.mark.asyncio
-async def test_fake_client_create_terminal_not_implemented():
-    """FakeClient.create_terminal() should raise NotImplementedError."""
+async def test_fake_client_create_terminal():
+    """FakeClient.create_terminal() should create terminal with unique ID."""
     client = FakeClient()
-    with pytest.raises(NotImplementedError):
-        await client.create_terminal(command="ls", session_id="sess-1")
+    response = await client.create_terminal(command="ls", session_id="sess-1")
+    assert response.terminal_id == "term-0"
+    assert "term-0" in client.terminals
 
 
 @pytest.mark.asyncio
-async def test_fake_client_terminal_output_not_implemented():
-    """FakeClient.terminal_output() should raise NotImplementedError."""
+async def test_fake_client_terminal_output():
+    """FakeClient.terminal_output() should return terminal output."""
     client = FakeClient()
-    with pytest.raises(NotImplementedError):
-        await client.terminal_output(session_id="sess-1", terminal_id="term-1")
+    terminal_id = client.queue_terminal(
+        command="echo", output="test output", exit_code=0
+    )
+    response = await client.terminal_output(session_id="sess-1", terminal_id=terminal_id)
+    assert response.output == "test output"
+    assert response.truncated is False
 
 
 @pytest.mark.asyncio
-async def test_fake_client_release_terminal_not_implemented():
-    """FakeClient.release_terminal() should raise NotImplementedError."""
+async def test_fake_client_release_terminal():
+    """FakeClient.release_terminal() should remove terminal from state."""
     client = FakeClient()
-    with pytest.raises(NotImplementedError):
-        await client.release_terminal(session_id="sess-1", terminal_id="term-1")
+    terminal_id = client.queue_terminal(command="ls", output="files", exit_code=0)
+    assert terminal_id in client.terminals
+    await client.release_terminal(session_id="sess-1", terminal_id=terminal_id)
+    assert terminal_id not in client.terminals
 
 
 @pytest.mark.asyncio
-async def test_fake_client_wait_for_terminal_exit_not_implemented():
-    """FakeClient.wait_for_terminal_exit() should raise NotImplementedError."""
+async def test_fake_client_wait_for_terminal_exit():
+    """FakeClient.wait_for_terminal_exit() should return exit code."""
     client = FakeClient()
-    with pytest.raises(NotImplementedError):
-        await client.wait_for_terminal_exit(session_id="sess-1", terminal_id="term-1")
+    terminal_id = client.queue_terminal(command="ls", output="files", exit_code=42)
+    response = await client.wait_for_terminal_exit(
+        session_id="sess-1", terminal_id=terminal_id
+    )
+    assert response.exit_code == 42
 
 
 @pytest.mark.asyncio
-async def test_fake_client_kill_terminal_not_implemented():
-    """FakeClient.kill_terminal() should raise NotImplementedError."""
+async def test_fake_client_kill_terminal():
+    """FakeClient.kill_terminal() should remove terminal from state."""
     client = FakeClient()
-    with pytest.raises(NotImplementedError):
-        await client.kill_terminal(session_id="sess-1", terminal_id="term-1")
+    terminal_id = client.queue_terminal(command="ls", output="files", exit_code=0)
+    assert terminal_id in client.terminals
+    await client.kill_terminal(session_id="sess-1", terminal_id=terminal_id)
+    assert terminal_id not in client.terminals
