@@ -8,12 +8,27 @@ Punie is an experimental agent that enables AI-assisted development with IDE-nat
 
 ## Features
 
-Coming soon...
+Punie bridges two complementary technologies:
+
+- **Pydantic AI** — Type-safe agent framework with structured output and dependency injection
+- **ACP** — Agent Communication Protocol for IDE integration (PyCharm, VS Code, etc.)
+
+The bridge enables:
+- IDE-native file operations (read, write, search)
+- Terminal command execution with streaming output
+- User permission controls for destructive operations
+- Progress visibility for all agent actions
+- Type-safe tool definitions and results
+
+## Documentation
 
 ```{toctree}
 :maxdepth: 2
-:caption: Contents:
+:caption: Research
 
+research/architecture
+research/acp-sdk
+research/pydantic-ai
 ```
 
 ## Indices and tables
