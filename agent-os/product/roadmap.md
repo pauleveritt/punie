@@ -346,7 +346,7 @@ also be moved to existing deterministic Python tools such as linters, formatters
 
 ### Pydantic AI Skills
 
-pydantic-ai-skills: A standardized framework that implements Anthropic’s Agent Skills framework specifically for
+pydantic-ai-skills: A standardized framework that implements Anthropic's Agent Skills framework specifically for
 Pydantic AI.
 
 Pydantic-DeepAgents: An extension of the core library that introduces a SkillsToolset. This allows agents to load
@@ -363,3 +363,49 @@ features:
   initial context window.
 - Dynamic Instructions: Using the @agent.instructions decorator, you can inject complex behavioral patterns and domain
   knowledge into the agent's prompt based on the runtime context, which effectively acts as a "soft skill".
+
+## 11. LM Studio Integration
+
+**Status:** Not Started
+
+**Context:** Simplify local model integration by replacing direct MLX model loading with OpenAI-compatible API calls. LM Studio and mlx-lm.server both expose OpenAI-compatible endpoints, allowing Punie to use Pydantic AI's built-in OpenAIModel with a custom base_url instead of maintaining custom MLX integration code.
+
+**Benefits:**
+- Removes ~1000 lines of custom MLX model code (MLXModel, chat template handling, tool call parsing)
+- Leverages Pydantic AI's first-class OpenAI support (no custom Model implementation needed)
+- Unified interface for both cloud (OpenAI) and local (LM Studio, mlx-lm.server) models
+- Easier to support multiple local model servers (Ollama, llama.cpp, etc.)
+- Separates model serving from agent logic (better separation of concerns)
+
+**Architecture:**
+```python
+from pydantic_ai.models.openai import OpenAIModel
+
+# Cloud OpenAI
+model = OpenAIModel("gpt-4o")
+
+# Local LM Studio
+model = OpenAIModel("local-model-name", base_url="http://localhost:1234/v1")
+
+# Local mlx-lm.server
+model = OpenAIModel("mlx-community/Qwen3-Coder-30B", base_url="http://localhost:8080/v1")
+```
+
+**Tasks:**
+- [ ] 11.1 Add LM Studio connection support
+    - Use Pydantic AI's OpenAIModel with custom base_url
+    - Support `local:http://localhost:1234/v1/model-name` format in CLI
+    - Add connection validation and error handling
+- [ ] 11.2 Remove direct MLX model loading code
+    - Delete src/punie/models/mlx.py (~500 lines)
+    - Remove MLXModel tests (test_mlx_model.py)
+    - Remove [local] optional dependency on mlx-lm
+    - Remove download-model CLI command (users manage models via LM Studio)
+- [ ] 11.3 Update documentation and examples
+    - Add LM Studio setup guide (install, download models, start server)
+    - Update examples to show both cloud and local usage
+    - Document mlx-lm.server as alternative to LM Studio
+- [ ] 11.4 Simplify model configuration
+    - Remove model download and caching logic
+    - Remove memory estimation code (server handles this)
+    - Simplify factory.py to only handle OpenAIModel creation
