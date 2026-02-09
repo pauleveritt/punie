@@ -246,32 +246,44 @@ coverage/quality improvements which provide more immediate value.
     - Memory check warns but doesn't block (user may know their system)
     - All 8 new tests pass (test_memory.py)
 
-## 7. Web UI Development
+## 7. Tool Performance Measurement
 
 **Status:** Not Started
 
-- [ ] 7.1 Design multi-agent tracking interface
-- [ ] 7.2 Build browser-based monitoring dashboard
-- [ ] 7.3 Implement agent interaction controls
-- [ ] 7.4 Add simultaneous agent management features
+**Context:** Punie supports both IDE tools (via ACP) and local tools (via LocalClient). Understanding the performance characteristics of each approach is critical for optimization and architecture decisions.
 
-## 8. Performance
+- [ ] 7.1 Create instrumentation infrastructure for tool timing
+- [ ] 7.2 Capture elapsed time per tool call for both IDE and local tools
+- [ ] 7.3 Generate HTML performance report with per-tool metrics
+- [ ] 7.4 Add comparative analysis: IDE vs. local tool execution
+- [ ] 7.5 Implement running time aggregation and visualization
 
-**Status:** Not Started
-
-- [ ] 8.1 Measure agent performance using ACP tools vs. native tools
-- [ ] 8.2 Benchmark tool execution latency across protocols
-- [ ] 8.3 Profile memory usage and token consumption patterns
-- [ ] 8.4 Identify bottlenecks in IDE tool delegation
-
-## 9. Advanced Features
+## 8. Web UI Development
 
 **Status:** Not Started
 
-- [ ] 9.1 Create domain-specific skills and policies framework
-- [ ] 9.2 Implement custom deterministic policies for project-specific rules
-- [ ] 9.3 Add support for free-threaded Python (PEP 703) — **Deferred: mlx-lm lacks cp314t wheels (as of 2026-02-08). Project switched to Python 3.14 (regular) to unblock local model installation. May revisit when free-threaded ecosystem matures.**
-- [ ] 9.4 Optimize for parallel agent operations across multiple cores
+- [ ] 8.1 Design multi-agent tracking interface
+- [ ] 8.2 Build browser-based monitoring dashboard
+- [ ] 8.3 Implement agent interaction controls
+- [ ] 8.4 Add simultaneous agent management features
+
+## 9. Performance Optimization
+
+**Status:** Not Started
+
+- [ ] 9.1 Measure agent performance using ACP tools vs. native tools
+- [ ] 9.2 Benchmark tool execution latency across protocols
+- [ ] 9.3 Profile memory usage and token consumption patterns
+- [ ] 9.4 Identify bottlenecks in IDE tool delegation
+
+## 10. Advanced Features
+
+**Status:** Not Started
+
+- [ ] 10.1 Create domain-specific skills and policies framework
+- [ ] 10.2 Implement custom deterministic policies for project-specific rules
+- [ ] 10.3 Add support for free-threaded Python (PEP 703) — **Deferred: mlx-lm lacks cp314t wheels (as of 2026-02-08). Project switched to Python 3.14 (regular) to unblock local model installation. May revisit when free-threaded ecosystem matures.**
+- [ ] 10.4 Optimize for parallel agent operations across multiple cores
 
 ## Research
 
@@ -294,7 +306,7 @@ programmatically rather than through traditional JSON-based tool use, resulting 
 
 **Relevance to Punie:** As Punie delegates tool execution to PyCharm via ACP, implementing code mode patterns could
 significantly improve performance, especially for complex multi-tool workflows. This could be particularly beneficial
-for the advanced features in Phase 9, where parallel agent operations and free-threaded execution would benefit from
+for the advanced features in Phase 10, where parallel agent operations and free-threaded execution would benefit from
 optimized tool calling patterns.
 
 ### Extensible Deterministic Tools
