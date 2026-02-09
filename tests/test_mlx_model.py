@@ -550,6 +550,55 @@ def test_generate_params_to_kwargs_with_sampler():
     assert kwargs["sampler"] is fake_sampler
 
 
+def test_generate_params_with_max_kv_size():
+    """Test GenerateParams includes max_kv_size in kwargs when set."""
+    gen_params = GenerateParams(max_tokens=512, max_kv_size=4096)
+    kwargs = gen_params.to_kwargs()
+
+    assert kwargs["max_tokens"] == 512
+    assert kwargs["max_kv_size"] == 4096
+    assert "sampler" not in kwargs
+
+
+def test_generate_params_without_max_kv_size():
+    """Test GenerateParams excludes max_kv_size from kwargs when None."""
+    gen_params = GenerateParams(max_tokens=512, max_kv_size=None)
+    kwargs = gen_params.to_kwargs()
+
+    assert kwargs["max_tokens"] == 512
+    assert "max_kv_size" not in kwargs
+
+
+def test_sampler_params_with_repetition_penalty():
+    """Test SamplerParams includes repetition_penalty."""
+    from punie.models.mlx import SamplerParams
+
+    sampler_params = SamplerParams(temp=0.7, top_p=0.9, repetition_penalty=1.1)
+    assert sampler_params.temp == 0.7
+    assert sampler_params.top_p == 0.9
+    assert sampler_params.repetition_penalty == 1.1
+
+
+def test_build_generate_params_with_max_kv_size():
+    """Test _build_generate_params extracts max_kv_size from settings."""
+    from punie.models.mlx import MLXModel
+
+    settings = {"temperature": 0.0, "max_tokens": 2048, "max_kv_size": 4096}
+    sampler_params, gen_params = MLXModel._build_generate_params(settings)
+
+    assert gen_params.max_kv_size == 4096
+
+
+def test_build_generate_params_with_repetition_penalty():
+    """Test _build_generate_params extracts repetition_penalty from settings."""
+    from punie.models.mlx import MLXModel
+
+    settings = {"temperature": 0.0, "repetition_penalty": 1.2}
+    sampler_params, gen_params = MLXModel._build_generate_params(settings)
+
+    assert sampler_params.repetition_penalty == 1.2
+
+
 # ============================================================================
 # Streaming fix test
 # ============================================================================

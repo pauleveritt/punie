@@ -617,6 +617,7 @@ name = "punie"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "mlx-lm" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
@@ -654,7 +655,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mlx-lm", marker = "extra == 'local'", specifier = ">=0.22.0" },
+    { name = "mlx-lm", specifier = "==0.30.6" },
+    { name = "mlx-lm", marker = "extra == 'local'", specifier = ">=0.30.0" },
     { name = "psutil", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-ai-slim", specifier = ">=0.1.0" },

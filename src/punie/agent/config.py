@@ -109,7 +109,9 @@ class AgentConfig:
 
     instructions: str = PUNIE_INSTRUCTIONS
     temperature: float = 0.0
-    max_tokens: int = 4096
+    max_tokens: int = 2048  # Reduced from 4096 to match GenerateParams default
     retries: int = 3
     output_retries: int = 2
     validate_python_syntax: bool = False  # off by default (ACP mode)
+    max_kv_size: int | None = None  # KV cache size limit (None = unlimited)
+    repetition_penalty: float = 1.0  # Repetition penalty (1.0 = no penalty, 1.1-1.2 recommended)

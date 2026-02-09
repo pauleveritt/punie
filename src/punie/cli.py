@@ -137,6 +137,20 @@ def resolve_perf(perf_flag: bool) -> bool:
     return os.getenv("PUNIE_PERF", "0") == "1"
 
 
+def resolve_max_kv_size(max_kv_size_flag: int | None) -> int | None:
+    """Resolve max_kv_size from CLI flag or env var.
+
+    Priority: CLI flag > PUNIE_MAX_KV_SIZE env var > None default.
+    Set PUNIE_MAX_KV_SIZE=4096 in acp.json to cap KV cache memory usage.
+    """
+    if max_kv_size_flag is not None:
+        return max_kv_size_flag
+    env_value = os.getenv("PUNIE_MAX_KV_SIZE")
+    if env_value:
+        return int(env_value)
+    return None
+
+
 def setup_logging(log_dir: Path, log_level: str) -> None:
     """Configure file-only logging with RotatingFileHandler.
 
@@ -612,6 +626,11 @@ def ask(
     ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
     perf: bool = typer.Option(False, "--perf", help="Generate performance report"),
+    max_kv_size: int | None = typer.Option(
+        None,
+        "--max-kv-size",
+        help="KV cache size limit (e.g., 4096 for low-RAM systems)",
+    ),
 ) -> None:
     """Ask the agent a question and get a response (without PyCharm).
 
@@ -620,26 +639,34 @@ def ask(
         punie ask "List all TODO comments" --model openai:gpt-4o
         punie ask "What does main.py do?" --workspace /path/to/project
         punie ask "Count Python files" --perf  # Generate performance report
+        punie ask "What is 2+2?" --max-kv-size 4096  # Limit KV cache for low-RAM
 
     Performance reporting can also be enabled via PUNIE_PERF=1 environment variable.
-    This is useful for acp.json configuration.
+    KV cache limit can be set via PUNIE_MAX_KV_SIZE environment variable.
+    These are useful for acp.json configuration.
     """
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    # Resolve perf from flag or env var
+    # Resolve perf and max_kv_size from flags or env vars
     resolved_perf = resolve_perf(perf)
+    resolved_max_kv_size = resolve_max_kv_size(max_kv_size)
 
-    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf))
+    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf, resolved_max_kv_size))
 
 
 async def _run_ask(
-    prompt: str, model: str, workspace: Path, perf: bool = False
+    prompt: str,
+    model: str,
+    workspace: Path,
+    perf: bool = False,
+    max_kv_size: int | None = None,
 ) -> None:
     """Run a simple ask interaction."""
     from datetime import datetime, timezone
 
     from punie.acp.contrib.tool_calls import ToolCallTracker
+    from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS, AgentConfig
     from punie.agent.deps import ACPDeps
     from punie.agent.factory import create_local_agent
     from punie.perf import PerformanceCollector, generate_html_report
@@ -647,9 +674,18 @@ async def _run_ask(
     # Create performance collector if requested
     collector = PerformanceCollector() if perf else None
 
+    # Create config with max_kv_size if provided
+    config = None
+    if max_kv_size is not None:
+        config = AgentConfig(
+            instructions=PUNIE_LOCAL_INSTRUCTIONS,
+            validate_python_syntax=True,
+            max_kv_size=max_kv_size,
+        )
+
     # Create agent and client
     agent, client = create_local_agent(
-        model=model, workspace=workspace, perf_collector=collector
+        model=model, workspace=workspace, config=config, perf_collector=collector
     )
 
     # Start prompt timing if collecting performance

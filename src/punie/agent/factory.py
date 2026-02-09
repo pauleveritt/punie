@@ -136,13 +136,20 @@ def create_pydantic_agent(
     elif isinstance(model, str) and model.startswith("local:"):
         model = _create_local_model(model.split(":", 1)[1])
 
+    # Build model settings dict dynamically to include optional parameters
+    model_settings_dict = {
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
+        "repetition_penalty": config.repetition_penalty,
+    }
+    if config.max_kv_size is not None:
+        model_settings_dict["max_kv_size"] = config.max_kv_size
+
     agent = Agent[ACPDeps, str](
         model,
         deps_type=ACPDeps,
         instructions=config.instructions,
-        model_settings=ModelSettings(
-            temperature=config.temperature, max_tokens=config.max_tokens
-        ),
+        model_settings=ModelSettings(**model_settings_dict),
         retries=config.retries,
         output_retries=config.output_retries,
         toolsets=[toolset],

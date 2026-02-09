@@ -102,13 +102,14 @@ MODEL_SIZES_MB: dict[str, float] = {
     "3B-4bit": 2048.0,  # ~2GB for 3B parameter model at 4-bit quantization
     "7B-4bit": 4096.0,  # ~4GB for 7B parameter model at 4-bit quantization
     "14B-4bit": 8192.0,  # ~8GB for 14B parameter model at 4-bit quantization
+    "30B-4bit": 17500.0,  # ~17.5GB for 30B parameter model at 4-bit quantization (MoE)
 }
 
 
 def estimate_model_size(model_name: str) -> float:
     """Estimate model size from name.
 
-    Looks for patterns like "3B", "7B", "14B" in model name.
+    Looks for patterns like "3B", "7B", "14B", "30B" in model name.
     Falls back to 4096MB (7B default) if no pattern matches.
 
     Args:
@@ -122,16 +123,20 @@ def estimate_model_size(model_name: str) -> float:
         4096.0
         >>> estimate_model_size("mlx-community/Qwen2.5-Coder-3B-Instruct-4bit")
         2048.0
+        >>> estimate_model_size("mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit")
+        17500.0
     """
     model_name_upper = model_name.upper()
 
-    # Check for parameter count patterns
-    if "3B" in model_name_upper:
-        return MODEL_SIZES_MB["3B-4bit"]
-    if "7B" in model_name_upper:
-        return MODEL_SIZES_MB["7B-4bit"]
+    # Check for parameter count patterns (check larger sizes first)
+    if "30B" in model_name_upper:
+        return MODEL_SIZES_MB["30B-4bit"]
     if "14B" in model_name_upper:
         return MODEL_SIZES_MB["14B-4bit"]
+    if "7B" in model_name_upper:
+        return MODEL_SIZES_MB["7B-4bit"]
+    if "3B" in model_name_upper:
+        return MODEL_SIZES_MB["3B-4bit"]
 
     # Default to 7B size
     return MODEL_SIZES_MB["7B-4bit"]

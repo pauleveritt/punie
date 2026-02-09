@@ -51,8 +51,6 @@ Quantized Qwen2.5-Coder models (4-bit and 8-bit) do **not** support tool calling
 | Qwen2.5-Coder-7B-Instruct | 7B | 4-bit | JSON | ❌ Failed | Outputs raw JSON in markdown |
 | Qwen2.5-Coder-7B-8bit | 7B | 8-bit | JSON | ❌ Failed | Hallucinates, leaks prompt |
 | Qwen2.5-Coder-14B-Instruct | 14B | 4-bit | JSON | ❌ Failed | Wrong XML tags |
-| Qwen2.5-Coder-32B-Instruct | 32B | 6-bit | JSON | ⚠️ Aborted | Download stalled |
-| Mistral-Small-24B-Instruct | 24B | 6-bit | N/A | ❌ Failed | No tool markers in template |
 | DeepSeek-Coder-V2-Lite | 16B | 4-bit | N/A | ❌ Failed | No tool markers in template |
 | **Qwen3-Coder-30B-A3B-Instruct** | **30B** | **4-bit** | **XML** | **✅ SUCCESS** | **Works perfectly!** |
 
@@ -71,12 +69,6 @@ Quantized Qwen2.5-Coder models (4-bit and 8-bit) do **not** support tool calling
 - ❌ **Failed**: Used wrong XML tags for tool calls
 - Chat template: ✅ Correct
 - Issue: Model output partially correct structure but didn't follow exact format
-
-### Mistral-Small-24B-Instruct-2501-6bit
-- ❌ **Failed**: No tool calling support in chat template
-- Chat template: ❌ No tool/function markers found
-- Behavior: Writes Python code to solve problems instead of calling tools
-- Issue: Model family doesn't support structured tool calling
 
 ### DeepSeek-Coder-V2-Lite-Instruct-4bit
 - ❌ **Failed**: No tool calling support in chat template
@@ -110,13 +102,13 @@ The Qwen2.5-Coder models lose their tool calling capabilities when quantized:
 2. **Model behavior**: Treats tool calling as code generation task or hallucinates
 3. **Chat template**: Correct format, but model can't follow it after quantization
 
-### Mistral & DeepSeek Models (Failed)
+### DeepSeek Models (Failed)
 
-These model families don't support tool calling at all:
+This model family doesn't support tool calling:
 
-1. **No tool calling training**: Models never learned structured tool calling
-2. **Chat templates lack markers**: No tool/function definitions in templates
-3. **Behavior**: Write Python code instead of calling tools
+1. **No tool calling training**: Model never learned structured tool calling
+2. **Chat template lacks markers**: No tool/function definitions in template
+3. **Behavior**: Writes Python code instead of calling tools
 
 ### Qwen3-Coder Models (✅ SUCCESS!)
 

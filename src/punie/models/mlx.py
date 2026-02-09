@@ -131,6 +131,7 @@ class SamplerParams:
 
     temp: float = 0.0
     top_p: float = 0.0
+    repetition_penalty: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -141,12 +142,15 @@ class GenerateParams:
 
     max_tokens: int = 2048
     sampler: Callable | None = None
+    max_kv_size: int | None = None
 
     def to_kwargs(self) -> dict[str, Any]:
         """Convert to kwargs dict for mlx-lm functions."""
         d: dict[str, Any] = {"max_tokens": self.max_tokens}
         if self.sampler is not None:
             d["sampler"] = self.sampler
+        if self.max_kv_size is not None:
+            d["max_kv_size"] = self.max_kv_size
         return d
 
 
@@ -388,6 +392,8 @@ class MLXModel(Model):
         tokenizer: "MLXTokenizer | None" = None,
         settings: ModelSettings | None = None,
         profile: Any = None,
+        prompt_cache: Any = None,
+        supports_repetition_penalty: bool = False,
     ) -> None:
         """Initialize MLX model with pre-loaded components.
 
@@ -399,11 +405,15 @@ class MLXModel(Model):
             tokenizer: Pre-loaded tokenizer (for testing)
             settings: Optional model settings
             profile: Optional model profile (not used for MLX)
+            prompt_cache: Optional prompt cache for reusing prefix tokens
+            supports_repetition_penalty: Whether mlx-lm supports repetition_penalty
         """
         super().__init__(settings=settings, profile=profile)
         self._model_name = model_name
         self.model_data = model_data
         self.tokenizer = tokenizer
+        self._prompt_cache = prompt_cache
+        self._supports_repetition_penalty = supports_repetition_penalty
 
     @classmethod
     def from_pretrained(
@@ -494,12 +504,40 @@ class MLXModel(Model):
             snapshot_after.rss_mb - snapshot.rss_mb,
         )
 
+        # Check for repetition_penalty support (once at load time)
+        from mlx_lm.sample_utils import make_sampler
+        supports_repetition_penalty = False
+        try:
+            # Test if repetition_penalty is accepted
+            make_sampler(temp=0.0, top_p=0.0, repetition_penalty=1.0)  # type: ignore[call-arg]
+            supports_repetition_penalty = True
+            logger.debug("mlx-lm supports repetition_penalty")
+        except TypeError:
+            logger.debug("mlx-lm does not support repetition_penalty yet")
+
+        # Create prompt cache for reusing system prompt + tool definitions
+        # Note: prompt caching not yet available in mlx-lm 0.30.x
+        prompt_cache = None
+        try:
+            from mlx_lm.utils import make_prompt_cache  # type: ignore[attr-defined]
+            prompt_cache = make_prompt_cache(model_data)  # type: ignore[operator]
+            logger.info("Created prompt cache for prefix token reuse")
+        except (ImportError, AttributeError):
+            # Prompt caching not yet available in current mlx-lm version
+            # Infrastructure is in place and will activate when mlx-lm adds support
+            logger.debug(
+                "Prompt caching not available in mlx-lm %s - will activate when feature is added",
+                getattr(__import__('mlx_lm'), '__version__', 'unknown'),
+            )
+
         return cls(
             model_name,
             model_data=model_data,
             tokenizer=tokenizer,
             settings=settings,
             profile=profile,
+            prompt_cache=prompt_cache,
+            supports_repetition_penalty=supports_repetition_penalty,
         )
 
     @property
@@ -741,11 +779,15 @@ class MLXModel(Model):
         sampler_params = SamplerParams(
             temp=settings.get("temperature", 0.0) if settings else 0.0,
             top_p=settings.get("top_p", 0.0) if settings else 0.0,
+            repetition_penalty=settings.get("repetition_penalty", 1.0) if settings else 1.0,  # type: ignore[typeddict-item]
         )
         max_tokens = 2048
         if settings and "max_tokens" in settings:
             max_tokens = settings["max_tokens"]
-        return sampler_params, GenerateParams(max_tokens=max_tokens)
+        max_kv_size = None
+        if settings and "max_kv_size" in settings:
+            max_kv_size = settings["max_kv_size"]  # type: ignore[typeddict-item]
+        return sampler_params, GenerateParams(max_tokens=max_tokens, max_kv_size=max_kv_size)
 
     def _generate(
         self,
@@ -859,9 +901,31 @@ class MLXModel(Model):
 
         # Build typed generation parameters
         sampler_params, gen_params = self._build_generate_params(settings)
-        sampler = make_sampler(temp=sampler_params.temp, top_p=sampler_params.top_p)
+
+        # Use repetition_penalty if supported (checked once at model load)
+        if self._supports_repetition_penalty:
+            sampler = make_sampler(
+                temp=sampler_params.temp,
+                top_p=sampler_params.top_p,
+                repetition_penalty=sampler_params.repetition_penalty,  # type: ignore[call-arg]
+            )
+        else:
+            # Use basic sampler without repetition_penalty
+            if sampler_params.repetition_penalty != 1.0:
+                logger.debug(
+                    "repetition_penalty=%.1f configured but not supported in this mlx-lm version",
+                    sampler_params.repetition_penalty,
+                )
+            sampler = make_sampler(
+                temp=sampler_params.temp,
+                top_p=sampler_params.top_p,
+            )
         gen_kwargs = gen_params.to_kwargs()
         gen_kwargs["sampler"] = sampler
+
+        # Add prompt cache to kwargs if available
+        if self._prompt_cache is not None:
+            gen_kwargs["prompt_cache"] = self._prompt_cache
 
         # Generate
         if stream:

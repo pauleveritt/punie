@@ -62,11 +62,14 @@ def test_check_memory_available_large_model_warns():
 
 
 def test_estimate_model_size_known_models():
-    """estimate_model_size should recognize 3B, 7B, 14B patterns."""
+    """estimate_model_size should recognize 3B, 7B, 14B, 30B patterns."""
     assert estimate_model_size("mlx-community/Qwen2.5-Coder-3B-Instruct-4bit") == 2048.0
     assert estimate_model_size("mlx-community/Qwen2.5-Coder-7B-Instruct-4bit") == 4096.0
     assert (
         estimate_model_size("mlx-community/Qwen2.5-Coder-14B-Instruct-4bit") == 8192.0
+    )
+    assert (
+        estimate_model_size("mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit") == 17500.0
     )
 
 
@@ -77,11 +80,12 @@ def test_estimate_model_size_unknown_defaults():
 
 
 def test_model_sizes_dict_has_expected_entries():
-    """MODEL_SIZES_MB should have entries for 3B, 7B, 14B."""
+    """MODEL_SIZES_MB should have entries for 3B, 7B, 14B, 30B."""
     assert "3B-4bit" in MODEL_SIZES_MB
     assert "7B-4bit" in MODEL_SIZES_MB
     assert "14B-4bit" in MODEL_SIZES_MB
-    assert len(MODEL_SIZES_MB) == 3
+    assert "30B-4bit" in MODEL_SIZES_MB
+    assert len(MODEL_SIZES_MB) == 4
 
 
 def test_memory_snapshot_peak_is_meaningful():
