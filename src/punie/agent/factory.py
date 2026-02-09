@@ -69,7 +69,7 @@ def _create_local_model(model_name: str | None = None) -> Model:
 
     Args:
         model_name: Optional HuggingFace model name.
-                   Defaults to mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+                   Defaults to mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
 
     Returns:
         MLXModel instance
@@ -80,7 +80,7 @@ def _create_local_model(model_name: str | None = None) -> Model:
     from punie.models.mlx import MLXModel
 
     if model_name is None:
-        model_name = "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+        model_name = "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
 
     logger.info("Creating local MLX model: %s", model_name)
     return MLXModel.from_pretrained(model_name)
@@ -97,7 +97,7 @@ def create_pydantic_agent(
         model: Model name (default: "test" for enhanced TestModel, no LLM calls).
                Special values:
                - "test": Enhanced TestModel with realistic responses
-               - "local": Local MLX model (mlx-community/Qwen2.5-Coder-7B-Instruct-4bit)
+               - "local": Local MLX model (mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit)
                - "local:model-name": Local MLX model with specific HuggingFace model
                Other options: "openai:gpt-4", "anthropic:claude-3-5-sonnet", etc.
                Can also pass a Model instance directly.

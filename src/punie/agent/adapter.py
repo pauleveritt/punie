@@ -61,6 +61,15 @@ from punie.agent.toolset import (
 logger = logging.getLogger(__name__)
 
 
+def _get_agent_tool_names(agent: PydanticAgent[Any, Any]) -> list[str]:
+    """Get tool names from a pydantic-ai Agent's user toolsets."""
+    names: list[str] = []
+    for ts in agent._user_toolsets:
+        if hasattr(ts, "tools"):
+            names.extend(ts.tools.keys())
+    return names
+
+
 class PunieAgent:
     """Adapter that bridges ACP Agent protocol to Pydantic AI.
 
@@ -182,12 +191,16 @@ class PunieAgent:
             # Tier 2: Capabilities fallback
             if toolset is None and self._client_capabilities:
                 logger.info("Using Tier 2: capabilities-based toolset")
-                toolset = create_toolset_from_capabilities(self._client_capabilities)
-                discovery_tier = 2
-                tool_names = list(toolset.tools.keys())
-                logger.info(
-                    f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
-                )
+                candidate = create_toolset_from_capabilities(self._client_capabilities)
+                if candidate.tools:
+                    toolset = candidate
+                    discovery_tier = 2
+                    tool_names = list(toolset.tools.keys())
+                    logger.info(
+                        f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
+                    )
+                else:
+                    logger.info("Tier 2 produced empty toolset, falling through to Tier 3")
 
             # Tier 3: Default fallback
             if toolset is None:
@@ -325,11 +338,8 @@ class PunieAgent:
                 logger.info("Starting tool registration...")
                 state = await self._discover_and_build_toolset(session_id)
                 self._sessions[session_id] = state
-                tool_count = (
-                    len(state.agent._function_toolset.tools)
-                    if state.agent._function_toolset
-                    else 0
-                )
+                tool_names = _get_agent_tool_names(state.agent)
+                tool_count = len(tool_names)
                 logger.info(
                     f"Registered session {session_id}: Tier {state.discovery_tier}, "
                     f"{tool_count} tools"
@@ -505,11 +515,8 @@ class PunieAgent:
 
         # Log model and tool information
         logger.info(f"Agent model: {pydantic_agent.model}")
-        if pydantic_agent._function_toolset:
-            tool_names = list(pydantic_agent._function_toolset.tools.keys())
-            logger.info(f"Agent tools available: {tool_names}")
-        else:
-            logger.info("Agent has no tools")
+        tool_names = _get_agent_tool_names(pydantic_agent)
+        logger.info(f"Agent tools available: {tool_names}")
 
         # Delegate to Pydantic AI with error handling
         logger.info("Calling pydantic_agent.run()...")

@@ -17,12 +17,9 @@ def test_download_model_list_flag():
 
     assert result.exit_code == 0
     assert "Available models" in result.output
-    assert "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit" in result.output
-    assert "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit" in result.output
-    assert "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit" in result.output
-    assert "~4GB" in result.output
-    assert "~2GB" in result.output
-    assert "~8GB" in result.output
+    assert "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" in result.output
+    assert "~15GB" in result.output
+    assert "tool calling works" in result.output
 
 
 def test_download_model_help():
@@ -32,21 +29,14 @@ def test_download_model_help():
     assert result.exit_code == 0
     assert "download-model" in result.output
     assert "HuggingFace model name" in result.output
-    assert "--models-dir" in result.output
+    assert "~/.cache/huggingface" in result.output  # Uses HuggingFace cache
 
 
 def test_download_model_missing_mlx_lm():
     """Test error when mlx-lm not installed (ImportError during download)."""
-    # Patch the actual import location in the download_model function
-    with patch("punie.cli.Path.mkdir"):
-        with patch.object(
-            Path,
-            "expanduser",
-            return_value=Path("/fake/.punie/models"),
-        ):
-            # Trigger ImportError when trying to import snapshot_download in download_model
-            with patch.dict("sys.modules", {"huggingface_hub": None}):
-                result = runner.invoke(app, ["download-model"])
+    # Trigger ImportError when trying to import snapshot_download in download_model
+    with patch.dict("sys.modules", {"huggingface_hub": None}):
+        result = runner.invoke(app, ["download-model"])
 
     assert result.exit_code == 1
     assert "Local model support requires mlx-lm" in result.output
@@ -98,17 +88,17 @@ def test_download_model_custom_name(tmp_path: Path):
     assert f"Downloading {custom_model}" in result.output
 
 
-def test_download_model_custom_dir(tmp_path: Path):
-    """Test download with custom models directory."""
-    custom_dir = tmp_path / "custom-models"
-    mock_snapshot = Mock()
+def test_download_model_uses_hf_cache():
+    """Test download uses HuggingFace cache (no custom directory)."""
+    mock_snapshot = Mock(return_value="/home/user/.cache/huggingface/hub/models--mlx-community--Qwen2.5-Coder-7B-Instruct-4bit")
 
     with patch.dict(
         "sys.modules", {"huggingface_hub": Mock(snapshot_download=mock_snapshot)}
     ):
-        result = runner.invoke(app, ["download-model", "--models-dir", str(custom_dir)])
+        result = runner.invoke(app, ["download-model"])
 
     assert result.exit_code == 0
+    assert "Cache: ~/.cache/huggingface/hub/" in result.output
 
 
 def test_download_model_network_error(tmp_path: Path):

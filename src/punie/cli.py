@@ -17,7 +17,10 @@ import typer
 
 from punie import __version__
 from punie.acp import run_agent
+from punie.acp.contrib.tool_calls import ToolCallTracker
 from punie.agent import PunieAgent
+from punie.agent.deps import ACPDeps
+from punie.agent.factory import create_local_agent
 from punie.http.app import create_app
 from punie.http.runner import run_dual
 from punie.http.types import Host, Port
@@ -369,11 +372,6 @@ def download_model(
         "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
         help="HuggingFace model name to download",
     ),
-    models_dir: Path = typer.Option(
-        Path("~/.cache/punie/models"),
-        "--models-dir",
-        help="Directory to store downloaded models (cached, re-downloadable)",
-    ),
     list_models: bool = typer.Option(
         False,
         "--list",
@@ -383,7 +381,7 @@ def download_model(
     """Download MLX models for local inference.
 
     Downloads quantized MLX models from HuggingFace for offline development.
-    Models are stored in ~/.punie/models/ by default.
+    Models are cached in ~/.cache/huggingface/hub/ (HuggingFace standard location).
 
     Recommended models:
     - mlx-community/Qwen2.5-Coder-7B-Instruct-4bit (~4GB, best balance)
@@ -394,18 +392,15 @@ def download_model(
     if list_models:
         typer.echo("Available models:\n")
         typer.echo(
-            "Name                                            Size    Description"
+            "Name                                                  Size    Description"
         )
-        typer.echo("─" * 78)
+        typer.echo("─" * 80)
         typer.echo(
-            "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit   ~4GB    Default (best balance)"
+            "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit      ~15GB   Default (tool calling works!)"
         )
-        typer.echo(
-            "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit   ~2GB    Faster, simpler tasks"
-        )
-        typer.echo(
-            "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit  ~8GB    Highest quality"
-        )
+        typer.echo("")
+        typer.echo("Note: Qwen2.5-Coder models don't support tool calling reliably.")
+        typer.echo("      Use Qwen3-Coder for tool calling, or cloud models for best results.")
         typer.echo("\nDownload with: punie download-model <model-name>")
         raise typer.Exit(0)
 
@@ -420,23 +415,19 @@ def download_model(
         typer.secho(msg, fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from e
 
-    # Expand models directory
-    models_dir = models_dir.expanduser()
-    models_dir.mkdir(parents=True, exist_ok=True)
-
-    # Download model
+    # Download model to HuggingFace cache (default location)
     typer.echo(f"Downloading {model_name}...")
-    typer.echo(f"Target directory: {models_dir}")
+    typer.echo("Cache: ~/.cache/huggingface/hub/")
     typer.echo("")
 
     try:
-        snapshot_download(
-            repo_id=model_name,
-            local_dir=models_dir / model_name.replace("/", "--"),
-        )
+        # Download to HuggingFace cache (no local_dir = uses default cache)
+        cache_path = snapshot_download(repo_id=model_name)
+
         typer.secho("✓ Model downloaded successfully!", fg=typer.colors.GREEN)
-        typer.echo(f"  Location: {models_dir / model_name.replace('/', '--')}")
+        typer.echo(f"  Location: {cache_path}")
         typer.echo(f"\nUse with: punie serve --model local:{model_name}")
+        typer.echo(f"Or test with: punie test-tools --model local:{model_name}")
     except Exception as e:
         typer.secho(f"Error downloading model: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from e
@@ -501,6 +492,203 @@ def serve(
             typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from e
         raise
+
+
+async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
+    """Test if a model can properly format tool calls.
+
+    Args:
+        model: Model name (e.g., "local", "local:model-name", "test")
+        prompt: Test prompt to send to the model
+        workspace: Workspace directory for file operations
+
+    Returns:
+        True if tool calls were detected, False otherwise
+    """
+    typer.echo(f"\n{'='*80}")
+    typer.secho("Testing Tool Calling", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.echo(f"{'='*80}")
+    typer.echo(f"Model: {model}")
+    typer.echo(f"Workspace: {workspace}")
+    typer.echo(f"Prompt: {prompt}")
+    typer.echo(f"{'='*80}\n")
+
+    # Create agent and client
+    typer.echo("Creating agent...")
+    agent, client = create_local_agent(model=model, workspace=workspace)
+
+    # Create dependencies
+    deps = ACPDeps(
+        client_conn=client,
+        session_id="test-session",
+        tracker=ToolCallTracker(),
+    )
+
+    # Run the agent
+    typer.echo("\nSending prompt to agent...\n")
+    try:
+        result = await agent.run(prompt, deps=deps)
+
+        typer.echo(f"\n{'='*80}")
+        typer.secho("RESULT", fg=typer.colors.BRIGHT_CYAN, bold=True)
+        typer.echo(f"{'='*80}")
+        typer.echo(result.output)
+        typer.echo(f"{'='*80}\n")
+
+        # Show tool calls if any
+        tool_calls_made = []
+        if result.all_messages():
+            for msg in result.all_messages():
+                if hasattr(msg, "parts"):
+                    for part in msg.parts:
+                        if hasattr(part, "tool_name"):
+                            tool_calls_made.append(
+                                f"{part.tool_name}({getattr(part, 'args', {})})"
+                            )
+
+        if tool_calls_made:
+            typer.secho(
+                "✓ SUCCESS - Tool calls were made:",
+                fg=typer.colors.GREEN,
+                bold=True,
+            )
+            for tc in tool_calls_made:
+                typer.echo(f"  - {tc}")
+            return True
+        else:
+            typer.secho(
+                "✗ FAILED - No tool calls detected in response",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+            typer.echo("\nThis usually means:")
+            typer.echo("  1. The model doesn't support tool calling")
+            typer.echo("  2. The model is outputting raw JSON instead of <tool_call> tags")
+            typer.echo("  3. The quantization level is too aggressive")
+            typer.echo("\nTry:")
+            typer.echo("  - Using an 8-bit model instead of 4-bit")
+            typer.echo("  - Using a larger model (14B instead of 7B)")
+            typer.echo("  - Checking logs with --debug flag")
+            return False
+
+    except Exception as e:
+        typer.secho(f"\n✗ ERROR: {e}", fg=typer.colors.RED, err=True)
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+@app.command("ask")
+def ask(
+    prompt: str = typer.Argument(..., help="Question or instruction for the agent"),
+    model: str = typer.Option(
+        "local",
+        "--model",
+        help="Model to use (e.g., 'local', 'openai:gpt-4o', 'anthropic:claude-3-5-sonnet')",
+    ),
+    workspace: Path = typer.Option(
+        Path.cwd(),
+        "--workspace",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        help="Workspace directory",
+    ),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+) -> None:
+    """Ask the agent a question and get a response (without PyCharm).
+
+    Examples:
+        punie ask "How many Python files are in this project?"
+        punie ask "List all TODO comments" --model openai:gpt-4o
+        punie ask "What does main.py do?" --workspace /path/to/project
+    """
+    if debug:
+        logging.basicConfig(level=logging.DEBUG)
+
+    asyncio.run(_run_ask(prompt, model, workspace))
+
+
+async def _run_ask(prompt: str, model: str, workspace: Path) -> None:
+    """Run a simple ask interaction."""
+    from punie.agent.factory import create_local_agent
+    from punie.agent.deps import ACPDeps
+    from punie.acp.contrib.tool_calls import ToolCallTracker
+
+    # Create agent and client
+    agent, client = create_local_agent(model=model, workspace=workspace)
+
+    # Create dependencies
+    deps = ACPDeps(
+        client_conn=client,
+        session_id="ask-session",
+        tracker=ToolCallTracker(),
+    )
+
+    # Run the agent
+    try:
+        result = await agent.run(prompt, deps=deps)
+
+        # Show the response
+        typer.echo(result.output)
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@app.command("test-tools")
+def test_tools(
+    model: str = typer.Option(
+        "local",
+        "--model",
+        help="Model to test (e.g., 'local', 'local:model-name', 'test')",
+    ),
+    prompt: str = typer.Option(
+        "How many Python files are in the current directory?",
+        "--prompt",
+        help="Test prompt to send",
+    ),
+    workspace: Path = typer.Option(
+        Path.cwd(),
+        "--workspace",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        help="Workspace directory for file operations",
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Enable DEBUG logging to see full prompts and outputs",
+    ),
+) -> None:
+    """Test if a model can properly call tools without PyCharm.
+
+    Tests tool calling locally to diagnose model issues. Useful for comparing
+    models and verifying that tool calling works before using with PyCharm.
+    """
+    # Setup logging
+    if debug:
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        logging.getLogger("punie.models.mlx").setLevel(logging.DEBUG)
+
+        # Add console handler for debug mode
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        root_logger.addHandler(console_handler)
+
+    # Run test
+    success = asyncio.run(_test_tool_calling(model, prompt, workspace))
+
+    # Exit with appropriate code
+    if not success:
+        raise typer.Exit(1)
 
 
 @app.command("stop-all")

@@ -56,7 +56,8 @@ def example_agent_with_local_model():
         agent = create_pydantic_agent(model="local")
 
         print(f"Agent created with model: {agent._model.model_name}")
-        print(f"Agent has {len(agent._function_tools)} tools available")
+        tool_names = [n for ts in agent._user_toolsets if hasattr(ts, "tools") for n in ts.tools]
+        print(f"Agent has {len(tool_names)} tools available")
 
         # Note: To actually run the agent, you need ACPDeps with a client connection
         # This example just demonstrates model setup

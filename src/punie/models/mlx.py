@@ -4,6 +4,29 @@ This module provides a Pydantic AI Model implementation that uses MLX for
 inference on macOS arm64 devices. It supports tool calling through chat
 templates and regex parsing of tool call tags.
 
+Tool Calling Format:
+    Qwen2.5-Coder models should output tool calls in this format:
+        <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
+
+    The chat template should instruct the model to use this format when
+    tools are provided. If the model outputs raw JSON without <tool_call>
+    tags, it may indicate:
+    - The model variant doesn't support tool calling
+    - The chat template is missing or incorrect
+    - The model needs fine-tuning with tool calling examples
+
+    Recommended models for tool calling:
+    - mlx-community/Qwen2.5-Coder-7B-Instruct-4bit (default, good balance)
+    - mlx-community/Qwen2.5-Coder-7B-Instruct (non-quantized, best quality)
+    - mlx-community/Qwen2.5-Coder-14B-Instruct-4bit (larger, slower, better)
+
+Troubleshooting:
+    If tool calls aren't working (model outputs raw JSON):
+    1. Check logs for "⚠️  Tool calling may not work" warnings
+    2. Try a non-quantized model (4-bit quantization may affect tool calling)
+    3. Verify chat template with: model.tokenizer.chat_template
+    4. Check that PyCharm is providing enabled capabilities
+
 Note: This module can be imported on any platform, but requires mlx-lm to
 actually run models. Use TYPE_CHECKING guards for imports.
 """
@@ -51,6 +74,47 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def check_chat_template_tool_support(tokenizer: "MLXTokenizer") -> tuple[bool, str]:
+    """Check if tokenizer's chat template supports tool calling.
+
+    Qwen2.5-Coder models should have a chat template that includes:
+    - Support for 'tools' parameter in apply_chat_template
+    - Formatting that instructs the model to use <tool_call> tags
+
+    Args:
+        tokenizer: The tokenizer to check
+
+    Returns:
+        Tuple of (supports_tools, diagnostic_message)
+    """
+    # Check if chat template exists
+    if not hasattr(tokenizer, 'chat_template') or not tokenizer.chat_template:
+        return False, "Tokenizer has no chat_template attribute"
+
+    template = tokenizer.chat_template
+
+    # For Qwen models, the template should mention tool_call or function
+    if isinstance(template, str):
+        has_tool_markers = any(
+            marker in template.lower()
+            for marker in ['tool_call', 'tools', 'function', '<tool_call>']
+        )
+        if not has_tool_markers:
+            return False, (
+                "Chat template does not contain tool/function markers. "
+                "This model may not support tool calling."
+            )
+
+        # Qwen2.5 specifically uses <tool_call> tags
+        if '<tool_call>' in template or 'tool_call' in template:
+            return True, "Chat template appears to support Qwen-style <tool_call> tags"
+
+        return False, "Chat template mentions tools but may not use expected format"
+
+    # Template is not a string (might be a dict or custom object)
+    return False, f"Chat template is type {type(template)}, cannot validate"
+
+
 class ToolCallDict(TypedDict):
     """A parsed tool call extracted from model output."""
 
@@ -75,7 +139,7 @@ class GenerateParams:
     Field names match generate_step()'s keyword arguments.
     """
 
-    max_tokens: int = 256
+    max_tokens: int = 2048
     sampler: Callable | None = None
 
     def to_kwargs(self) -> dict[str, Any]:
@@ -89,32 +153,128 @@ class GenerateParams:
 def parse_tool_calls(text: str) -> tuple[str, list[ToolCallDict]]:
     """Extract tool calls from model output.
 
-    MLX models output tool calls as:
-    <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
+    Supports two formats:
+    1. JSON: <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
+    2. XML: <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
 
     Args:
-        text: Model output possibly containing <tool_call>...</tool_call> blocks
+        text: Model output possibly containing tool call blocks
 
     Returns:
         Tuple of (remaining_text, list of tool call dicts)
     """
-    pattern = r"<tool_call>(.*?)</tool_call>"
-    matches = re.findall(pattern, text, re.DOTALL)
-
     calls = []
+    clean_text = text
+    patterns_to_remove = []
+
+    # Pattern 1: Standard <tool_call>...</tool_call> blocks
+    pattern = r"<tool_call>(.*?)</tool_call>"
+    matches = re.finditer(pattern, text, re.DOTALL)
+
     for match in matches:
-        try:
-            call = json.loads(match.strip())
-            if "name" in call:
-                calls.append(call)
-        except json.JSONDecodeError:
-            # Skip invalid JSON
+        match_stripped = match.group(1).strip()
+        parsed_successfully = False
+
+        # Try JSON format first
+        if match_stripped.startswith("{"):
+            try:
+                call = json.loads(match_stripped)
+                if "name" in call:
+                    calls.append(call)
+                    parsed_successfully = True
+            except json.JSONDecodeError:
+                pass
+
+        # Try XML format if JSON failed: <function=name><parameter=key>value</parameter></function>
+        if not parsed_successfully:
+            xml_call = _parse_xml_tool_call(match_stripped)
+            if xml_call:
+                calls.append(xml_call)
+                parsed_successfully = True
+
+        # Always remove the tool_call tags, even if parsing failed
+        patterns_to_remove.append((match.start(), match.end()))
+
+    # Pattern 2: Broken format without opening <tool_call> tag
+    # Some models output: <function=name>...</function></tool_call>
+    broken_pattern = r"<function=([^>]+)>(.*?)</function>\s*</tool_call>"
+    broken_matches = re.finditer(broken_pattern, text, re.DOTALL)
+
+    for match in broken_matches:
+        # Check if this match overlaps with any already-found matches
+        start, end = match.start(), match.end()
+        overlaps = any(s <= start < e or s < end <= e for s, e in patterns_to_remove)
+        if overlaps:
             continue
 
-    # Remove tool call tags from text
-    clean_text = re.sub(pattern, "", text, flags=re.DOTALL).strip()
+        func_name = match.group(1)
+        params_block = match.group(2)
+        xml_call = _parse_xml_function_block(func_name, params_block)
+        if xml_call:
+            calls.append(xml_call)
+            patterns_to_remove.append((start, end))
+
+    # Remove matched patterns from text (in reverse order to preserve indices)
+    patterns_to_remove.sort(reverse=True)
+    for start, end in patterns_to_remove:
+        clean_text = clean_text[:start] + clean_text[end:]
+
+    clean_text = clean_text.strip()
 
     return clean_text, calls
+
+
+def _parse_xml_tool_call(xml_content: str) -> ToolCallDict | None:
+    """Parse XML-format tool call.
+
+    Expected format: <function=name><parameter=key>value</parameter></function>
+
+    Args:
+        xml_content: XML content inside <tool_call> tags
+
+    Returns:
+        Tool call dict or None if parsing fails
+    """
+    # Extract function name
+    func_match = re.search(r"<function=([^>]+)>", xml_content)
+    if not func_match:
+        return None
+
+    func_name = func_match.group(1).strip()
+
+    # Extract parameters
+    param_pattern = r"<parameter=([^>]+)>(.*?)</parameter>"
+    param_matches = re.findall(param_pattern, xml_content, re.DOTALL)
+
+    arguments = {}
+    for param_name, param_value in param_matches:
+        arguments[param_name.strip()] = param_value.strip()
+
+    return {"name": func_name, "arguments": arguments}
+
+
+def _parse_xml_function_block(func_name: str, params_block: str) -> ToolCallDict | None:
+    """Parse XML function block (broken format without <tool_call> opening tag).
+
+    Args:
+        func_name: Function name extracted from <function=name>
+        params_block: Content between <function> and </function> tags
+
+    Returns:
+        Tool call dict or None if parsing fails
+    """
+    # Extract parameters
+    param_pattern = r"<parameter=([^>]+)>(.*?)</parameter>"
+    param_matches = re.findall(param_pattern, params_block, re.DOTALL)
+
+    arguments = {}
+    for param_name, param_value in param_matches:
+        arguments[param_name.strip()] = param_value.strip()
+
+    if not arguments:
+        return None
+
+    return {"name": func_name.strip(), "arguments": arguments}
 
 
 class AsyncStream:
@@ -376,6 +536,10 @@ class MLXModel(Model):
         chat_messages = self._map_request(messages)
         tools = self._build_tools(model_request_parameters)
 
+        logger.info("=== MLX request() starting ===")
+        logger.info(f"Chat messages: {len(chat_messages)} messages")
+        logger.info(f"Tools available: {len(tools) if tools else 0}")
+
         # Generate response
         output = self._generate(
             messages=chat_messages,
@@ -387,7 +551,12 @@ class MLXModel(Model):
         assert isinstance(output, str)
 
         # Parse for tool calls
+        logger.info("Parsing output for tool calls...")
         text, tool_calls = parse_tool_calls(output)
+
+        logger.info(f"Parsed result: {len(tool_calls)} tool calls, {len(text)} chars of text")
+        if tool_calls:
+            logger.info(f"Tool calls parsed: {[tc['name'] for tc in tool_calls]}")
 
         # Build response parts
         parts: list[ModelResponsePart] = []
@@ -402,6 +571,8 @@ class MLXModel(Model):
                     args=tool_call.get("arguments", {}),
                 )
             )
+
+        logger.info(f"=== MLX request() complete: {len(parts)} response parts ===")
 
         return ModelResponse(
             parts=parts,
@@ -539,13 +710,15 @@ class MLXModel(Model):
                     if isinstance(part, TextPart):
                         assistant_content += part.content
                     elif isinstance(part, ToolCallPart):
+                        # Keep arguments as dict for Qwen3 template compatibility
+                        # (Qwen3 template expects dict, not JSON string)
                         tool_calls.append(
                             {
                                 "id": part.tool_call_id,
                                 "type": "function",
                                 "function": {
                                     "name": part.tool_name,
-                                    "arguments": json.dumps(part.args_as_dict()),
+                                    "arguments": part.args_as_dict(),
                                 },
                             }
                         )
@@ -569,7 +742,7 @@ class MLXModel(Model):
             temp=settings.get("temperature", 0.0) if settings else 0.0,
             top_p=settings.get("top_p", 0.0) if settings else 0.0,
         )
-        max_tokens = 256
+        max_tokens = 2048
         if settings and "max_tokens" in settings:
             max_tokens = settings["max_tokens"]
         return sampler_params, GenerateParams(max_tokens=max_tokens)
@@ -601,13 +774,88 @@ class MLXModel(Model):
             msg = "Model not loaded. Use from_pretrained() to load the model."
             raise RuntimeError(msg)
 
+        # Log diagnostic info about tool calling setup
+        logger.info("=== MLX Generation Diagnostics ===")
+        logger.info(f"Model: {self._model_name}")
+        logger.info(f"Number of messages: {len(messages)}")
+        logger.info(f"Number of tools: {len(tools) if tools else 0}")
+
+        if tools:
+            logger.info(f"Tool names: {[t['function']['name'] for t in tools]}")
+            # Log first tool definition for inspection
+            logger.debug(f"First tool definition: {tools[0]}")
+
+            # Check ALL tools for properties format issues
+            for idx, tool_def in enumerate(tools):
+                func = tool_def['function']
+                tool_name = func.get('name', f'tool_{idx}')
+                if 'parameters' in func:
+                    params = func['parameters']
+                    if 'properties' in params:
+                        props = params['properties']
+                        if not isinstance(props, dict):
+                            logger.error(
+                                f"Tool '{tool_name}' has properties that's not a dict: "
+                                f"type={type(props)}, value={props}"
+                            )
+                    else:
+                        logger.warning(f"Tool '{tool_name}' parameters has no 'properties' key")
+                else:
+                    logger.warning(f"Tool '{tool_name}' has no 'parameters' key")
+
+        # Check if tokenizer has chat template and if it supports tools
+        has_chat_template = hasattr(self.tokenizer, 'chat_template') and self.tokenizer.chat_template
+        logger.info(f"Tokenizer has chat_template: {has_chat_template}")
+
+        if has_chat_template:
+            # Log a snippet of the chat template
+            template = self.tokenizer.chat_template
+            if isinstance(template, str):
+                logger.debug(f"Chat template (first 200 chars): {template[:200]}")
+            else:
+                logger.debug(f"Chat template type: {type(template)}")
+
+            # Check tool support if tools are provided
+            if tools:
+                supports_tools, message = check_chat_template_tool_support(self.tokenizer)
+                if supports_tools:
+                    logger.info(f"✓ {message}")
+                else:
+                    logger.warning(
+                        f"⚠️  Tool calling may not work: {message}\n"
+                        f"   Consider using a model explicitly trained for tool calling, such as:\n"
+                        f"   - mlx-community/Qwen2.5-Coder-7B-Instruct (non-quantized)\n"
+                        f"   - mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
+                    )
+
         # Apply chat template
-        prompt = self.tokenizer.apply_chat_template(
-            messages,
-            tools=tools,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
+        try:
+            prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tools=tools,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+
+            # Log the formatted prompt
+            logger.info(f"Chat template produced prompt length: {len(prompt)} chars")
+            logger.debug(f"Full prompt:\n{'='*80}\n{prompt}\n{'='*80}")
+
+            # Look for tool-related markers in the prompt
+            if tools:
+                tool_markers = ['<tool_call>', '<function', '"name":', '"arguments":', 'function_call']
+                found_markers = [m for m in tool_markers if m in prompt]
+                if found_markers:
+                    logger.info(f"Tool markers found in prompt: {found_markers}")
+                else:
+                    logger.warning(
+                        "⚠️  NO tool markers found in prompt! "
+                        "Chat template may not support tool calling properly."
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to apply chat template: {e}")
+            raise
 
         # Build typed generation parameters
         sampler_params, gen_params = self._build_generate_params(settings)
@@ -624,9 +872,45 @@ class MLXModel(Model):
                 **gen_kwargs,
             )
         else:
-            return generate(
+            output = generate(
                 self.model_data,
                 self.tokenizer,
                 prompt,
                 **gen_kwargs,
             )
+
+            # Log raw output before processing
+            logger.info(f"Raw model output length: {len(output)} chars")
+            logger.debug(f"Raw output:\n{'='*80}\n{output}\n{'='*80}")
+
+            # Check for tool call markers in output
+            if tools:
+                if "<tool_call>" in output:
+                    logger.info("✓ Model output contains <tool_call> tags")
+                elif "function_call" in output or '"name":' in output:
+                    logger.warning(
+                        "⚠️  Model output looks like tool call JSON but missing <tool_call> tags! "
+                        "This suggests the model doesn't understand the expected format."
+                    )
+                else:
+                    logger.info("Model output does not appear to contain tool calls")
+
+            # Strip special tokens that may leak into output
+            # Common patterns: <|im_end|>, <[im_end]>, </s>, <|endoftext|>
+            special_tokens = [
+                "<|im_end|>",
+                "<[im_end]>",
+                "<|im_start|>",
+                "<[im_start]>",
+                "</s>",
+                "<|endoftext|>",
+            ]
+            for token in special_tokens:
+                output = output.replace(token, "")
+
+            cleaned_output = output.strip()
+            if cleaned_output != output:
+                logger.debug(f"Stripped {len(output) - len(cleaned_output)} chars of special tokens/whitespace")
+
+            logger.info("=== MLX Generation Complete ===")
+            return cleaned_output

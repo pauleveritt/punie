@@ -472,7 +472,7 @@ def test_factory_local_default_model_name(monkeypatch):
     monkeypatch.setattr(MLXModel, "from_pretrained", fake_from_pretrained)
 
     _ = factory._create_local_model()
-    assert created_model_name == "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+    assert created_model_name == "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
 
 
 # ============================================================================
@@ -488,7 +488,7 @@ def test_build_generate_params_defaults():
 
     assert sampler_params.temp == 0.0
     assert sampler_params.top_p == 0.0
-    assert gen_params.max_tokens == 256
+    assert gen_params.max_tokens == 2048
     assert gen_params.sampler is None
 
 
@@ -514,7 +514,7 @@ def test_build_generate_params_partial_settings():
 
     assert sampler_params.temp == 0.5
     assert sampler_params.top_p == 0.0  # default
-    assert gen_params.max_tokens == 256  # default
+    assert gen_params.max_tokens == 2048  # default
     assert gen_params.sampler is None
 
 
@@ -598,6 +598,50 @@ async def test_streamed_response_handles_generation_response():
 
 
 # ============================================================================
+# Special token stripping tests
+# ============================================================================
+
+
+def test_generate_strips_special_tokens():
+    """Test that _generate() strips special tokens from output."""
+    from unittest.mock import MagicMock, patch
+
+    from punie.models.mlx import MLXModel
+
+    # Create model with mocked dependencies
+    model = MLXModel(
+        "test-model",
+        model_data=MagicMock(),
+        tokenizer=MagicMock(),
+    )
+
+    # Mock tokenizer.apply_chat_template to return a simple prompt
+    model.tokenizer.apply_chat_template.return_value = "test prompt"
+
+    # Test output with various special tokens that should be stripped
+    test_cases = [
+        ("Hello world<|im_end|>", "Hello world"),
+        ("Hello world<[im_end]>", "Hello world"),
+        ("Response</s>", "Response"),
+        ("Text<|endoftext|>", "Text"),
+        ("Start<|im_start|>middle<|im_end|>end", "Startmiddleend"),
+        ("Multiple<[im_end]><|im_end|></s>", "Multiple"),
+    ]
+
+    for input_text, expected_output in test_cases:
+        # Patch mlx_lm functions (imported inside _generate)
+        with patch("mlx_lm.generate", return_value=input_text):
+            with patch("mlx_lm.sample_utils.make_sampler", return_value=MagicMock()):
+                result = model._generate(
+                    messages=[{"role": "user", "content": "test"}],
+                    tools=None,
+                    settings=None,
+                    stream=False,
+                )
+                assert result == expected_output, f"Failed for input: {input_text}"
+
+
+# ============================================================================
 # Runtime guard test
 # ============================================================================
 
@@ -616,3 +660,75 @@ def test_generate_raises_without_model_loaded():
             settings=None,
             stream=False,
         )
+
+
+def test_parse_xml_tool_call_complete():
+    """XML format tool call with complete tags."""
+    text = '''<tool_call>
+<function=read_file>
+<parameter=path>src/main.py</parameter>
+</function>
+</tool_call>'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 1
+    assert calls[0]["name"] == "read_file"
+    assert calls[0]["arguments"] == {"path": "src/main.py"}
+    assert content == ""
+
+
+def test_parse_xml_tool_call_broken():
+    """XML format tool call missing opening tool_call tag."""
+    text = '''Some text
+<function=run_command>
+<parameter=command>ls -la</parameter>
+</function>
+</tool_call>'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 1
+    assert calls[0]["name"] == "run_command"
+    assert calls[0]["arguments"] == {"command": "ls -la"}
+    assert "Some text" in content
+    assert "<function" not in content
+
+
+def test_parse_xml_tool_call_multiple_params():
+    """XML format with multiple parameters."""
+    text = '''<tool_call>
+<function=write_file>
+<parameter=path>/tmp/test.txt</parameter>
+<parameter=content>Hello World</parameter>
+</function>
+</tool_call>'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 1
+    assert calls[0]["name"] == "write_file"
+    assert calls[0]["arguments"] == {
+        "path": "/tmp/test.txt",
+        "content": "Hello World"
+    }
+
+
+def test_parse_mixed_json_and_xml_tool_calls():
+    """Mix of JSON and XML format tool calls."""
+    text = '''Text before
+<tool_call>{"name": "json_tool", "arguments": {"key": "value"}}</tool_call>
+middle text
+<tool_call>
+<function=xml_tool>
+<parameter=param>data</parameter>
+</function>
+</tool_call>
+text after'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 2
+    assert calls[0]["name"] == "json_tool"
+    assert calls[0]["arguments"] == {"key": "value"}
+    assert calls[1]["name"] == "xml_tool"
+    assert calls[1]["arguments"] == {"param": "data"}
+    assert "Text before" in content
+    assert "middle text" in content
+    assert "text after" in content

@@ -121,16 +121,20 @@ async def test_new_session_records_discovery_tier():
 
 @pytest.mark.asyncio
 async def test_new_session_tier_2_fallback():
-    """new_session() uses Tier 2 (capabilities) when no catalog."""
+    """new_session() uses Tier 2 (capabilities) when no catalog but has enabled capabilities."""
     fake = FakeClient(
         tool_catalog=[],  # Empty catalog triggers Tier 2
-        capabilities=ClientCapabilities(fs=FileSystemCapability()),
+        capabilities=ClientCapabilities(
+            fs=FileSystemCapability(read_text_file=True, write_text_file=True)
+        ),
     )
     agent = PunieAgent(model="test")
     agent.on_connect(fake)
     await agent.initialize(
         protocol_version=1,
-        client_capabilities=ClientCapabilities(fs=FileSystemCapability()),
+        client_capabilities=ClientCapabilities(
+            fs=FileSystemCapability(read_text_file=True, write_text_file=True)
+        ),
     )
 
     response = await agent.new_session(cwd="/tmp", mcp_servers=[])
@@ -165,12 +169,18 @@ async def test_new_session_graceful_failure():
         async def discover_tools(self, session_id: str, **kwargs):
             raise RuntimeError("Discovery failed")
 
-    fake = FailingClient(capabilities=ClientCapabilities(fs=FileSystemCapability()))
+    fake = FailingClient(
+        capabilities=ClientCapabilities(
+            fs=FileSystemCapability(read_text_file=True, write_text_file=True)
+        )
+    )
     agent = PunieAgent(model="test")
     agent.on_connect(fake)
     await agent.initialize(
         protocol_version=1,
-        client_capabilities=ClientCapabilities(fs=FileSystemCapability()),
+        client_capabilities=ClientCapabilities(
+            fs=FileSystemCapability(read_text_file=True, write_text_file=True)
+        ),
     )
 
     # Should not raise, should fall back to Tier 2
