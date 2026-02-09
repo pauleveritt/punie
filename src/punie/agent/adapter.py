@@ -12,6 +12,9 @@ The adapter supports dynamic tool discovery via a three-tier fallback:
 """
 
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic_ai import Agent as PydanticAgent
@@ -57,6 +60,7 @@ from punie.agent.toolset import (
     create_toolset_from_capabilities,
     create_toolset_from_catalog,
 )
+from punie.perf import PerformanceCollector, generate_html_report
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +123,21 @@ class PunieAgent:
         self._client_info: Implementation | None = None
         self._sessions: dict[str, SessionState] = {}
         self._greeted_sessions: set[str] = set()  # Track which sessions got greeting
-        self._pending_errors: dict[str, str] = {}  # Store errors to send during first prompt
-        logger.info("=== PunieAgent.__init__() complete ===")
+        self._pending_errors: dict[
+            str, str
+        ] = {}  # Store errors to send during first prompt
 
+        # Performance reporting via PUNIE_PERF env var
+        # TODO: Re-enable after fixing collector lifecycle issues
+        # Temporarily disabled due to infinite loop when reusing collectors across prompts
+        self._perf_enabled = False  # os.getenv("PUNIE_PERF", "0") == "1"
+        self._perf_collectors: dict[
+            str, PerformanceCollector
+        ] = {}  # Per-session collectors
+        if self._perf_enabled:
+            logger.info("Performance reporting enabled via PUNIE_PERF=1")
+
+        logger.info("=== PunieAgent.__init__() complete ===")
 
     def on_connect(self, conn: Client) -> None:
         """Called when client connects."""
@@ -130,7 +146,6 @@ class PunieAgent:
         logger.info(f"Connection object: {conn}")
         self._conn = conn
         logger.info("=== on_connect() complete ===")
-
 
     async def _discover_and_build_toolset(self, session_id: str) -> SessionState:
         """Discover tools and build session state.
@@ -146,7 +161,9 @@ class PunieAgent:
         >>> # See examples/10_session_registration.py for usage
         """
         try:
-            logger.info(f"=== _discover_and_build_toolset() for session {session_id} ===")
+            logger.info(
+                f"=== _discover_and_build_toolset() for session {session_id} ==="
+            )
             logger.info(f"Connection available: {self._conn is not None}")
             logger.info(f"Model: {self._model}")
 
@@ -155,9 +172,17 @@ class PunieAgent:
                 logger.info("No connection, using Tier 3 default toolset")
                 toolset = create_toolset()
                 model_value = cast(KnownModelName | Model, self._model)
-                pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+                # Create collector if perf enabled
+                perf_collector = PerformanceCollector() if self._perf_enabled else None
+                if perf_collector:
+                    self._perf_collectors[session_id] = perf_collector
+                pydantic_agent = create_pydantic_agent(
+                    model=model_value, toolset=toolset, perf_collector=perf_collector
+                )
                 logger.info("Tier 3 agent created successfully")
-                return SessionState(catalog=None, agent=pydantic_agent, discovery_tier=3)
+                return SessionState(
+                    catalog=None, agent=pydantic_agent, discovery_tier=3
+                )
 
             catalog: ToolCatalog | None = None
             toolset = None
@@ -168,7 +193,9 @@ class PunieAgent:
                 logger.info("Checking for discover_tools method...")
                 if hasattr(self._conn, "discover_tools"):
                     logger.info("discover_tools method found, calling it...")
-                    catalog_dict = await self._conn.discover_tools(session_id=session_id)
+                    catalog_dict = await self._conn.discover_tools(
+                        session_id=session_id
+                    )
                     logger.info(f"discover_tools returned: {catalog_dict}")
                     if catalog_dict and catalog_dict.get("tools"):
                         logger.info("Parsing tool catalog...")
@@ -200,7 +227,9 @@ class PunieAgent:
                         f"Built toolset from capabilities: {len(tool_names)} tools - {tool_names}"
                     )
                 else:
-                    logger.info("Tier 2 produced empty toolset, falling through to Tier 3")
+                    logger.info(
+                        "Tier 2 produced empty toolset, falling through to Tier 3"
+                    )
 
             # Tier 3: Default fallback
             if toolset is None:
@@ -217,8 +246,15 @@ class PunieAgent:
             # Cast is safe: __init__ ensures self._model is KnownModelName | Model when not legacy
             model_value = cast(KnownModelName | Model, self._model)
 
+            # Create collector if perf enabled (one per session)
+            perf_collector = PerformanceCollector() if self._perf_enabled else None
+            if perf_collector:
+                self._perf_collectors[session_id] = perf_collector
+
             try:
-                pydantic_agent = create_pydantic_agent(model=model_value, toolset=toolset)
+                pydantic_agent = create_pydantic_agent(
+                    model=model_value, toolset=toolset, perf_collector=perf_collector
+                )
                 logger.info("Pydantic AI agent created successfully")
             except ImportError as exc:
                 # Handle missing mlx-lm gracefully
@@ -253,7 +289,9 @@ class PunieAgent:
 
                     # Fall back to test model
                     logger.info("Falling back to test model...")
-                    pydantic_agent = create_pydantic_agent(model="test", toolset=toolset)
+                    pydantic_agent = create_pydantic_agent(
+                        model="test", toolset=toolset, perf_collector=perf_collector
+                    )
                     logger.info("Fallback to test model successful")
                 else:
                     # Other ImportError, re-raise
@@ -262,7 +300,9 @@ class PunieAgent:
             state = SessionState(
                 catalog=catalog, agent=pydantic_agent, discovery_tier=discovery_tier
             )
-            logger.info(f"=== _discover_and_build_toolset() complete, tier={discovery_tier} ===")
+            logger.info(
+                f"=== _discover_and_build_toolset() complete, tier={discovery_tier} ==="
+            )
             return state
         except Exception as exc:
             logger.exception("CRITICAL: _discover_and_build_toolset() failed")
@@ -433,7 +473,11 @@ class PunieAgent:
         2. Use client_capabilities if no discovery (capability flags)
         3. Use all 7 static tools if no capabilities (backward compat)
         """
-        from punie.acp.helpers import text_block, update_agent_message, update_agent_message_text
+        from punie.acp.helpers import (
+            text_block,
+            update_agent_message,
+            update_agent_message_text,
+        )
 
         logger.info(f"=== prompt() called for session {session_id} ===")
 
@@ -518,6 +562,14 @@ class PunieAgent:
         tool_names = _get_agent_tool_names(pydantic_agent)
         logger.info(f"Agent tools available: {tool_names}")
 
+        # Start performance timing if enabled
+        collector = self._perf_collectors.get(session_id)
+        if collector:
+            logger.info("Starting performance timing")
+            # Determine backend - always "ide" for ACP mode
+            backend = "ide"
+            collector.start_prompt(str(self._model), backend)
+
         # Delegate to Pydantic AI with error handling
         logger.info("Calling pydantic_agent.run()...")
         try:
@@ -544,6 +596,28 @@ class PunieAgent:
         except Exception as exc:
             logger.exception("Agent run failed")
             response_text = f"Agent error: {exc}"
+
+        # End performance timing and generate report if enabled
+        if collector:
+            logger.info("Ending performance timing and generating report")
+            collector.end_prompt()
+            try:
+                report_data = collector.report()
+                html = generate_html_report(report_data)
+
+                # Generate filename with timestamp
+                timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+                report_filename = f"punie-perf-{timestamp}.html"
+
+                # Save to current working directory (should be workspace root)
+                report_path = Path.cwd() / report_filename
+                report_path.write_text(html)
+                logger.info(f"Performance report saved to: {report_path}")
+
+                # Append report location to response
+                response_text += f"\n\n📊 **Performance report**: `{report_filename}`"
+            except Exception as perf_exc:
+                logger.warning(f"Failed to generate performance report: {perf_exc}")
 
         logger.info("Sending session_update to client...")
         await conn.session_update(

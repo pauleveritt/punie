@@ -126,6 +126,17 @@ def resolve_mode(mode_flag: str | None) -> str:
     return os.getenv("PUNIE_MODE", "acp")
 
 
+def resolve_perf(perf_flag: bool) -> bool:
+    """Resolve performance reporting from CLI flag or env var.
+
+    Priority: CLI flag > PUNIE_PERF env var > False default.
+    Set PUNIE_PERF=1 in acp.json to enable performance reporting.
+    """
+    if perf_flag:
+        return True
+    return os.getenv("PUNIE_PERF", "0") == "1"
+
+
 def setup_logging(log_dir: Path, log_level: str) -> None:
     """Configure file-only logging with RotatingFileHandler.
 
@@ -400,7 +411,9 @@ def download_model(
         )
         typer.echo("")
         typer.echo("Note: Qwen2.5-Coder models don't support tool calling reliably.")
-        typer.echo("      Use Qwen3-Coder for tool calling, or cloud models for best results.")
+        typer.echo(
+            "      Use Qwen3-Coder for tool calling, or cloud models for best results."
+        )
         typer.echo("\nDownload with: punie download-model <model-name>")
         raise typer.Exit(0)
 
@@ -505,13 +518,13 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
     Returns:
         True if tool calls were detected, False otherwise
     """
-    typer.echo(f"\n{'='*80}")
+    typer.echo(f"\n{'=' * 80}")
     typer.secho("Testing Tool Calling", fg=typer.colors.BRIGHT_CYAN, bold=True)
-    typer.echo(f"{'='*80}")
+    typer.echo(f"{'=' * 80}")
     typer.echo(f"Model: {model}")
     typer.echo(f"Workspace: {workspace}")
     typer.echo(f"Prompt: {prompt}")
-    typer.echo(f"{'='*80}\n")
+    typer.echo(f"{'=' * 80}\n")
 
     # Create agent and client
     typer.echo("Creating agent...")
@@ -529,11 +542,11 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
     try:
         result = await agent.run(prompt, deps=deps)
 
-        typer.echo(f"\n{'='*80}")
+        typer.echo(f"\n{'=' * 80}")
         typer.secho("RESULT", fg=typer.colors.BRIGHT_CYAN, bold=True)
-        typer.echo(f"{'='*80}")
+        typer.echo(f"{'=' * 80}")
         typer.echo(result.output)
-        typer.echo(f"{'='*80}\n")
+        typer.echo(f"{'=' * 80}\n")
 
         # Show tool calls if any
         tool_calls_made = []
@@ -563,7 +576,9 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
             )
             typer.echo("\nThis usually means:")
             typer.echo("  1. The model doesn't support tool calling")
-            typer.echo("  2. The model is outputting raw JSON instead of <tool_call> tags")
+            typer.echo(
+                "  2. The model is outputting raw JSON instead of <tool_call> tags"
+            )
             typer.echo("  3. The quantization level is too aggressive")
             typer.echo("\nTry:")
             typer.echo("  - Using an 8-bit model instead of 4-bit")
@@ -596,6 +611,7 @@ def ask(
         help="Workspace directory",
     ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+    perf: bool = typer.Option(False, "--perf", help="Generate performance report"),
 ) -> None:
     """Ask the agent a question and get a response (without PyCharm).
 
@@ -603,21 +619,44 @@ def ask(
         punie ask "How many Python files are in this project?"
         punie ask "List all TODO comments" --model openai:gpt-4o
         punie ask "What does main.py do?" --workspace /path/to/project
+        punie ask "Count Python files" --perf  # Generate performance report
+
+    Performance reporting can also be enabled via PUNIE_PERF=1 environment variable.
+    This is useful for acp.json configuration.
     """
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    asyncio.run(_run_ask(prompt, model, workspace))
+    # Resolve perf from flag or env var
+    resolved_perf = resolve_perf(perf)
+
+    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf))
 
 
-async def _run_ask(prompt: str, model: str, workspace: Path) -> None:
+async def _run_ask(
+    prompt: str, model: str, workspace: Path, perf: bool = False
+) -> None:
     """Run a simple ask interaction."""
-    from punie.agent.factory import create_local_agent
-    from punie.agent.deps import ACPDeps
+    from datetime import datetime, timezone
+
     from punie.acp.contrib.tool_calls import ToolCallTracker
+    from punie.agent.deps import ACPDeps
+    from punie.agent.factory import create_local_agent
+    from punie.perf import PerformanceCollector, generate_html_report
+
+    # Create performance collector if requested
+    collector = PerformanceCollector() if perf else None
 
     # Create agent and client
-    agent, client = create_local_agent(model=model, workspace=workspace)
+    agent, client = create_local_agent(
+        model=model, workspace=workspace, perf_collector=collector
+    )
+
+    # Start prompt timing if collecting performance
+    if collector:
+        # Determine backend from model name
+        backend = "local" if model.startswith("local") else "ide"
+        collector.start_prompt(model, backend)
 
     # Create dependencies
     deps = ACPDeps(
@@ -630,8 +669,24 @@ async def _run_ask(prompt: str, model: str, workspace: Path) -> None:
     try:
         result = await agent.run(prompt, deps=deps)
 
+        # End prompt timing if collecting performance
+        if collector:
+            collector.end_prompt()
+
         # Show the response
         typer.echo(result.output)
+
+        # Generate and save performance report if requested
+        if collector:
+            report_data = collector.report()
+            html = generate_html_report(report_data)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+            report_path = Path.cwd() / f"punie-perf-{timestamp}.html"
+
+            report_path.write_text(html)
+            typer.echo(f"\nPerformance report: {report_path}")
 
     except Exception as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
@@ -724,7 +779,7 @@ def stop_all(
                 # Skip the current stop-all command process
                 if "stop-all" not in " ".join(cmdline):
                     punie_processes.append(proc)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except psutil.NoSuchProcess, psutil.AccessDenied:
             continue
 
     if not punie_processes:
@@ -736,7 +791,7 @@ def stop_all(
         try:
             cmdline = " ".join(proc.cmdline())
             typer.echo(f"  PID {proc.pid}: {cmdline[:80]}...")
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except psutil.NoSuchProcess, psutil.AccessDenied:
             continue
 
     # Terminate processes gracefully

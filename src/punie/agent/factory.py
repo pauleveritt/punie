@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.toolsets import AbstractToolset
 
 from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS, AgentConfig
 from punie.agent.deps import ACPDeps
@@ -20,6 +21,10 @@ from punie.agent.toolset import create_toolset
 
 if TYPE_CHECKING:
     from punie.local import LocalClient
+    from punie.perf import PerformanceCollector, TimedToolset
+else:
+    # Import at runtime for wrapping
+    from punie.perf import PerformanceCollector, TimedToolset
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +93,9 @@ def _create_local_model(model_name: str | None = None) -> Model:
 
 def create_pydantic_agent(
     model: KnownModelName | Model = "test",
-    toolset: FunctionToolset[ACPDeps] | None = None,
+    toolset: AbstractToolset[ACPDeps] | None = None,
     config: AgentConfig | None = None,
+    perf_collector: PerformanceCollector | None = None,
 ) -> Agent[ACPDeps, str]:
     """Create a Pydantic AI agent configured for Punie.
 
@@ -105,6 +111,8 @@ def create_pydantic_agent(
                  For dynamic discovery, pass create_toolset_from_catalog() or
                  create_toolset_from_capabilities() result.
         config: Optional AgentConfig. If None, uses AgentConfig() defaults (PyCharm/ACP mode).
+        perf_collector: Optional PerformanceCollector for timing measurements. If provided,
+                       wraps toolset with TimedToolset to record timing data.
 
     Returns:
         Pydantic AI Agent configured with ACPDeps and toolset
@@ -114,6 +122,10 @@ def create_pydantic_agent(
 
     if config is None:
         config = AgentConfig()
+
+    # Wrap toolset with performance measurement if requested
+    if perf_collector is not None:
+        toolset = TimedToolset(wrapped=toolset, collector=perf_collector)
 
     # Use enhanced test model if "test" string is passed
     if model == "test":
@@ -154,6 +166,7 @@ def create_local_agent(
     model: KnownModelName | Model = "local",
     workspace: Path | None = None,
     config: AgentConfig | None = None,
+    perf_collector: PerformanceCollector | None = None,
 ) -> tuple[Agent[ACPDeps, str], LocalClient]:
     """Create a Pydantic AI agent with local filesystem tools.
 
@@ -167,6 +180,7 @@ def create_local_agent(
         workspace: Root directory for file operations. Defaults to current directory.
         config: Optional AgentConfig. If None, defaults to local-mode config with
                 PUNIE_LOCAL_INSTRUCTIONS and validate_python_syntax=True.
+        perf_collector: Optional PerformanceCollector for timing measurements.
 
     Returns:
         Tuple of (agent, client). Callers construct ACPDeps per prompt using:
@@ -182,6 +196,6 @@ def create_local_agent(
 
     workspace = workspace or Path.cwd()
     client = LocalClient(workspace=workspace)
-    agent = create_pydantic_agent(model=model, config=config)
+    agent = create_pydantic_agent(model=model, config=config, perf_collector=perf_collector)
 
     return agent, client
