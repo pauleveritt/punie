@@ -10,6 +10,46 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 
 ## Experiments
 
+### Phase 13: Evaluation Harness (2026-02-11)
+
+**Goal:** Build standardized evaluation infrastructure to measure model performance.
+
+**What we did:**
+- Created `EvalPrompt` and `EvalSuite` dataclasses for organizing evaluation prompts
+- Implemented scoring functions (`score_tool_calling`, `score_keyword_presence`, `score_prompt`)
+- Built `EvalResult` and `EvalReport` dataclasses for storing and analyzing results
+- Created `run_evaluation()` async function for full evaluation loop
+- Added HTML report generation following `perf/report.py` pattern
+- Created baseline evaluation suite with tool_calling, code_generation, and reasoning prompts
+
+**Commands run:**
+```bash
+uv run pytest tests/test_training_eval_*.py -v
+# All 46 tests passed
+```
+
+**Results:**
+- ✅ 368 total tests (up from 322, +46 for Phase 13)
+- ✅ Evaluation infrastructure ready for use
+- ✅ HTML reports for visualizing results
+- ✅ All code passes ruff and ty checks
+
+**Files created:**
+- `src/punie/training/eval_prompts.py` - Prompt and suite dataclasses
+- `src/punie/training/eval_suites.py` - Pre-defined suite factory
+- `src/punie/training/eval_results.py` - Result dataclasses and reporting
+- `src/punie/training/eval_scoring.py` - Pure scoring functions
+- `src/punie/training/eval_runner.py` - Evaluation orchestration
+- `src/punie/training/eval_report.py` - HTML report generation
+- 6 test files with 46 tests total
+
+**Next steps:**
+- Phase 13.5: Add CLI commands (`punie eval`, etc.)
+- Phase 13.6: Create spec documentation
+- Then move to Phase 14: Training Data Infrastructure
+
+---
+
 ### Phase 12: Server Management Infrastructure (2026-02-11)
 
 **Goal:** Build infrastructure for automated mlx_lm.server lifecycle management.
