@@ -23,6 +23,7 @@ from punie.agent.toolset import create_toolset
 if TYPE_CHECKING:
     from punie.local import LocalClient
     from punie.perf import PerformanceCollector, TimedToolset
+    from punie.training.server_config import ServerConfig
 else:
     # Import at runtime for wrapping
     from punie.perf import PerformanceCollector, TimedToolset
@@ -154,6 +155,33 @@ def _create_local_model(spec: str = "") -> Model:
 
     provider = OpenAIProvider(base_url=parsed.base_url)
     return OpenAIChatModel(parsed.model_name, provider=provider)
+
+
+def create_server_model(config: "ServerConfig") -> Model:
+    """Create a model for mlx_lm.server based on ServerConfig.
+
+    Thin wrapper using OpenAIProvider + OpenAIChatModel pattern.
+    Used by evaluation and training infrastructure.
+
+    Args:
+        config: ServerConfig with base_url and model configuration
+
+    Returns:
+        OpenAIChatModel configured to connect to mlx_lm.server
+
+    Examples:
+        >>> from punie.training.server_config import ServerConfig
+        >>> config = ServerConfig(model_path="mlx-community/Qwen3-Coder-30B")
+        >>> model = create_server_model(config)
+    """
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    logger.info("Creating server model at %s", config.base_url)
+
+    provider = OpenAIProvider(base_url=config.base_url)
+    # Model name is "default" for mlx_lm.server (it serves a single model)
+    return OpenAIChatModel("default", provider=provider)
 
 
 def create_pydantic_agent(

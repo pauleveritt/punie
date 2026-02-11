@@ -414,3 +414,63 @@ model = OpenAIChatModel("model-name", provider=provider)
     - Added _parse_local_spec() pure function with 7 tests
 
 **Note:** Phase 6 (Local Model Integration with MLX) was superseded by this implementation. Direct MLX model loading proved fragile (chat template issues, quantization failures, XML/JSON format parsing). Delegating to LM Studio or mlx-lm.server provides better reliability and maintainability.
+
+## 12. Server Management
+
+**Status:** ✅ Completed (2026-02-11)
+
+**Context:** Automate starting/stopping `mlx_lm.server` from Python so evaluation and training can be fully scripted. All code launches mlx-lm as a subprocess — no import-time dependency on mlx-lm. All tests work without it installed.
+
+**Architecture:**
+```python
+from punie.training.server_config import ServerConfig
+from punie.training.server import ServerProcess
+
+# Configure server
+config = ServerConfig(
+    model_path="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+    port=8080,
+    adapter_path=None,  # Or path to LoRA adapter
+)
+
+# Manage lifecycle
+async with ServerProcess(config=config) as server:
+    # Server is running and healthy
+    model = create_server_model(config)
+    # ... use model ...
+# Server stopped automatically
+```
+
+**Accomplished:**
+- [x] 12.1 Server configuration dataclass
+    - Created ServerConfig (frozen) with model_path, port, host, adapter_path, max_kv_size, repetition_penalty
+    - Added base_url property for OpenAI-compatible API endpoint
+    - 8 comprehensive tests for frozen behavior, defaults, base_url construction
+- [x] 12.2 Server process lifecycle
+    - Created build_server_command() pure function (easily tested)
+    - Implemented ServerProcess (non-frozen, like LocalClient pattern)
+    - async start() — launch subprocess, poll /v1/models until ready
+    - async stop() — SIGTERM, wait, SIGKILL if needed
+    - async health_check() — GET /v1/models
+    - is_running property
+    - Async context manager support (__aenter__/__aexit__)
+    - 9 tests for command building, lifecycle, health checks, idempotent stop
+- [x] 12.3 Integration with factory
+    - Added create_server_model(config) -> Model
+    - Thin wrapper using OpenAIProvider + OpenAIChatModel
+    - Follows same pattern as _create_local_model()
+- [x] 12.4 Training speed benchmark
+    - Created create_dummy_dataset() for generating test data
+    - Implemented run_training_benchmark() to measure LoRA training speed
+    - BenchmarkResult (frozen) with seconds_per_iter, total_seconds, num_iters, peak_memory_gb
+    - 3 tests for dataset creation (validation, directories, num_examples)
+- [x] 12.5 Spec + roadmap
+    - Created agent-os/specs/2026-02-11-server-management/ (plan, shape, standards, references)
+    - Updated roadmap with Phase 12 entry
+
+**Test Suite:** 320 tests passing (297 → 320, +23 new tests)
+**Coverage:** 81%+ (maintained above 80% target)
+**Type Safety:** All code passes ty type checking
+**Quality:** Ruff ✅, Ty ✅, All tests ✅
+
+**Next:** Phase 13 will build the evaluation harness using this server management infrastructure.
