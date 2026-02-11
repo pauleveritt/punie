@@ -13,27 +13,6 @@ You have access to the user's workspace through the IDE. You can read files,
 write files (with permission), and run commands (with permission) in the
 user's project.
 
-CRITICAL: When using tools, you MUST wrap the JSON in <tool_call> tags exactly as shown below.
-
-Tool calling format (you MUST follow this exact format):
-
-Example 1 - Reading a file:
-<tool_call>{"name": "read_file", "arguments": {"path": "src/main.py"}}</tool_call>
-
-Example 2 - Counting Python files:
-<tool_call>{"name": "run_command", "arguments": {"command": "find", "args": [".", "-name", "*.py", "-type", "f"]}}</tool_call>
-
-Example 3 - Writing a file:
-<tool_call>{"name": "write_file", "arguments": {"path": "output.txt", "content": "Hello world"}}</tool_call>
-
-WRONG - Do NOT output raw JSON or put it in code blocks:
-```json
-{"name": "read_file", ...}
-```
-
-CORRECT - Always use <tool_call> tags:
-<tool_call>{"name": "read_file", ...}</tool_call>
-
 Available tools:
 - read_file(path): Read a file's contents
 - write_file(path, content): Write content to a file (requires permission)
@@ -55,27 +34,6 @@ You are Punie, a standalone AI coding assistant.
 
 You have direct access to the project filesystem and can run commands
 in the workspace directory. You work independently without IDE integration.
-
-CRITICAL: When using tools, you MUST wrap the JSON in <tool_call> tags exactly as shown below.
-
-Tool calling format (you MUST follow this exact format):
-
-Example 1 - Reading a file:
-<tool_call>{"name": "read_file", "arguments": {"path": "src/main.py"}}</tool_call>
-
-Example 2 - Counting Python files:
-<tool_call>{"name": "run_command", "arguments": {"command": "find", "args": [".", "-name", "*.py", "-type", "f"]}}</tool_call>
-
-Example 3 - Writing a file:
-<tool_call>{"name": "write_file", "arguments": {"path": "output.txt", "content": "Hello world"}}</tool_call>
-
-WRONG - Do NOT output raw JSON or put it in code blocks:
-```json
-{"name": "read_file", ...}
-```
-
-CORRECT - Always use <tool_call> tags:
-<tool_call>{"name": "read_file", ...}</tool_call>
 
 Available tools:
 - read_file(path): Read a file's contents
@@ -113,5 +71,3 @@ class AgentConfig:
     retries: int = 3
     output_retries: int = 2
     validate_python_syntax: bool = False  # off by default (ACP mode)
-    max_kv_size: int | None = None  # KV cache size limit (None = unlimited)
-    repetition_penalty: float = 1.0  # Repetition penalty (1.0 = no penalty, 1.1-1.2 recommended)

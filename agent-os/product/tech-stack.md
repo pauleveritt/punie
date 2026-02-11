@@ -21,7 +21,10 @@
 
 ## Local Models
 
-- To be determined (exploring options like Ollama)
+- LM Studio (https://lmstudio.ai/) - Primary recommendation for user-friendly local model hosting
+- mlx-lm.server - Alternative for Apple Silicon users who prefer command-line tools
+- OpenAI-compatible API protocol (supports any compatible server: Ollama, llama.cpp, etc.)
+- Pydantic AI's OpenAIChatModel + OpenAIProvider for unified cloud/local interface
 
 ## HTTP Server
 

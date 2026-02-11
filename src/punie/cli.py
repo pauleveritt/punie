@@ -137,20 +137,6 @@ def resolve_perf(perf_flag: bool) -> bool:
     return os.getenv("PUNIE_PERF", "0") == "1"
 
 
-def resolve_max_kv_size(max_kv_size_flag: int | None) -> int | None:
-    """Resolve max_kv_size from CLI flag or env var.
-
-    Priority: CLI flag > PUNIE_MAX_KV_SIZE env var > None default.
-    Set PUNIE_MAX_KV_SIZE=4096 in acp.json to cap KV cache memory usage.
-    """
-    if max_kv_size_flag is not None:
-        return max_kv_size_flag
-    env_value = os.getenv("PUNIE_MAX_KV_SIZE")
-    if env_value:
-        return int(env_value)
-    return None
-
-
 def setup_logging(log_dir: Path, log_level: str) -> None:
     """Configure file-only logging with RotatingFileHandler.
 
@@ -302,13 +288,7 @@ def main(
     resolved_model = resolve_model(model)
 
     # Run ACP agent
-    try:
-        asyncio.run(run_acp_agent(resolved_model, name))
-    except RuntimeError as e:
-        if "not downloaded" in str(e):
-            typer.secho(str(e), fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from e
-        raise
+    asyncio.run(run_acp_agent(resolved_model, name))
 
 
 @app.command()
@@ -334,8 +314,10 @@ def init(
     Creates ~/.jetbrains/acp.json to enable PyCharm agent discovery.
     Merges with existing config to preserve other agents.
 
-    By default, sets PUNIE_MODEL=local for offline development with MLX models.
+    By default, sets PUNIE_MODEL=local for local development with LM Studio.
     Use --model to specify test or a cloud model like claude-sonnet-4-5-20250929.
+
+    For local models, start LM Studio (https://lmstudio.ai/) and load a model first.
     """
     # Resolve Punie executable
     command, args = resolve_punie_command()
@@ -391,75 +373,6 @@ def init(
                 typer.echo(f"  {key}: {value}")
 
 
-@app.command("download-model")
-def download_model(
-    model_name: str = typer.Argument(
-        "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
-        help="HuggingFace model name to download",
-    ),
-    list_models: bool = typer.Option(
-        False,
-        "--list",
-        help="List recommended models",
-    ),
-) -> None:
-    """Download MLX models for local inference.
-
-    Downloads quantized MLX models from HuggingFace for offline development.
-    Models are cached in ~/.cache/huggingface/hub/ (HuggingFace standard location).
-
-    Recommended models:
-    - mlx-community/Qwen2.5-Coder-7B-Instruct-4bit (~4GB, best balance)
-    - mlx-community/Qwen2.5-Coder-3B-Instruct-4bit (~2GB, faster)
-    - mlx-community/Qwen2.5-Coder-14B-Instruct-4bit (~8GB, highest quality)
-    """
-    # Handle --list flag
-    if list_models:
-        typer.echo("Available models:\n")
-        typer.echo(
-            "Name                                                  Size    Description"
-        )
-        typer.echo("─" * 80)
-        typer.echo(
-            "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit      ~15GB   Default (tool calling works!)"
-        )
-        typer.echo("")
-        typer.echo("Note: Qwen2.5-Coder models don't support tool calling reliably.")
-        typer.echo(
-            "      Use Qwen3-Coder for tool calling, or cloud models for best results."
-        )
-        typer.echo("\nDownload with: punie download-model <model-name>")
-        raise typer.Exit(0)
-
-    # Check if mlx-lm is installed
-    try:
-        from huggingface_hub import snapshot_download  # type: ignore[import-untyped]
-    except ImportError as e:
-        msg = (
-            "Local model support requires mlx-lm.\n"
-            "Install with: uv pip install 'punie[local]'"
-        )
-        typer.secho(msg, fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from e
-
-    # Download model to HuggingFace cache (default location)
-    typer.echo(f"Downloading {model_name}...")
-    typer.echo("Cache: ~/.cache/huggingface/hub/")
-    typer.echo("")
-
-    try:
-        # Download to HuggingFace cache (no local_dir = uses default cache)
-        cache_path = snapshot_download(repo_id=model_name)
-
-        typer.secho("✓ Model downloaded successfully!", fg=typer.colors.GREEN)
-        typer.echo(f"  Location: {cache_path}")
-        typer.echo(f"\nUse with: punie serve --model local:{model_name}")
-        typer.echo(f"Or test with: punie test-tools --model local:{model_name}")
-    except Exception as e:
-        typer.secho(f"Error downloading model: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from e
-
-
 @app.command()
 def serve(
     host: str = typer.Option(
@@ -512,13 +425,7 @@ def serve(
     typer.echo("")
 
     # Run agent
-    try:
-        asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
-    except RuntimeError as e:
-        if "not downloaded" in str(e):
-            typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from e
-        raise
+    asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
 
 
 async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
@@ -626,11 +533,6 @@ def ask(
     ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
     perf: bool = typer.Option(False, "--perf", help="Generate performance report"),
-    max_kv_size: int | None = typer.Option(
-        None,
-        "--max-kv-size",
-        help="KV cache size limit (e.g., 4096 for low-RAM systems)",
-    ),
 ) -> None:
     """Ask the agent a question and get a response (without PyCharm).
 
@@ -639,20 +541,18 @@ def ask(
         punie ask "List all TODO comments" --model openai:gpt-4o
         punie ask "What does main.py do?" --workspace /path/to/project
         punie ask "Count Python files" --perf  # Generate performance report
-        punie ask "What is 2+2?" --max-kv-size 4096  # Limit KV cache for low-RAM
+        punie ask "Explain the code" --model local:  # Use LM Studio
 
+    For local models, start LM Studio (https://lmstudio.ai/) first and load a model.
     Performance reporting can also be enabled via PUNIE_PERF=1 environment variable.
-    KV cache limit can be set via PUNIE_MAX_KV_SIZE environment variable.
-    These are useful for acp.json configuration.
     """
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    # Resolve perf and max_kv_size from flags or env vars
+    # Resolve perf from flag or env var
     resolved_perf = resolve_perf(perf)
-    resolved_max_kv_size = resolve_max_kv_size(max_kv_size)
 
-    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf, resolved_max_kv_size))
+    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf))
 
 
 async def _run_ask(
@@ -660,13 +560,11 @@ async def _run_ask(
     model: str,
     workspace: Path,
     perf: bool = False,
-    max_kv_size: int | None = None,
 ) -> None:
     """Run a simple ask interaction."""
     from datetime import datetime, timezone
 
     from punie.acp.contrib.tool_calls import ToolCallTracker
-    from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS, AgentConfig
     from punie.agent.deps import ACPDeps
     from punie.agent.factory import create_local_agent
     from punie.perf import PerformanceCollector, generate_html_report
@@ -674,18 +572,9 @@ async def _run_ask(
     # Create performance collector if requested
     collector = PerformanceCollector() if perf else None
 
-    # Create config with max_kv_size if provided
-    config = None
-    if max_kv_size is not None:
-        config = AgentConfig(
-            instructions=PUNIE_LOCAL_INSTRUCTIONS,
-            validate_python_syntax=True,
-            max_kv_size=max_kv_size,
-        )
-
-    # Create agent and client
+    # Create agent and client (uses default config)
     agent, client = create_local_agent(
-        model=model, workspace=workspace, config=config, perf_collector=collector
+        model=model, workspace=workspace, perf_collector=collector
     )
 
     # Start prompt timing if collecting performance
@@ -764,7 +653,6 @@ def test_tools(
     if debug:
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)
-        logging.getLogger("punie.models.mlx").setLevel(logging.DEBUG)
 
         # Add console handler for debug mode
         console_handler = logging.StreamHandler()

@@ -12,7 +12,6 @@ The adapter supports dynamic tool discovery via a three-tier fallback:
 """
 
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -256,36 +255,42 @@ class PunieAgent:
                     model=model_value, toolset=toolset, perf_collector=perf_collector
                 )
                 logger.info("Pydantic AI agent created successfully")
-            except ImportError as exc:
-                # Handle missing mlx-lm gracefully
-                if "mlx-lm" in str(exc):
+            except Exception as exc:
+                # Handle local server connection errors gracefully
+                # This catches errors when trying to connect to LM Studio or mlx-lm.server
+                if isinstance(model_value, str) and "local" in model_value.lower():
                     error_msg = (
-                        "⚠️ **Local model support not available**\n\n"
-                        f"Your configuration is set to use model `{self._model}`, but the required "
-                        "`mlx-lm` package is not installed.\n\n"
+                        "⚠️ **Local model server not available**\n\n"
+                        f"Your configuration is set to use model `{self._model}`, but the local "
+                        "model server is not responding.\n\n"
                         "**To fix this, choose one of these options:**\n\n"
-                        "1. **Use the test model (recommended for development):**\n"
+                        "1. **Start LM Studio:**\n"
+                        "   - Download and install LM Studio from https://lmstudio.ai/\n"
+                        "   - Load a model in the UI\n"
+                        "   - Start the server (default: http://localhost:1234)\n\n"
+                        "2. **Start mlx-lm.server:**\n"
+                        "   ```bash\n"
+                        "   uv pip install mlx-lm\n"
+                        "   mlx-lm.server --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit\n"
+                        "   ```\n\n"
+                        "3. **Use the test model (recommended for development):**\n"
                         "   ```bash\n"
                         "   uv run punie init --model test\n"
                         "   ```\n"
                         "   Then restart PyCharm's agent connection.\n\n"
-                        "2. **Install local model support:**\n"
-                        "   ```bash\n"
-                        "   uv pip install 'punie[local]'\n"
-                        "   punie download-model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit\n"
-                        "   ```\n\n"
-                        "3. **Use a cloud model:**\n"
+                        "4. **Use a cloud model:**\n"
                         "   ```bash\n"
                         "   uv run punie init --model openai:gpt-4o\n"
                         "   ```\n"
                         "   (Requires OPENAI_API_KEY environment variable)\n\n"
+                        f"Error details: {exc}\n\n"
                         "Falling back to test model for this session..."
                     )
                     logger.error(error_msg)
 
                     # Store error to send during first prompt (avoids protocol issues)
                     self._pending_errors[session_id] = error_msg
-                    logger.info("Stored mlx-lm error to send during first prompt")
+                    logger.info("Stored local server error to send during first prompt")
 
                     # Fall back to test model
                     logger.info("Falling back to test model...")
@@ -294,7 +299,7 @@ class PunieAgent:
                     )
                     logger.info("Fallback to test model successful")
                 else:
-                    # Other ImportError, re-raise
+                    # Not a local model error, re-raise
                     raise
 
             state = SessionState(
@@ -493,7 +498,7 @@ class PunieAgent:
 
         # Send any pending errors and greeting for first prompt in session
         if session_id not in self._greeted_sessions and self._conn:
-            # Send pending errors first (e.g., mlx-lm missing)
+            # Send pending errors first (e.g., local server not available)
             if session_id in self._pending_errors:
                 error_msg = self._pending_errors[session_id]
                 logger.info("Sending pending error message to client")

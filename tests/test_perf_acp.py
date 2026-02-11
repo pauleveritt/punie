@@ -5,7 +5,6 @@ collector lifecycle issues when reusing agents across prompts.
 These tests are marked as xfail until the issue is resolved.
 """
 
-from pathlib import Path
 
 import pytest
 

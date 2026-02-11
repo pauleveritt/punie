@@ -241,7 +241,7 @@ def test_factory_sets_model_settings():
     settings = agent.model_settings
     assert settings is not None
     assert settings["temperature"] == 0.0
-    assert settings["max_tokens"] == 4096
+    assert settings["max_tokens"] == 2048
 
 
 def test_factory_sets_retries():

@@ -13,22 +13,20 @@ Imagine a tiny Python coding agent:
 ## Installation
 
 ```bash
-# Basic installation
 uv pip install punie
-
-# With local model support (macOS Apple Silicon only)
-uv pip install 'punie[local]'
 ```
 
 ## Usage
 
-### Local MLX Models (Offline Development)
+### Local Models (LM Studio)
 
-Run Punie completely offline using local MLX models on Apple Silicon:
+Run Punie completely offline using LM Studio or mlx-lm.server:
 
 ```bash
-# 1. Download a model (one-time setup, stored in ~/.cache/punie/models/)
-punie download-model
+# 1. Start LM Studio (https://lmstudio.ai/)
+#    - Download and install LM Studio
+#    - Load a model in the UI
+#    - Start the local server (default: http://localhost:1234)
 
 # 2. Use the default local model
 punie serve --model local
@@ -36,17 +34,27 @@ punie serve --model local
 # Or set via environment variable
 PUNIE_MODEL=local punie serve
 
-# Use a specific model
-punie serve --model local:mlx-community/Qwen2.5-Coder-3B-Instruct-4bit
+# Use a specific model name
+punie serve --model local:my-model
 
-# List available models
-punie download-model --list
+# Use a custom server URL
+punie serve --model "local:http://localhost:8080/v1/custom-model"
 ```
 
-**Recommended models:**
-- `mlx-community/Qwen2.5-Coder-7B-Instruct-4bit` (default) - ~4GB, best balance
-- `mlx-community/Qwen2.5-Coder-3B-Instruct-4bit` - ~2GB, faster for simple tasks
-- `mlx-community/Qwen2.5-Coder-14B-Instruct-4bit` - ~8GB, highest quality
+**Alternative: mlx-lm.server**
+
+For Apple Silicon users who prefer command-line tools:
+
+```bash
+# Install mlx-lm
+uv pip install mlx-lm
+
+# Start the server
+mlx-lm.server --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+
+# Then use Punie (in another terminal)
+punie serve --model "local:http://localhost:8080/v1/default"
+```
 
 **Benefits:**
 - Zero API costs
@@ -54,10 +62,13 @@ punie download-model --list
 - No internet required (after initial model download)
 - Fast response times (no API latency)
 - Full tool calling support (read/write files, run commands)
+- Works with any OpenAI-compatible server
 
-**Requirements:**
-- macOS with Apple Silicon (M1/M2/M3/M4)
-- 8GB+ unified memory (16GB+ for 14B model)
+**Recommended models for LM Studio:**
+- Qwen2.5-Coder series (7B, 14B)
+- DeepSeek-Coder series
+- CodeLlama series
+- Any GGUF model with tool calling support
 
 ### PyCharm Integration
 
@@ -78,14 +89,17 @@ punie download-model --list
 ```python
 from punie.agent.factory import create_pydantic_agent
 
-# Create agent with local model
+# Create agent with local model (assumes LM Studio running)
 agent = create_pydantic_agent(model='local')
 
-# Or with custom model
-agent = create_pydantic_agent(model='local:mlx-community/Qwen2.5-Coder-3B-Instruct-4bit')
+# Or with specific model name
+agent = create_pydantic_agent(model='local:my-model')
+
+# Or with custom server URL
+agent = create_pydantic_agent(model='local:http://localhost:8080/v1/custom')
 ```
 
-See `examples/15_mlx_local_model.py` for a complete example.
+See `examples/15_local_model_server.py` for a complete example.
 
 ## Architecture
 
@@ -95,7 +109,7 @@ Punie bridges three technologies:
 - Type-safe agent framework with structured output
 - Tool definitions with JSON schemas
 - Dependency injection for clean testing
-- Multi-model support (OpenAI, Anthropic, local MLX)
+- Multi-model support (OpenAI, Anthropic, local servers via OpenAI-compatible API)
 
 ### 2. Agent Communication Protocol (IDE Integration)
 - JSON-RPC 2.0 over stdio for IDE communication

@@ -366,12 +366,12 @@ features:
 
 ## 11. LM Studio Integration
 
-**Status:** Not Started
+**Status:** ✅ Completed (2026-02-10)
 
-**Context:** Simplify local model integration by replacing direct MLX model loading with OpenAI-compatible API calls. LM Studio and mlx-lm.server both expose OpenAI-compatible endpoints, allowing Punie to use Pydantic AI's built-in OpenAIModel with a custom base_url instead of maintaining custom MLX integration code.
+**Context:** Simplified local model integration by replacing direct MLX model loading with OpenAI-compatible API calls. LM Studio and mlx-lm.server both expose OpenAI-compatible endpoints, allowing Punie to use Pydantic AI's built-in OpenAIChatModel with a custom base_url instead of maintaining custom MLX integration code.
 
 **Benefits:**
-- Removes ~1000 lines of custom MLX model code (MLXModel, chat template handling, tool call parsing)
+- Removed ~2,400 lines of code (MLXModel, chat template handling, tool call parsing, tests)
 - Leverages Pydantic AI's first-class OpenAI support (no custom Model implementation needed)
 - Unified interface for both cloud (OpenAI) and local (LM Studio, mlx-lm.server) models
 - Easier to support multiple local model servers (Ollama, llama.cpp, etc.)
@@ -379,33 +379,38 @@ features:
 
 **Architecture:**
 ```python
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
-# Cloud OpenAI
-model = OpenAIModel("gpt-4o")
-
-# Local LM Studio
-model = OpenAIModel("local-model-name", base_url="http://localhost:1234/v1")
+# Local LM Studio (default)
+provider = OpenAIProvider(base_url="http://localhost:1234/v1")
+model = OpenAIChatModel("default", provider=provider)
 
 # Local mlx-lm.server
-model = OpenAIModel("mlx-community/Qwen3-Coder-30B", base_url="http://localhost:8080/v1")
+provider = OpenAIProvider(base_url="http://localhost:8080/v1")
+model = OpenAIChatModel("model-name", provider=provider)
 ```
 
-**Tasks:**
-- [ ] 11.1 Add LM Studio connection support
-    - Use Pydantic AI's OpenAIModel with custom base_url
-    - Support `local:http://localhost:1234/v1/model-name` format in CLI
-    - Add connection validation and error handling
-- [ ] 11.2 Remove direct MLX model loading code
-    - Delete src/punie/models/mlx.py (~500 lines)
-    - Remove MLXModel tests (test_mlx_model.py)
-    - Remove [local] optional dependency on mlx-lm
-    - Remove download-model CLI command (users manage models via LM Studio)
-- [ ] 11.3 Update documentation and examples
-    - Add LM Studio setup guide (install, download models, start server)
-    - Update examples to show both cloud and local usage
-    - Document mlx-lm.server as alternative to LM Studio
-- [ ] 11.4 Simplify model configuration
-    - Remove model download and caching logic
-    - Remove memory estimation code (server handles this)
-    - Simplify factory.py to only handle OpenAIModel creation
+**Accomplished:**
+- [x] 11.1 Add LM Studio connection support
+    - Uses Pydantic AI's OpenAIChatModel with OpenAIProvider(base_url=...)
+    - Supports three spec formats: "", "model-name", "http://host:port/v1/model"
+    - Added connection error handling with helpful fallback messages
+- [x] 11.2 Remove direct MLX model loading code
+    - Deleted src/punie/models/ directory (3 files, ~1,137 lines)
+    - Removed MLXModel tests (~784 lines)
+    - Removed [local] optional dependency on mlx-lm
+    - Removed download-model CLI command (~67 lines)
+    - Removed test_cli_download.py (~188 lines)
+    - Removed max_kv_size and repetition_penalty from AgentConfig
+- [x] 11.3 Update documentation and examples
+    - Updated README.md with LM Studio setup guide
+    - Created examples/15_local_model_server.py
+    - Documented mlx-lm.server as alternative to LM Studio
+- [x] 11.4 Simplify model configuration
+    - Removed model download and caching logic
+    - Removed memory estimation code (server handles this)
+    - Simplified factory.py: _create_local_model() now ~5 lines (was ~20)
+    - Added _parse_local_spec() pure function with 7 tests
+
+**Note:** Phase 6 (Local Model Integration with MLX) was superseded by this implementation. Direct MLX model loading proved fragile (chat template issues, quantization failures, XML/JSON format parsing). Delegating to LM Studio or mlx-lm.server provides better reliability and maintainability.

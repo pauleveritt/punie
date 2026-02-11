@@ -7,10 +7,11 @@ configured with ACPDeps and toolset (static or dynamic).
 import ast
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic_ai import Agent, FunctionToolset, ModelRetry, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.toolsets import AbstractToolset
@@ -27,6 +28,62 @@ else:
     from punie.perf import PerformanceCollector, TimedToolset
 
 logger = logging.getLogger(__name__)
+
+# Local model defaults for OpenAI-compatible servers (LM Studio, mlx-lm.server)
+DEFAULT_LOCAL_BASE_URL = "http://localhost:1234/v1"
+DEFAULT_LOCAL_MODEL = "default"
+
+
+@dataclass(frozen=True)
+class LocalModelSpec:
+    """Parsed local model specification."""
+
+    base_url: str
+    model_name: str
+
+
+def _parse_local_spec(spec: str = "") -> LocalModelSpec:
+    """Parse local model specification string.
+
+    Supports three formats:
+    1. "" (empty) → default URL + default model
+    2. "model-name" → default URL + given model
+    3. "http://host:port/v1/model" → custom URL + model
+
+    Args:
+        spec: Model specification string
+
+    Returns:
+        LocalModelSpec with base_url and model_name
+
+    Examples:
+        >>> _parse_local_spec("")
+        LocalModelSpec(base_url='http://localhost:1234/v1', model_name='default')
+
+        >>> _parse_local_spec("my-model")
+        LocalModelSpec(base_url='http://localhost:1234/v1', model_name='my-model')
+
+        >>> _parse_local_spec("http://localhost:8080/v1/custom-model")
+        LocalModelSpec(base_url='http://localhost:8080/v1', model_name='custom-model')
+    """
+    if not spec:
+        return LocalModelSpec(base_url=DEFAULT_LOCAL_BASE_URL, model_name=DEFAULT_LOCAL_MODEL)
+
+    # Check if it's a URL (starts with http:// or https://)
+    if spec.startswith(("http://", "https://")):
+        # Split URL to extract base_url and model_name
+        # Expected format: http://host:port/v1/model-name
+        parts = spec.rsplit("/", 1)
+        if len(parts) == 2:
+            base_url, model_name = parts
+        else:
+            # URL without model name, use default model
+            base_url = spec.rstrip("/")
+            model_name = DEFAULT_LOCAL_MODEL
+        return LocalModelSpec(base_url=base_url, model_name=model_name)
+
+    # Otherwise, it's just a model name
+    return LocalModelSpec(base_url=DEFAULT_LOCAL_BASE_URL, model_name=spec)
 
 
 def _create_enhanced_test_model() -> TestModel:
@@ -69,26 +126,34 @@ def _validate_python_code_blocks(text: str) -> None:
             ) from e
 
 
-def _create_local_model(model_name: str | None = None) -> Model:
-    """Create a local MLX model for offline inference on Apple Silicon.
+def _create_local_model(spec: str = "") -> Model:
+    """Create a local model via OpenAI-compatible API.
+
+    Connects to LM Studio or mlx-lm.server via OpenAI-compatible API.
+    Supports three specification formats:
+    1. "" (empty) → http://localhost:1234/v1 + "default"
+    2. "model-name" → http://localhost:1234/v1 + model-name
+    3. "http://host:port/v1/model" → custom URL + model
 
     Args:
-        model_name: Optional HuggingFace model name.
-                   Defaults to mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
+        spec: Model specification string (see formats above)
 
     Returns:
-        MLXModel instance
+        OpenAIChatModel configured to connect to local server
 
-    Raises:
-        ImportError: If mlx-lm is not installed or not on macOS arm64
+    Examples:
+        >>> model = _create_local_model()  # Default LM Studio
+        >>> model = _create_local_model("my-model")  # LM Studio with specific model
+        >>> model = _create_local_model("http://localhost:8080/v1/qwen")  # Custom server
     """
-    from punie.models.mlx import MLXModel
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
 
-    if model_name is None:
-        model_name = "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
+    parsed = _parse_local_spec(spec)
+    logger.info("Creating local model: %s at %s", parsed.model_name, parsed.base_url)
 
-    logger.info("Creating local MLX model: %s", model_name)
-    return MLXModel.from_pretrained(model_name)
+    provider = OpenAIProvider(base_url=parsed.base_url)
+    return OpenAIChatModel(parsed.model_name, provider=provider)
 
 
 def create_pydantic_agent(
@@ -103,8 +168,9 @@ def create_pydantic_agent(
         model: Model name (default: "test" for enhanced TestModel, no LLM calls).
                Special values:
                - "test": Enhanced TestModel with realistic responses
-               - "local": Local MLX model (mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit)
-               - "local:model-name": Local MLX model with specific HuggingFace model
+               - "local": Local model via OpenAI-compatible API (default: http://localhost:1234/v1)
+               - "local:model-name": Local model with specific model name
+               - "local:http://host:port/v1/model": Custom local server URL + model
                Other options: "openai:gpt-4", "anthropic:claude-3-5-sonnet", etc.
                Can also pass a Model instance directly.
         toolset: Optional toolset to use. If None, uses create_toolset() (all 7 static tools).
@@ -132,18 +198,15 @@ def create_pydantic_agent(
         logger.info("Using enhanced test model for better debugging")
         model = _create_enhanced_test_model()
     elif model == "local":
-        model = _create_local_model()
+        model = _create_local_model("")
     elif isinstance(model, str) and model.startswith("local:"):
         model = _create_local_model(model.split(":", 1)[1])
 
-    # Build model settings dict dynamically to include optional parameters
+    # Build model settings dict with standard parameters
     model_settings_dict = {
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
-        "repetition_penalty": config.repetition_penalty,
     }
-    if config.max_kv_size is not None:
-        model_settings_dict["max_kv_size"] = config.max_kv_size
 
     agent = Agent[ACPDeps, str](
         model,
@@ -182,7 +245,7 @@ def create_local_agent(
     without requiring PyCharm or any IDE connection.
 
     Args:
-        model: Model name (default: "local" for MLX model).
+        model: Model name (default: "local" for local OpenAI-compatible server).
                Can use "test" for enhanced TestModel or any other model.
         workspace: Root directory for file operations. Defaults to current directory.
         config: Optional AgentConfig. If None, defaults to local-mode config with
