@@ -31,6 +31,7 @@ dev = [
     "furo>=2025.12.19",
     "httpx>=0.28.0",
     "linkify-it-py>=2.0.3",
+    "mlx-lm>=0.30.6",
     "myst-parser",
     "pyrefly>=0.46.1",
     "pyright>=1.1.407",

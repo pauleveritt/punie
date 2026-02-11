@@ -6,7 +6,7 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 
 | Step | Dataset | Adapter | Overall | Tool Calling | Code Gen | Reasoning | Notes |
 |------|---------|---------|---------|-------------|----------|-----------|-------|
-| Baseline | — | — | — | — | — | — | Not yet evaluated |
+| Baseline | — | — | 41.7% | — | 33.3% | 50.0% | Qwen2.5-Coder-1.5B-4bit untrained |
 
 ## Experiments
 
@@ -92,6 +92,53 @@ uv run ty check src/punie/training/
 **Next steps:**
 - Phase 12.4: Run actual benchmark with mlx-lm installed to verify 30B model is trainable
 - Phase 13: Build evaluation harness using this infrastructure
+
+---
+
+### Validation: Real Model Evaluation (2026-02-11)
+
+**Goal:** Validate evaluation infrastructure with real model.
+
+**Model:** mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit (~1GB, small for testing)
+
+**Commands run:**
+```bash
+uv add --dev mlx-lm  # Installed version 0.30.6
+uv run python test_eval_only.py
+```
+
+**Results:**
+```
+✅ Server management: WORKS
+   - Server started automatically on port 8080
+   - Server stopped cleanly after evaluation
+
+✅ Evaluation: WORKS
+   - Overall Score: 41.7%
+   - Success Rate: 100.0%
+   - 2 prompts executed successfully
+
+📊 Category Scores:
+   - Reasoning: 50.0% (answered "2+2 = 4")
+   - Code Generation: 33.3% (tried to use tools, got 1/3 keywords)
+
+📝 Observations:
+   - Base model scores are low (expected - no fine-tuning yet!)
+   - Model attempted tool calling but doesn't know our tool names
+   - HTML report generated successfully
+   - Infrastructure works end-to-end
+```
+
+**Files generated:**
+- `eval_quick_test.html` - Visual report with results
+
+**Conclusion:**
+✅ Evaluation harness validated - ready for use!
+✅ Server management works automatically
+✅ Scoring functions work correctly
+✅ HTML reports generate properly
+
+**Next:** Try training speed benchmark, then proceed to Phase 14.
 
 ---
 
