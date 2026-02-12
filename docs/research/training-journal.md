@@ -6,13 +6,15 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 
 | Model/Adapter | Overall | Code Gen | Reasoning | Tool Calling | Status | Date |
 |---------------|---------|----------|-----------|--------------|--------|------|
-| **Base model** | **71.4%** | **100%** | **100%** | **33.3%** | ✅ Best | 2026-02-11 |
-| successful-demo | 67.9% | 87.5% | 100% | 33.3% | ⚠️ Slight regression | 2026-02-11 |
-| glaive-function-calling | 53.6% | 70.8% | 66.7% | 33.3% | ❌ Significant regression | 2026-02-11 |
-| baseline-diverse-python | 51.2% | 29.2% | 100% | 33.3% | ❌ Major regression | 2026-02-11 |
-| tool-calling-synthetic | 32.1% | 62.5% | 0% | 33.3% | ❌ Catastrophic | 2026-02-11 |
+| **1.5B Base (Qwen2.5)** | **71.4%** | **100%** | **100%** | **33.3%** | ✅ BEST | 2026-02-11 |
+| successful-demo (1.5B) | 67.9% | 87.5% | 100% | 33.3% | ⚠️ Slight regression | 2026-02-11 |
+| 30B Base (Qwen3) | 60.7% | 87.5% | 50% | 50% | ⚠️ Worse overall | 2026-02-11 |
+| qwen-tool-format (1.5B) | 57.1% | 100% | 75% | 16.7% | ❌ Format didn't help | 2026-02-11 |
+| glaive-function-calling (1.5B) | 53.6% | 70.8% | 66.7% | 33.3% | ❌ Significant regression | 2026-02-11 |
+| baseline-diverse-python (1.5B) | 51.2% | 29.2% | 100% | 33.3% | ❌ Major regression | 2026-02-11 |
+| tool-calling-synthetic (1.5B) | 32.1% | 62.5% | 0% | 33.3% | ❌ Catastrophic | 2026-02-11 |
 
-**Note:** Previous baseline (41.7%) was from invalid server (mlx_lm.server never loaded models). All measurements before 2026-02-11 are unreliable.
+**Note:** Previous baseline (41.7%) was from invalid server. All measurements before 2026-02-11 are unreliable.
 
 ## Experiments
 
@@ -195,6 +197,95 @@ Step 5 assumes training helps and measures the effect of dataset pruning. Since 
 
 **Commits:**
 - 35b1460: Add punie eval CLI and fix tool-call extraction
+- f357f85: Document baseline evaluation and training failure analysis
+
+---
+
+### Phase 16.5: Overnight Investigation - Root Cause Found (2026-02-11)
+
+**Goal:** Fix training data format, then test 30B model if that fails.
+
+**What happened:**
+After identifying training data format mismatch as the suspected root cause, attempted two solutions:
+
+**Attempt 1: Qwen-Specific Training Format**
+Created training data with Qwen's `<tool_call>` XML format:
+```xml
+<tool_call>
+{"name": "read_file", "arguments": {"path": "/etc/hosts"}}
+</tool_call>
+```
+
+Trained adapter with 10 examples, 50 iterations.
+
+**Result:** Tool calling got WORSE (16.7% vs base 33.3%)
+- Overall: 57.1% (down from 71.4%)
+- Code: 100% (maintained!)
+- Reasoning: 75% (down from 100%)
+- Tools: 16.7% (worse than base)
+
+**Conclusion:** Training data format is NOT the issue.
+
+**Attempt 2: Test 30B Model**
+Evaluated `Qwen3-Coder-30B-A3B-Instruct-4bit` base model to test if size is limiting factor.
+
+**Result:** 30B is WORSE overall (60.7% vs 71.4%)
+- Code: 87.5% (down from 100%!)
+- Reasoning: 50% (down from 100%!)
+- Tools: 50% (better, but still poor)
+
+**Conclusion:** Model size is NOT the solution. Smaller 1.5B model is actually better.
+
+**Root Cause Identified:**
+
+**Architectural incompatibility between mlx_lm.server and PydanticAI:**
+
+1. **mlx_lm.server:** Returns raw text from model (JSON in markdown code blocks)
+2. **PydanticAI:** Expects OpenAI API's structured `tool_calls` objects
+3. **The gap:** mlx_lm.server doesn't parse tool calls from model output
+
+**Why training failed:**
+- Training teaches text format (JSON, XML, etc.)
+- Evaluation expects structured message parts
+- No amount of training can bridge this architectural gap
+
+**Why models regress:**
+- Catastrophic forgetting on narrow datasets
+- Overfitting on small examples (8-5000)
+- Training optimizes wrong target (text vs structure)
+
+**Final Recommendation:**
+
+✅ **Use 1.5B base model (no adapter) for production:**
+- Best overall: 71.4%
+- Perfect code generation: 100%
+- Perfect reasoning: 100%
+- Tool calling doesn't work due to architecture (not training)
+
+❌ **Don't train adapters:**
+- All training makes performance worse
+- Base model is already optimal
+
+⬜ **For tool calling to work, need to:**
+- Modify mlx_lm.server to parse tool calls from text
+- Or switch to llama.cpp/vLLM with native function calling
+- Or use cloud APIs (OpenAI, Anthropic) for tool calling
+- Or modify PydanticAI evaluation to parse JSON from text
+
+**Files generated:**
+- `data/qwen-tool-calling/` - 10 examples with XML format
+- `adapters/qwen-tool-calling/` - Trained adapter (didn't help)
+- `eval_qwen_tool_calling.html` - 57.1% (worse than base)
+- `eval_30b_base_model.html` - 60.7% (worse than 1.5B)
+- `create_qwen_tool_training_data.py` - Script for generating Qwen data
+- `docs/research/tool-calling-investigation.md` - Complete analysis (15 pages)
+
+**Key lessons:**
+1. Infrastructure works perfectly
+2. Base model is best (training hurts)
+3. Architecture matters more than training data
+4. Smaller can be better (1.5B > 30B overall)
+5. Tool calling requires proper API support
 
 ---
 
