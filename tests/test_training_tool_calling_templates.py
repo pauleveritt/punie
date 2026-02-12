@@ -50,7 +50,8 @@ def test_tool_call_example_to_training_example():
     assert training_example.messages[1].content == "Read the file test.py"
 
     assert training_example.messages[2].role == "assistant"
-    assert "read_file" in training_example.messages[2].content
+    assert "<tool_call>" in training_example.messages[2].content
+    assert '"name": "read_file"' in training_example.messages[2].content
     assert '"path": "test.py"' in training_example.messages[2].content
 
     assert training_example.messages[3].role == "user"
@@ -72,7 +73,8 @@ def test_create_read_file_example():
 
     assert len(example.messages) == 5
     assert example.messages[1].content == "What does main.py do?"
-    assert "read_file" in example.messages[2].content
+    assert "<tool_call>" in example.messages[2].content
+    assert '"name": "read_file"' in example.messages[2].content
     assert "src/main.py" in example.messages[2].content
     assert "def main()" in example.messages[3].content
     assert "empty main function" in example.messages[4].content
@@ -89,7 +91,8 @@ def test_create_write_file_example():
 
     assert len(example.messages) == 5
     assert example.messages[1].content == "Create a test file with hello world"
-    assert "write_file" in example.messages[2].content
+    assert "<tool_call>" in example.messages[2].content
+    assert '"name": "write_file"' in example.messages[2].content
     assert "test.txt" in example.messages[2].content
     assert "File written successfully" in example.messages[3].content
     assert "created test.txt" in example.messages[4].content
@@ -106,7 +109,8 @@ def test_create_run_command_example():
 
     assert len(example.messages) == 5
     assert example.messages[1].content == "Run the tests"
-    assert "run_command" in example.messages[2].content
+    assert "<tool_call>" in example.messages[2].content
+    assert '"name": "run_command"' in example.messages[2].content
     assert "pytest tests/" in example.messages[2].content
     assert "5 passed" in example.messages[3].content
     assert "All 5 tests passed" in example.messages[4].content
@@ -132,13 +136,15 @@ def test_create_multi_tool_example():
 
     # First tool call
     assert example.messages[2].role == "assistant"
-    assert "read_file" in example.messages[2].content
+    assert "<tool_call>" in example.messages[2].content
+    assert '"name": "read_file"' in example.messages[2].content
     assert example.messages[3].role == "user"
     assert "def main()" in example.messages[3].content
 
     # Second tool call
     assert example.messages[4].role == "assistant"
-    assert "run_command" in example.messages[4].content
+    assert "<tool_call>" in example.messages[4].content
+    assert '"name": "run_command"' in example.messages[4].content
     assert example.messages[5].role == "user"
     assert "3 passed" in example.messages[5].content
 

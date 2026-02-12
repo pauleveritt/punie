@@ -6,7 +6,7 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 
 | Model/Adapter | Overall | Code Gen | Reasoning | Tool Calling | Status | Date |
 |---------------|---------|----------|-----------|--------------|--------|------|
-| **1.5B Base (Qwen2.5)** | **71.4%** | **100%** | **100%** | **33.3%** | ✅ BEST | 2026-02-11 |
+| **1.5B Base (Qwen2.5)** | **71.4%** | **100%** | **100%** | **33.3%** | ⚠️ No tool support | 2026-02-11 |
 | successful-demo (1.5B) | 67.9% | 87.5% | 100% | 33.3% | ⚠️ Slight regression | 2026-02-11 |
 | 30B Base (Qwen3) | 60.7% | 87.5% | 50% | 50% | ⚠️ Worse overall | 2026-02-11 |
 | qwen-tool-format (1.5B) | 57.1% | 100% | 75% | 16.7% | ❌ Format didn't help | 2026-02-11 |
@@ -14,9 +14,84 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 | baseline-diverse-python (1.5B) | 51.2% | 29.2% | 100% | 33.3% | ❌ Major regression | 2026-02-11 |
 | tool-calling-synthetic (1.5B) | 32.1% | 62.5% | 0% | 33.3% | ❌ Catastrophic | 2026-02-11 |
 
-**Note:** Previous baseline (41.7%) was from invalid server. All measurements before 2026-02-11 are unreliable.
+**Note:** All measurements above are invalid - eval pipeline was missing tool call parsing layer. Re-evaluation needed with fixed pipeline.
 
 ## Experiments
+
+### Phase 17: Tool Call Parsing Fix & Model Shift (2026-02-12)
+
+**Goal:** Restore tool call parsing to eval pipeline and shift to Qwen3 Instruct models.
+
+**Context:** The Phase 16.5 conclusion of "architectural incompatibility" was wrong. A prior investigation (Feb 8, documented in `docs/tool-calling-investigation-results.md`) had already solved tool calling:
+
+1. **Feb 8:** Tested 7 models. Qwen3-Coder-30B-A3B-Instruct-4bit **successfully calls tools** using XML format
+2. **Feb 8:** Added `parse_tool_calls()` to `src/punie/models/mlx.py` - parses both JSON and XML from raw text
+3. **Feb 11:** The entire MLX model layer was **deleted** (commit `a227ae9`) when architecture shifted to `mlx_lm.server`
+4. **Feb 11 overnight:** Eval pipeline found no tool calls because the parsing layer no longer exists
+
+**The real issue:** Models generate `<tool_call>` text, but nothing converts it to structured parts.
+
+**What we did:**
+1. Extracted `parse_tool_calls()` from git history (commit `80bb3df`)
+2. Created standalone module `src/punie/training/tool_call_parser.py`
+3. Integrated into `eval_runner.py` to parse tool calls from raw text
+4. Updated CLI defaults to use Qwen3-Coder-30B-A3B-Instruct-4bit
+5. Added comprehensive test suite (14 tests for JSON, XML, and broken formats)
+
+**Commands run:**
+```bash
+# Created new module and tests
+git show 80bb3df:src/punie/models/mlx.py  # Recovered parsing code
+
+# Verification
+uv run pytest tests/test_training_tool_call_parser.py -v  # 14 passed
+uv run pytest tests/test_training_eval_runner.py -v      # 4 passed
+uv run pytest tests/test_training*.py -v                  # 168 passed
+uv run ruff check src/punie/training/                     # All passed
+uv run ty check src/punie/training/                       # All passed
+```
+
+**Results:**
+- ✅ Tool call parser restored with full test coverage
+- ✅ Eval pipeline now extracts tool calls from both structured parts AND raw text
+- ✅ All 168 training tests pass
+- ✅ Default model shifted to Qwen3-Coder-30B-A3B-Instruct-4bit
+- ✅ All code passes ruff and ty checks
+
+**Key findings:**
+1. **Previous evaluations were invalid** - missing parsing layer meant no tool calls detected
+2. **Qwen3 Instruct models support tool calling** - confirmed by Feb 8 investigation
+3. **Qwen2.5 1.5B is code-only** - no tool support, good for code generation only
+4. **Training data still viable** - diverse-python-5k can be reused for fine-tuning Qwen3
+
+**Model decision:**
+- ✅ **New default: Qwen3-Coder-30B-A3B-Instruct-4bit**
+  - Supports tool calling out of the box (XML format)
+  - Proven to work in Feb 8 investigation
+  - Can be fine-tuned with existing training data
+
+- ⬜ **Qwen2.5-Coder-1.5B-Instruct-4bit remains viable for:**
+  - Code generation tasks only (no tools needed)
+  - Lower memory footprint scenarios
+  - Faster inference
+
+**Next steps:**
+1. ⬜ Re-run baseline evaluation with Qwen3-Coder-30B to get valid tool calling scores
+2. ⬜ Evaluate whether existing training data helps or hurts Qwen3
+3. ⬜ Consider evaluating newer/smaller Qwen3 Instruct models as they become available
+
+**Files created:**
+- `src/punie/training/tool_call_parser.py` - Standalone parsing module
+- `tests/test_training_tool_call_parser.py` - Comprehensive test suite
+- Updated `src/punie/training/eval_runner.py` - Integrated parser
+- Updated `src/punie/cli.py` - New default model
+
+**Commits:** *(to be added after commit)*
+
+**Removed:**
+- `OVERNIGHT_RESULTS.md` - Conclusions were based on missing parsing layer
+
+---
 
 ### Phase 16: Baseline Evaluation & Training Failure Analysis (2026-02-11)
 

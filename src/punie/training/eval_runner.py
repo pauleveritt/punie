@@ -15,6 +15,7 @@ from punie.training.eval_results import EvalReport, EvalResult
 from punie.training.eval_scoring import score_prompt
 from punie.training.server import ServerProcess
 from punie.training.server_config import ServerConfig
+from punie.training.tool_call_parser import parse_tool_calls
 
 
 @dataclass(frozen=True)
@@ -81,15 +82,19 @@ async def run_evaluation(config: EvalRunConfig) -> EvalReport:
                 # Run agent with prompt
                 result = await agent.run(prompt.prompt_text, deps=deps)
 
-                # Extract tool calls from result messages
-                # Iterate through all messages and collect tool names from parts
+                # Extract tool calls from both structured parts AND raw text
                 tool_calls_list = []
+                # Check structured parts first (for cloud models that return proper tool_calls)
                 if result.all_messages():
                     for msg in result.all_messages():
                         if hasattr(msg, "parts"):
                             for part in msg.parts:
                                 if hasattr(part, "tool_name"):
                                     tool_calls_list.append(part.tool_name)
+                # If no structured tool calls found, parse from raw text (for mlx_lm.server)
+                if not tool_calls_list:
+                    _, parsed_calls = parse_tool_calls(result.output)
+                    tool_calls_list = [call["name"] for call in parsed_calls if "name" in call]
                 tool_calls_made: tuple[str, ...] = tuple(tool_calls_list)
 
                 # Calculate duration

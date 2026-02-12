@@ -439,6 +439,8 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
     Returns:
         True if tool calls were detected, False otherwise
     """
+    from punie.training.tool_call_parser import parse_tool_calls
+
     typer.echo(f"\n{'=' * 80}")
     typer.secho("Testing Tool Calling", fg=typer.colors.BRIGHT_CYAN, bold=True)
     typer.echo(f"{'=' * 80}")
@@ -479,6 +481,14 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
                             tool_calls_made.append(
                                 f"{part.tool_name}({getattr(part, 'args', {})})"
                             )
+
+        # Fallback: parse tool calls from raw text (for local models)
+        if not tool_calls_made:
+            _, parsed_calls = parse_tool_calls(result.output)
+            tool_calls_made = [
+                f"{call['name']}({call.get('arguments', {})})"
+                for call in parsed_calls if "name" in call
+            ]
 
         if tool_calls_made:
             typer.secho(
@@ -777,7 +787,7 @@ def train(
         dir_okay=True,
     ),
     model: str = typer.Option(
-        "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
         "--model",
         "-m",
         help="Base model to fine-tune",
@@ -841,7 +851,7 @@ def train(
 @app.command("eval")
 def eval_model(
     model: str = typer.Option(
-        "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
         "--model",
         "-m",
         help="Model to evaluate",

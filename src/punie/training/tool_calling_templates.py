@@ -39,8 +39,8 @@ class ToolCallExample:
         4. Tool result (as user message)
         5. Final assistant response
         """
-        # Format tool call in the style expected by chat models
-        tool_call_response = f"I'll use the {self.tool_name} tool.\n\n```json\n{{\n  \"tool\": \"{self.tool_name}\",\n  \"arguments\": {self.tool_arguments}\n}}\n```"
+        # Format tool call in Qwen <tool_call> format expected by parser
+        tool_call_response = f'<tool_call>\n{{"name": "{self.tool_name}", "arguments": {self.tool_arguments}}}\n</tool_call>'
 
         messages = (
             ChatMessage(role="system", content=self.system_message),
@@ -160,8 +160,8 @@ def create_multi_tool_example(
     ]
 
     for tool_name, arguments, result in tool_sequence:
-        # Assistant makes tool call
-        tool_call_response = f"I'll use the {tool_name} tool.\n\n```json\n{{\n  \"tool\": \"{tool_name}\",\n  \"arguments\": {arguments}\n}}\n```"
+        # Assistant makes tool call in Qwen <tool_call> format
+        tool_call_response = f'<tool_call>\n{{"name": "{tool_name}", "arguments": {arguments}}}\n</tool_call>'
         messages.append(ChatMessage(role="assistant", content=tool_call_response))
 
         # Tool result
