@@ -1,0 +1,13 @@
+30B Real Task Testing Results (Existing Server)
+================================================================================
+
+Model: qwen3-30b-a3b-instruct-2507-mlx
+Success rate: 4/5 (80.0%)
+Average time: 98.11s
+Average tool calls: 3.2
+
+protocol_search: {'id': 'protocol_search', 'success': True, 'time': 30.831093083999804, 'tool_calls': 2, 'found_concepts': 4, 'total_concepts': 4}
+import_usage: {'id': 'import_usage', 'success': True, 'time': 17.310202624999874, 'tool_calls': 4, 'found_concepts': 2, 'total_concepts': 3}
+function_signature: {'id': 'function_signature', 'success': True, 'time': 32.224963958000444, 'tool_calls': 6, 'found_concepts': 2, 'total_concepts': 3}
+test_count: {'id': 'test_count', 'success': True, 'time': 18.596804332999454, 'tool_calls': 4, 'found_concepts': 3, 'total_concepts': 3}
+dataclass_search: {'id': 'dataclass_search', 'success': False, 'time': 391.5924192090006, 'tool_calls': 0, 'found_concepts': 0, 'total_concepts': 2, 'error': 'The next request would exceed the request_limit of 50'}
