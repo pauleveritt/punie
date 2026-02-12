@@ -912,3 +912,66 @@ def dataset_stats(
     except Exception as e:
         typer.secho(f"❌ Failed to compute stats: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+
+@dataset_app.command("download")
+def dataset_download(
+    name: str = typer.Argument(
+        ...,
+        help="Dataset name (sample, python-code)",
+    ),
+    output: Path = typer.Option(
+        Path("data/downloaded"),
+        "--output",
+        "-o",
+        help="Output directory",
+    ),
+    max_examples: int = typer.Option(
+        100,
+        "--max",
+        "-m",
+        help="Maximum examples to download",
+    ),
+) -> None:
+    """Download a dataset and convert to training format.
+
+    Available datasets:
+      sample      - Tiny Shakespeare (for testing)
+      python-code - Python code examples from CodeSearchNet
+    """
+    from punie.training.downloaders import download_python_code_dataset, download_sample_dataset
+
+    downloaders = {
+        "sample": download_sample_dataset,
+        "python-code": download_python_code_dataset,
+    }
+
+    if name not in downloaders:
+        typer.secho(f"❌ Unknown dataset: {name}", fg=typer.colors.RED, err=True)
+        typer.echo(f"Available: {', '.join(downloaders.keys())}")
+        raise typer.Exit(1)
+
+    typer.echo(f"📥 Downloading dataset: {name}")
+    typer.echo(f"   Output: {output}")
+    typer.echo(f"   Max examples: {max_examples}")
+    typer.echo("\nThis may take a moment...")
+
+    try:
+        stats = downloaders[name](output, max_examples=max_examples)
+
+        typer.secho(f"\n✅ Download complete!", fg=typer.colors.GREEN)
+        typer.echo(f"\n📊 Statistics:")
+        typer.echo(f"   Total: {stats.total_examples} examples")
+        typer.echo(f"   Train: {stats.train_count}")
+        typer.echo(f"   Valid: {stats.valid_count}")
+        typer.echo(f"   Test:  {stats.test_count}")
+        typer.echo(f"   Avg messages: {stats.avg_messages_per_example:.1f}")
+        typer.echo(f"\n💡 Next steps:")
+        typer.echo(f"   Validate: punie dataset validate {output}")
+        typer.echo(f"   Train:    punie train {output}")
+
+    except Exception as e:
+        typer.secho(f"\n❌ Download failed: {e}", fg=typer.colors.RED, err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(1)

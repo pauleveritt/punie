@@ -28,6 +28,7 @@ punie = "punie.cli:app"
 dev = [
     "anyio>=4.0.0",
     "coverage>=7.13.0",
+    "datasets>=4.5.0",
     "furo>=2025.12.19",
     "httpx>=0.28.0",
     "linkify-it-py>=2.0.3",
