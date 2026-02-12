@@ -110,8 +110,8 @@ def download_python_code_dataset(
 ) -> DatasetStats:
     """Download Python code examples for training.
 
-    Uses the code_search_net dataset (MIT License, CodeSearchNet corpus).
-    This is a real dataset but we're using a small sample.
+    Uses bigcode/the-stack-dedup dataset (Apache 2.0 License).
+    This is a large, actively-maintained dataset of source code.
 
     Args:
         output_dir: Output directory for JSONL files
@@ -122,27 +122,36 @@ def download_python_code_dataset(
     """
     from datasets import load_dataset
 
-    # Load Python subset of code_search_net
-    # This dataset is MIT licensed and suitable for training
-    dataset = load_dataset("code_search_net", "python", split="train", streaming=True)
+    # Load Python subset of The Stack (deduplicated)
+    # This dataset is Apache 2.0 licensed and actively maintained
+    dataset = load_dataset(
+        "bigcode/the-stack-dedup",
+        data_dir="data/python",
+        split="train",
+        streaming=True,
+    )
 
     examples = []
     for i, item in enumerate(dataset):
         if i >= max_examples:
             break
 
-        # Extract code and docstring
-        code = item.get("func_code_string", "")
-        docstring = item.get("func_documentation_string", "")
+        # Extract code content
+        code = item.get("content", "")
 
-        # Skip if too short or malformed
-        if len(code.strip()) < 50 or len(docstring.strip()) < 20:
+        # Skip if too short or likely not useful
+        if len(code.strip()) < 100:
             continue
 
-        # Create chat format: user asks for code, assistant provides it
+        # Skip files that are mostly comments or imports
+        code_lines = [line for line in code.split("\n") if line.strip() and not line.strip().startswith("#")]
+        if len(code_lines) < 5:
+            continue
+
+        # Create chat format: code explanation task
         messages = (
             ChatMessage(role="system", content="You are a helpful Python coding assistant."),
-            ChatMessage(role="user", content=f"Write a Python function that: {docstring}"),
+            ChatMessage(role="user", content="Write Python code to solve a programming task:"),
             ChatMessage(role="assistant", content=code),
         )
 
