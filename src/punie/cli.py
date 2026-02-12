@@ -887,9 +887,9 @@ def eval_model(
       punie eval --no-server --port 8080  # Use existing server
     """
     from datetime import datetime, timezone
-    from punie.training.eval_prompts import get_baseline_suite
+    from punie.training.eval_suites import create_baseline_suite
     from punie.training.eval_runner import EvalRunConfig, run_evaluation
-    from punie.training.eval_html import generate_eval_html
+    from punie.training.eval_report import generate_eval_html_report
     from punie.training.server_config import ServerConfig
 
     typer.echo(f"🔍 Evaluating model")
@@ -909,7 +909,7 @@ def eval_model(
     )
 
     # Get baseline suite
-    suite = get_baseline_suite()
+    suite = create_baseline_suite()
 
     # Create eval config
     eval_config = EvalRunConfig(
@@ -929,7 +929,7 @@ def eval_model(
             output = Path.cwd() / f"eval_{timestamp}.html"
 
         # Generate HTML report
-        html = generate_eval_html(report)
+        html = generate_eval_html_report(report, suite)
         output.write_text(html)
 
         # Print summary

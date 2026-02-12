@@ -4,14 +4,199 @@ This document tracks all training experiments, evaluations, and decisions for Pu
 
 ## Cumulative Results
 
-| Step | Dataset | Adapter | Overall | Tool Calling | Code Gen | Reasoning | Notes |
-|------|---------|---------|---------|-------------|----------|-----------|-------|
-| Baseline | — | — | 41.7% | — | 33.3% | 50.0% | Qwen2.5-Coder-1.5B-4bit untrained |
-| Pipeline Test (Baseline) | 40 examples | — | 50.0% | — | — | — | Sample dataset, 2 prompts |
-| Pipeline Test (Adapted) | 40 examples | 10 iters | 0.0% | — | — | — | Expected: too few iterations |
-| Workflow Test | 40 examples | 10 iters | — | — | — | — | Training succeeded, adapter created (20MB) |
+| Model/Adapter | Overall | Code Gen | Reasoning | Tool Calling | Status | Date |
+|---------------|---------|----------|-----------|--------------|--------|------|
+| **Base model** | **71.4%** | **100%** | **100%** | **33.3%** | ✅ Best | 2026-02-11 |
+| successful-demo | 67.9% | 87.5% | 100% | 33.3% | ⚠️ Slight regression | 2026-02-11 |
+| glaive-function-calling | 53.6% | 70.8% | 66.7% | 33.3% | ❌ Significant regression | 2026-02-11 |
+| baseline-diverse-python | 51.2% | 29.2% | 100% | 33.3% | ❌ Major regression | 2026-02-11 |
+| tool-calling-synthetic | 32.1% | 62.5% | 0% | 33.3% | ❌ Catastrophic | 2026-02-11 |
+
+**Note:** Previous baseline (41.7%) was from invalid server (mlx_lm.server never loaded models). All measurements before 2026-02-11 are unreliable.
 
 ## Experiments
+
+### Phase 16: Baseline Evaluation & Training Failure Analysis (2026-02-11)
+
+**Goal:** Establish valid baseline measurements after fixing mlx_lm.server, then evaluate all trained adapters.
+
+**Context:** First valid measurements ever. Previous 17 HTML reports were invalid because server never loaded models (wrong command format `python -m mlx_lm.server` vs correct `python -m mlx_lm server`). Fixed in commit f4d3b3a.
+
+**Commands run:**
+```bash
+# Add punie eval CLI command (Step 1-3 from plan)
+# - Fix tool-call extraction in eval_runner.py
+# - Add punie eval command to cli.py
+# - Clean up 40 stale root files
+
+# Step 4: Baseline evaluations
+uv run punie eval --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit --port 8080 --output eval_base_model.html
+uv run punie eval --adapter adapters/baseline-diverse-python-5k/ --port 8080 --output eval_baseline_diverse_python.html
+uv run punie eval --adapter adapters/glaive-function-calling/ --port 8080 --output eval_glaive_function_calling.html
+uv run punie eval --adapter adapters/tool-calling-synthetic/ --port 8080 --output eval_tool_calling_synthetic.html
+uv run punie eval --adapter adapters/successful-demo/ --port 8080 --output eval_successful_demo.html
+```
+
+**Results:**
+```
+Base model:                 71.4% avg (100% code, 100% reason, 33.3% tools) ✅ BEST
+successful-demo:            67.9% avg (87.5% code, 100% reason, 33.3% tools)
+glaive-function-calling:    53.6% avg (70.8% code, 66.7% reason, 33.3% tools)
+baseline-diverse-python:    51.2% avg (29.2% code, 100% reason, 33.3% tools)
+tool-calling-synthetic:     32.1% avg (62.5% code, 0% reason, 33.3% tools) ❌ WORST
+```
+
+**Critical Finding: ALL TRAINING HURTS PERFORMANCE**
+
+Every single trained adapter performed worse than the untrained base model. This contradicts basic expectations of fine-tuning.
+
+**Key Observations:**
+
+1. **Tool Calling Fixed at 33.3% (1/3 prompts)**
+   - No adapter improved tool calling
+   - All stuck at same score
+   - This was the primary target for training!
+   - Suggests: data format mismatch or model size limitation
+
+2. **Code Generation Severely Hurt**
+   - Base: 100% perfect
+   - baseline-diverse-python: 29.2% (destroyed!)
+   - Worst regression of all categories
+
+3. **Reasoning Sometimes Destroyed**
+   - tool-calling-synthetic: 0% (complete failure)
+   - Suggests catastrophic forgetting
+
+4. **Hand-Authored Data Best**
+   - successful-demo (8 examples): 67.9%
+   - Close to base model despite smallest dataset
+   - Quality >> quantity for small datasets
+
+**Root Cause Hypotheses:**
+
+### H1: Data Format Mismatch (HIGH LIKELIHOOD)
+
+**Problem:** Training data has tool calls as plain text in assistant messages, but evaluation expects structured `tool_use` message parts.
+
+**Evidence:**
+- Tool calling never improves (stuck at 33.3%)
+- Training on tool-calling datasets doesn't help
+- Evaluation extracts tool names from `msg.parts` with `tool_name` attribute
+
+**Training data format (mlx_lm):**
+```json
+{
+  "messages": [
+    {"role": "assistant", "content": "I'll use list_dir to find files..."}
+  ]
+}
+```
+
+**Evaluation expects (PydanticAI):**
+```python
+for part in msg.parts:
+    if hasattr(part, "tool_name"):
+        # Structured tool_use part, not text!
+```
+
+**Next Step:** Inspect training data to verify format.
+
+### H2: Model Size Limitation (MEDIUM LIKELIHOOD)
+
+**Problem:** 1.5B parameters may be too small for tool-calling LoRA.
+
+**Evidence:**
+- Base model already struggles (33.3%)
+- LoRA adds only ~1-5M parameters (0.07-0.3%)
+- Tool calling requires schema understanding + formatting
+
+**Next Step:** Run baseline eval on 30B model for comparison.
+
+### H3: Catastrophic Forgetting (MEDIUM LIKELIHOOD)
+
+**Problem:** Training on narrow datasets causes forgetting of general capabilities.
+
+**Evidence:**
+- baseline-diverse-python: code gen dropped 70.8%
+- tool-calling-synthetic: reasoning dropped to 0%
+- successful-demo (smallest) performed best (less forgetting?)
+
+**Potential Causes:**
+- Too many iterations (100 may be excessive for 8-5000 examples)
+- Learning rate too high (1e-5 may be aggressive)
+- No regularization (dropout=0.0)
+
+**Next Step:** Hyperparameter sweep with validation loss monitoring.
+
+### H4: LoRA Configuration Issues (LOW-MEDIUM LIKELIHOOD)
+
+**Current Config:**
+- rank: 8 (default)
+- alpha: 16 (default)
+- dropout: 0.0 (no regularization!)
+- Target modules: q_proj, v_proj (likely)
+
+**Issues:**
+- Rank 8 may be too low for structured output
+- Missing o_proj, gate_proj targets?
+- No dropout = overfitting on small datasets
+
+**Next Step:** Try rank=16, alpha=32, dropout=0.1, all linear layers.
+
+### H5: Evaluation-Training Distribution Mismatch (HIGH LIKELIHOOD)
+
+**Problem:** Evaluation prompts may be out-of-distribution vs training data.
+
+**Evaluation Examples:**
+- "List all Python files in the workspace"
+- "What is 15 * 23?"
+- "Write a function to calculate factorial"
+
+**Training Data Sources:**
+- diverse-python-5k: General Python Q&A (likely Stack Overflow)
+- glaive-function-calling: Function calling (format unknown)
+- tool-calling-synthetic: Our generated examples
+
+**If training data doesn't include file system operations or factorial examples, model won't generalize.**
+
+**Next Step:** Inspect training data to verify coverage of evaluation scenarios.
+
+**Decision: Cancel Step 5 (Progressive Pruning)**
+
+Step 5 assumes training helps and measures the effect of dataset pruning. Since **all training hurts**, pruning won't fix the fundamental issue.
+
+**Instead: Investigate root causes**
+
+**Immediate Actions:**
+1. ✅ Document findings (this entry)
+2. ⬜ Inspect training data format (diverse-python-5k, glaive)
+3. ⬜ Check which tool-calling prompt succeeds (inspect HTML reports)
+4. ⬜ Run 30B model baseline for size comparison
+
+**Short-term:**
+1. ⬜ Fix training data format if mismatch found
+2. ⬜ Create properly formatted tool-calling dataset
+3. ⬜ Retrain and evaluate with corrected data
+4. ⬜ If still fails, switch to 30B model
+
+**Files generated:**
+- eval_base_model.html (71.4%)
+- eval_baseline_diverse_python.html (51.2%)
+- eval_glaive_function_calling.html (53.6%)
+- eval_tool_calling_synthetic.html (32.1%)
+- eval_successful_demo.html (67.9%)
+- docs/research/training-journal.md (this updated journal)
+
+**Infrastructure improvements:**
+- Added `punie eval` CLI command
+- Fixed tool-call extraction in eval_runner.py
+- Cleaned up 40 stale root files (18 scripts, 17 HTML reports, 5 markdown files)
+- Updated .gitignore for training artifacts
+
+**Commits:**
+- 35b1460: Add punie eval CLI and fix tool-call extraction
+
+---
 
 ### Phase 15: Progressive Dataset Pruning (2026-02-11)
 
