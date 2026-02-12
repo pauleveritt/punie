@@ -2,9 +2,21 @@
 
 import asyncio
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from punie.training.lora_config import LoRAConfig
+
+
+@dataclass(frozen=True)
+class TrainingResult:
+    """Result from running LoRA training.
+
+    Contains the adapter path and training output for log parsing.
+    """
+
+    adapter_path: Path
+    output: str  # Combined stdout + stderr for log parsing
 
 
 def build_train_command(config: LoRAConfig) -> list[str]:
@@ -46,8 +58,8 @@ def build_train_command(config: LoRAConfig) -> list[str]:
     return cmd
 
 
-async def run_training(config: LoRAConfig) -> Path:
-    """Run LoRA training with given configuration.
+async def run_training_with_logs(config: LoRAConfig) -> TrainingResult:
+    """Run LoRA training and return results with training logs.
 
     Executes mlx_lm.lora as subprocess and waits for completion.
 
@@ -55,7 +67,7 @@ async def run_training(config: LoRAConfig) -> Path:
         config: LoRA training configuration
 
     Returns:
-        Path to output adapter directory
+        TrainingResult with adapter path and training output
 
     Raises:
         subprocess.CalledProcessError: If training fails
@@ -82,4 +94,25 @@ async def run_training(config: LoRAConfig) -> Path:
             stderr=stderr,
         )
 
-    return config.output_directory
+    # Combine stdout and stderr for log parsing
+    output = stdout.decode("utf-8", errors="replace") + "\n" + stderr.decode("utf-8", errors="replace")
+
+    return TrainingResult(adapter_path=config.output_directory, output=output)
+
+
+async def run_training(config: LoRAConfig) -> Path:
+    """Run LoRA training with given configuration.
+
+    Executes mlx_lm.lora as subprocess and waits for completion.
+
+    Args:
+        config: LoRA training configuration
+
+    Returns:
+        Path to output adapter directory
+
+    Raises:
+        subprocess.CalledProcessError: If training fails
+    """
+    result = await run_training_with_logs(config)
+    return result.adapter_path
