@@ -1,0 +1,94 @@
+================================================================================
+PROTOCOL SEARCH BENCHMARK RESULTS
+================================================================================
+Query: "What classes in this codebase implement a protocol?"
+Date: 2026-02-12
+Context: Comparing Claude Code vs 30B model (30B crashed system with 16GB RAM)
+
+================================================================================
+CLAUDE CODE (SONNET 4.5) - BASELINE
+================================================================================
+
+Execution time: 10.76s
+Tool calls: 2 (parallel Grep operations)
+Accuracy: 100% (6/6 classes found)
+Classes found: HttpAppFactory, Client, Agent, MessageDispatcher, MessageQueue, MessageStateStore
+
+Response:
+--------------------------------------------------------------------------------
+Based on my search, I found the following Protocol classes in the codebase:
+
+1. **HttpAppFactory** - src/punie/http/types.py:18
+   Protocol for HTTP application factory
+
+2. **Client** - src/punie/acp/interfaces.py:74
+   Protocol defining the ACP client interface
+
+3. **Agent** - src/punie/acp/interfaces.py:169
+   Protocol defining the ACP agent interface
+
+4. **MessageStateStore** - src/punie/acp/task/state.py:31
+   Protocol for message state storage
+
+5. **MessageQueue** - src/punie/acp/task/queue.py:13
+   Protocol for message queue operations
+
+6. **MessageDispatcher** - src/punie/acp/task/dispatcher.py:25
+   Protocol for message dispatching
+
+Note: There's also `_WritePipeProtocol` in src/punie/acp/stdio.py:29 which
+inherits from asyncio.BaseProtocol (not typing.Protocol), so it's a different
+type of protocol.
+
+All 6 typing.Protocol classes define interfaces that other classes must implement,
+following Python's structural subtyping pattern.
+--------------------------------------------------------------------------------
+
+Tool Usage Details:
+- Tool 1: Grep for "class \w+\(.*Protocol.*\):" in src/**/*.py
+- Tool 2: Grep for "class.*Protocol" in src/**/*.py (parallel execution)
+- Both searches used glob filtering to focus on Python files
+- Results merged to provide comprehensive list
+
+
+================================================================================
+QWEN3-CODER-30B-4BIT (WARM) - TO BE MEASURED
+================================================================================
+
+⚠️  WARNING: Previous run crashed system with 16GB RAM usage
+⚠️  Measurement pending user approval due to resource constraints
+
+Expected performance (from previous successful run in summary):
+- Execution time: ~60-90s (warm)
+- Tool calls: ~6
+- Accuracy: 100% (found all 6 classes)
+
+Resource requirements:
+- RAM: ~16GB
+- Risk: System crash on machines with limited RAM
+
+
+================================================================================
+ANALYSIS
+================================================================================
+
+Claude Code Performance:
+✅ Fast: 10.76s execution time
+✅ Efficient: Only 2 tool calls (parallel execution)
+✅ Accurate: 100% - found all 6 Protocol classes
+✅ Cloud-based: No local RAM pressure
+
+30B Model Performance (from previous test):
+⚠️  Slow: 60-90s execution time (5.6-8.4x slower)
+⚠️  More tool calls: ~6 calls (3x more)
+✅ Accurate: 100% - found all 6 Protocol classes
+❌ High RAM: 16GB usage - crashed user's Mac
+
+Conclusion:
+The 30B model provides autonomous capability but at significant cost:
+- 6-8x slower execution
+- 3x more tool usage
+- Requires 16GB RAM (unsustainable)
+
+NORTH STAR: Need much smaller, targeted model that approaches Claude Code
+efficiency while maintaining autonomous reasoning capability.
