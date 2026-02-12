@@ -763,3 +763,152 @@ def stop_all(
                     typer.echo(f"  PID {proc.pid}")
                 except psutil.NoSuchProcess:
                     continue
+
+
+# Training commands
+
+@app.command("train")
+def train(
+    data_dir: Path = typer.Argument(
+        ...,
+        help="Directory with train.jsonl, valid.jsonl, test.jsonl files",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    model: str = typer.Option(
+        "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        "--model",
+        "-m",
+        help="Base model to fine-tune",
+    ),
+    output: Path = typer.Option(
+        Path("adapters/default"),
+        "--output",
+        "-o",
+        help="Output directory for adapter weights",
+    ),
+    iters: int = typer.Option(
+        100,
+        "--iters",
+        "-i",
+        help="Number of training iterations",
+    ),
+    batch_size: int = typer.Option(
+        4,
+        "--batch-size",
+        "-b",
+        help="Training batch size",
+    ),
+    learning_rate: float = typer.Option(
+        1e-5,
+        "--learning-rate",
+        "-lr",
+        help="Learning rate",
+    ),
+) -> None:
+    """Run LoRA fine-tuning on a dataset.
+
+    Trains a LoRA adapter on the provided dataset and saves adapter weights.
+    """
+    from punie.training.lora_config import LoRAConfig
+    from punie.training.train_runner import run_training
+
+    typer.echo(f"🚀 Starting LoRA training")
+    typer.echo(f"   Model: {model}")
+    typer.echo(f"   Data: {data_dir}")
+    typer.echo(f"   Output: {output}")
+    typer.echo(f"   Iterations: {iters}")
+
+    config = LoRAConfig(
+        base_model=model,
+        data_directory=data_dir,
+        output_directory=output,
+        num_iters=iters,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+    )
+
+    try:
+        adapter_path = asyncio.run(run_training(config))
+        typer.secho(f"\n✅ Training complete!", fg=typer.colors.GREEN)
+        typer.echo(f"   Adapter saved to: {adapter_path}")
+    except Exception as e:
+        typer.secho(f"\n❌ Training failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+dataset_app = typer.Typer(help="Dataset management commands")
+app.add_typer(dataset_app, name="dataset")
+
+
+@dataset_app.command("validate")
+def dataset_validate(
+    directory: Path = typer.Argument(
+        ...,
+        help="Directory with train.jsonl, valid.jsonl, test.jsonl files",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+) -> None:
+    """Validate a training dataset.
+
+    Checks for common issues like invalid roles, empty content, etc.
+    """
+    from punie.training.dataset_io import read_dataset
+    from punie.training.dataset_validation import validate_dataset
+
+    typer.echo(f"📋 Validating dataset: {directory}")
+
+    try:
+        dataset = read_dataset(directory)
+        errors = validate_dataset(dataset)
+
+        if not errors:
+            typer.secho("✅ Dataset is valid!", fg=typer.colors.GREEN)
+            typer.echo(f"   Train: {len(dataset.train)} examples")
+            typer.echo(f"   Valid: {len(dataset.valid)} examples")
+            typer.echo(f"   Test: {len(dataset.test)} examples")
+        else:
+            typer.secho(f"\n❌ Found {len(errors)} validation errors:", fg=typer.colors.RED)
+            for error in errors[:10]:  # Show first 10
+                typer.echo(f"   • {error}")
+            if len(errors) > 10:
+                typer.echo(f"   ... and {len(errors) - 10} more")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.secho(f"❌ Validation failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@dataset_app.command("stats")
+def dataset_stats(
+    directory: Path = typer.Argument(
+        ...,
+        help="Directory with train.jsonl, valid.jsonl, test.jsonl files",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+) -> None:
+    """Show statistics for a training dataset."""
+    from punie.training.dataset_io import compute_stats, read_dataset
+
+    typer.echo(f"📊 Dataset statistics: {directory}\n")
+
+    try:
+        dataset = read_dataset(directory)
+        stats = compute_stats(dataset)
+
+        typer.echo(f"Total examples: {stats.total_examples}")
+        typer.echo(f"\nSplit breakdown:")
+        typer.echo(f"  Train: {stats.train_count} ({stats.train_count / max(stats.total_examples, 1) * 100:.1f}%)")
+        typer.echo(f"  Valid: {stats.valid_count} ({stats.valid_count / max(stats.total_examples, 1) * 100:.1f}%)")
+        typer.echo(f"  Test:  {stats.test_count} ({stats.test_count / max(stats.total_examples, 1) * 100:.1f}%)")
+        typer.echo(f"\nAverage messages per example: {stats.avg_messages_per_example:.1f}")
+
+    except Exception as e:
+        typer.secho(f"❌ Failed to compute stats: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
