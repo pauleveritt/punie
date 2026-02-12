@@ -473,4 +473,149 @@ async with ServerProcess(config=config) as server:
 **Type Safety:** All code passes ty type checking
 **Quality:** Ruff ✅, Ty ✅, All tests ✅
 
-**Next:** Phase 13 will build the evaluation harness using this server management infrastructure.
+---
+
+## Phase 13: Evaluation Harness
+
+**Status:** ✅ Complete
+**Date:** 2026-02-11
+
+**Goal:** Run standardized prompts against models, score results, produce baseline reports.
+
+**Key Components:**
+- Evaluation prompts and suites with categories
+- Scoring functions (tool calling + keyword presence)
+- Evaluation runner with server lifecycle management
+- HTML report generation
+- CLI command: `punie eval`
+
+**Example Usage:**
+```python
+from punie.training.eval_suites import create_baseline_suite
+from punie.training.eval_runner import run_evaluation, EvalRunConfig
+from punie.training.server_config import ServerConfig
+
+suite = create_baseline_suite()
+config = EvalRunConfig(
+    server_config=ServerConfig(
+        model_path="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        port=8080,
+    ),
+    suite=suite,
+    workspace=Path.cwd(),
+    manage_server=True,
+)
+report = await run_evaluation(config)
+print(f"Score: {report.overall_score:.1%}")
+```
+
+**Validation:** Successfully evaluated Qwen2.5-Coder-1.5B with 41.7% baseline score.
+
+**Test Suite:** All tests passing
+**Quality:** Ruff ✅, Ty ✅, All tests ✅
+
+---
+
+## Phase 14: Training Data Infrastructure
+
+**Status:** ✅ Complete
+**Date:** 2026-02-11
+
+**Goal:** Framework for managing, validating, filtering, and writing training datasets in MLX LoRA format.
+
+**Key Components:**
+- Dataset dataclasses (ChatMessage, TrainingExample, TrainingDataset)
+- Validation functions (message count, roles, content)
+- Filtering functions (language, Python version, content quality)
+- JSONL I/O (read/write datasets)
+- LoRA training runner (build command, execute training)
+- CLI commands: `punie train`, `punie dataset validate`, `punie dataset stats`, `punie dataset download`
+
+**Example Usage:**
+```python
+from punie.training.lora_config import LoRAConfig
+from punie.training.train_runner import run_training
+
+config = LoRAConfig(
+    base_model="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+    data_directory=Path("data/train"),
+    output_directory=Path("adapters/v1"),
+    num_iters=100,
+    batch_size=4,
+    learning_rate=1e-5,
+)
+adapter_path = await run_training(config)
+```
+
+**Critical Fix:** Training command format changed from `mlx_lm.lora` to `python -m mlx_lm lora --train` (discovered during pipeline testing).
+
+**Validation:** Full end-to-end pipeline test (`test_full_training_pipeline.py`) runs successfully: data generation → validation → baseline eval → training → adapted eval → comparison.
+
+**Test Suite:** 130 training tests passing
+**Quality:** Ruff ✅, Ty ✅, All tests ✅
+
+---
+
+## Phase 15: Progressive Dataset Pruning
+
+**Status:** 🚧 Partial (15.1, 15.3+ complete)
+**Date:** 2026-02-11
+
+**Goal:** Download datasets, progressively filter them, train and evaluate at each step, compare results.
+
+**Completed:**
+
+**15.1: Dataset Downloads**
+- `download_sample_dataset()`: Synthetic examples for testing
+- `download_python_code_dataset()`: CodeSearchNet Python code (MIT licensed)
+- Both support streaming (never download full corpus)
+- Convert to chat-completion format compatible with mlx_lm.lora
+
+**15.3+: Progressive Pruning Infrastructure**
+- CLI filter command: `punie dataset filter`
+  - Language filtering (remove non-English)
+  - Python version filtering (remove Python 2, old versions)
+  - Content quality filtering (remove short/malformed examples)
+- CLI merge command: `punie dataset merge`
+  - Combine multiple datasets
+  - Useful for adding hand-authored examples
+- Evaluation comparison: `compare_reports()`
+  - Side-by-side HTML comparison of multiple evaluation runs
+  - Shows score deltas, category breakdowns
+  - Highlights improvements/regressions
+
+**Example Workflow:**
+```bash
+# Download dataset
+punie dataset download sample --max 100 --output data/raw/
+
+# Filter step-by-step
+punie dataset filter data/raw/ --language en --output data/step-a/
+punie dataset filter data/step-a/ --min-python 3.10 --output data/step-b/
+punie dataset filter data/step-b/ --min-messages 3 --output data/step-c/
+
+# Train at each step
+punie train data/step-c/ --output adapters/step-c/ --iters 100
+
+# Evaluate
+punie eval --adapter adapters/step-c/
+
+# Merge with hand-authored examples
+punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
+```
+
+**Validation:** Full progressive pruning test (`test_progressive_pruning.py`) demonstrates:
+- Creating test dataset with known quality issues
+- Filtering step-by-step (language → Python version → content quality)
+- Retention rate tracking (started 7 examples → 5 retained)
+- Comparison report generation
+
+**Pending:**
+- 15.2: Download real datasets (Dolma Wiki, RedPajama) — requires user action
+- 15.4: Hyperparameter tuning (grid search for learning rate, LoRA rank, iterations)
+- 15.5: Inference parameter tuning (temperature, top-p, repetition penalty)
+
+**Test Suite:** 130 training tests passing (+4 new comparison tests)
+**Quality:** Ruff ✅, Ty ✅, All tests ✅
+
+**Next:** User can now run real progressive pruning experiments with downloaded datasets, or proceed to Phase 16 (tool calling data).
