@@ -90,8 +90,10 @@ def test_build_train_command_minimal():
         "4",
         "--learning-rate",
         "1e-05",
-        "--num-layers",
+        "--lora-layers",
         "16",
+        "--rank",
+        "8",
     ]
 
 
@@ -117,8 +119,10 @@ def test_build_train_command_custom():
     assert "8" in cmd
     assert "--learning-rate" in cmd
     assert str(5e-5) in cmd
-    assert "--num-layers" in cmd
+    assert "--lora-layers" in cmd
     assert "32" in cmd
+    assert "--rank" in cmd
+    assert "8" in cmd  # Default lora_rank
 
 
 def test_build_train_command_paths_are_strings():

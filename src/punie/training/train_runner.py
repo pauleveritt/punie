@@ -48,12 +48,11 @@ def build_train_command(config: LoRAConfig) -> list[str]:
         str(config.batch_size),
         "--learning-rate",
         str(config.learning_rate),
-        "--num-layers",  # Changed from --lora-layers
+        "--lora-layers",
         str(config.lora_layers),
+        "--rank",  # LoRA rank (r parameter)
+        str(config.lora_rank),
     ]
-
-    # Note: LoRA rank is set via config file or defaults
-    # Can be extended later with --config flag
 
     return cmd
 
