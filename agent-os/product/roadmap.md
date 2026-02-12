@@ -610,12 +610,34 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - Retention rate tracking (started 7 examples → 5 retained)
 - Comparison report generation
 
-**Pending:**
-- 15.2: Download real datasets (Dolma Wiki, RedPajama) — requires user action
-- 15.4: Hyperparameter tuning (grid search for learning rate, LoRA rank, iterations)
-- 15.5: Inference parameter tuning (temperature, top-p, repetition penalty)
+**15.4: Hyperparameter Tuning** (Complete 2026-02-11)
+- `HyperparamGrid` for defining search space (learning rates, LoRA ranks, iterations, batch sizes)
+- `run_hyperparam_search()` runs grid search: train + evaluate each combination
+- `TrainingLog` and `parse_training_log()` extract train/val loss curves from mlx_lm output
+- `TrainingResult` returns adapter path + training output for log parsing
+- `run_training_with_logs()` captures training output (backwards compatible)
+- Demo script: `test_hyperparam_tuning.py` (2 LR × 2 ranks × 10 iters)
+- Sorts results by score, finds best configuration automatically
+- **Test Suite:** 143 training tests passing (+13 new)
 
-**Test Suite:** 130 training tests passing (+4 new comparison tests)
+**15.5: Inference Parameter Tuning** (Complete 2026-02-11)
+- `InferenceGrid` for server-side parameter search (temperature, top-p, repetition penalty, max KV cache)
+- `run_inference_search()` tests each parameter combination via evaluation
+- `InferenceResult` stores server config + eval results
+- Note: Temperature/top-p typically require model-level config (documented for future enhancement)
+- Current implementation tests server-level parameters (max_kv_size, repetition_penalty)
+- **Test Suite:** 149 training tests passing (+6 new)
+
+**Pending:**
+- 15.2: Download real datasets (Dolma Wiki, RedPajama, KodCode) — requires user action
+
+**Test Suite:** 149 training tests passing
 **Quality:** Ruff ✅, Ty ✅, All tests ✅
 
-**Next:** User can now run real progressive pruning experiments with downloaded datasets, or proceed to Phase 16 (tool calling data).
+**Phase 15 Summary:**
+- ✅ Complete progressive pruning workflow (download → filter → merge → train → evaluate → compare)
+- ✅ Hyperparameter tuning (grid search finds optimal training params)
+- ✅ Inference tuning (optimize server-side generation parameters)
+- ✅ All infrastructure ready for production use
+
+**Next:** Phase 16 (tool calling data) or user-driven experiments with real datasets.
