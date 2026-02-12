@@ -73,9 +73,13 @@ def test_build_train_command_minimal():
     cmd = build_train_command(config)
 
     assert cmd == [
-        "mlx_lm.lora",
+        "python",
+        "-m",
+        "mlx_lm",
+        "lora",
         "--model",
         "test-model",
+        "--train",
         "--data",
         "/data",
         "--adapter-path",
@@ -86,7 +90,7 @@ def test_build_train_command_minimal():
         "4",
         "--learning-rate",
         "1e-05",
-        "--lora-layers",
+        "--num-layers",
         "16",
     ]
 
@@ -113,7 +117,7 @@ def test_build_train_command_custom():
     assert "8" in cmd
     assert "--learning-rate" in cmd
     assert str(5e-5) in cmd
-    assert "--lora-layers" in cmd
+    assert "--num-layers" in cmd
     assert "32" in cmd
 
 

@@ -8,7 +8,7 @@ from punie.training.lora_config import LoRAConfig
 
 
 def build_train_command(config: LoRAConfig) -> list[str]:
-    """Build mlx_lm.lora training command.
+    """Build mlx_lm lora training command.
 
     Pure function - easily tested without running actual training.
 
@@ -19,9 +19,13 @@ def build_train_command(config: LoRAConfig) -> list[str]:
         Command as list of strings
     """
     cmd = [
-        "mlx_lm.lora",
+        "python",
+        "-m",
+        "mlx_lm",
+        "lora",
         "--model",
         config.base_model,
+        "--train",  # Required flag to actually train
         "--data",
         str(config.data_directory),
         "--adapter-path",
@@ -32,12 +36,12 @@ def build_train_command(config: LoRAConfig) -> list[str]:
         str(config.batch_size),
         "--learning-rate",
         str(config.learning_rate),
-        "--lora-layers",
+        "--num-layers",  # Changed from --lora-layers
         str(config.lora_layers),
     ]
 
-    # Note: LoRA rank is set via --lora-parameters which is more complex
-    # For now, using defaults. Can be extended later.
+    # Note: LoRA rank is set via config file or defaults
+    # Can be extended later with --config flag
 
     return cmd
 
