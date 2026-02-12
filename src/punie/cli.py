@@ -975,3 +975,205 @@ def dataset_download(
         import traceback
         traceback.print_exc()
         raise typer.Exit(1)
+
+
+@dataset_app.command("filter")
+def dataset_filter(
+    input_dir: Path = typer.Argument(
+        ...,
+        help="Input dataset directory",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    output_dir: Path = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Output directory for filtered dataset",
+    ),
+    language: str | None = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="Filter by language (e.g., 'en')",
+    ),
+    min_python: str | None = typer.Option(
+        None,
+        "--min-python",
+        help="Minimum Python version (e.g., '3', '3.10')",
+    ),
+    min_messages: int | None = typer.Option(
+        None,
+        "--min-messages",
+        help="Minimum messages per example",
+    ),
+) -> None:
+    """Filter a dataset by quality criteria.
+
+    Apply one or more filters to remove low-quality examples. Each filter
+    produces a report showing what was kept vs. removed.
+
+    Examples:
+      punie dataset filter data/raw/ -o data/step-a/ --language en
+      punie dataset filter data/step-a/ -o data/step-b/ --min-python 3.10
+    """
+    from punie.training.dataset_filters import (
+        filter_by_content_quality,
+        filter_by_language,
+        filter_by_python_version,
+    )
+    from punie.training.dataset_io import read_dataset, write_dataset
+    from punie.training.dataset import TrainingDataset
+
+    typer.echo(f"🔍 Filtering dataset: {input_dir}")
+    typer.echo(f"   Output: {output_dir}\n")
+
+    try:
+        # Read input dataset
+        dataset = read_dataset(input_dir)
+        typer.echo(f"📊 Input: {len(dataset.train) + len(dataset.valid) + len(dataset.test)} examples\n")
+
+        # Track statistics
+        train_kept, train_removed = dataset.train, ()
+        valid_kept, valid_removed = dataset.valid, ()
+        test_kept, test_removed = dataset.test, ()
+
+        # Apply filters
+        if language:
+            typer.echo(f"🌍 Filtering by language: {language}")
+            train_kept, train_rem = filter_by_language(train_kept, language)
+            valid_kept, valid_rem = filter_by_language(valid_kept, language)
+            test_kept, test_rem = filter_by_language(test_kept, language)
+            removed = len(train_rem) + len(valid_rem) + len(test_rem)
+            typer.echo(f"   Removed: {removed} examples")
+
+        if min_python:
+            typer.echo(f"🐍 Filtering by Python version: >={min_python}")
+            train_kept, train_rem = filter_by_python_version(train_kept, min_python)
+            valid_kept, valid_rem = filter_by_python_version(valid_kept, min_python)
+            test_kept, test_rem = filter_by_python_version(test_kept, min_python)
+            removed = len(train_rem) + len(valid_rem) + len(test_rem)
+            typer.echo(f"   Removed: {removed} examples")
+
+        if min_messages:
+            typer.echo(f"💬 Filtering by message count: >={min_messages}")
+            train_kept, train_rem = filter_by_content_quality(train_kept, min_messages)
+            valid_kept, valid_rem = filter_by_content_quality(valid_kept, min_messages)
+            test_kept, test_rem = filter_by_content_quality(test_kept, min_messages)
+            removed = len(train_rem) + len(valid_rem) + len(test_rem)
+            typer.echo(f"   Removed: {removed} examples")
+
+        # Create filtered dataset
+        filtered = TrainingDataset(
+            name=dataset.name,
+            version=f"{dataset.version}-filtered",
+            train=train_kept,
+            valid=valid_kept,
+            test=test_kept,
+        )
+
+        # Write output
+        write_dataset(filtered, output_dir)
+
+        typer.secho(f"\n✅ Filtering complete!", fg=typer.colors.GREEN)
+        typer.echo(f"\n📊 Output: {len(filtered.train) + len(filtered.valid) + len(filtered.test)} examples")
+        typer.echo(f"   Train: {len(filtered.train)}")
+        typer.echo(f"   Valid: {len(filtered.valid)}")
+        typer.echo(f"   Test:  {len(filtered.test)}")
+
+        original_total = len(dataset.train) + len(dataset.valid) + len(dataset.test)
+        filtered_total = len(filtered.train) + len(filtered.valid) + len(filtered.test)
+        retention = filtered_total / max(original_total, 1) * 100
+
+        typer.echo(f"\n   Retention rate: {retention:.1f}%")
+
+    except Exception as e:
+        typer.secho(f"❌ Filtering failed: {e}", fg=typer.colors.RED, err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(1)
+
+
+@dataset_app.command("merge")
+def dataset_merge(
+    input_dirs: list[Path] = typer.Argument(
+        ...,
+        help="Input dataset directories to merge",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    output_dir: Path = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Output directory for merged dataset",
+    ),
+    name: str = typer.Option(
+        "merged",
+        "--name",
+        "-n",
+        help="Name for merged dataset",
+    ),
+) -> None:
+    """Merge multiple datasets into one.
+
+    Combines training examples from multiple sources. Useful for adding
+    hand-authored examples to downloaded datasets.
+
+    Example:
+      punie dataset merge data/filtered/step-c/ data/hand-authored/ \\
+          --output data/merged/v1/ --name combined-v1
+    """
+    from punie.training.dataset import TrainingDataset
+    from punie.training.dataset_io import read_dataset, write_dataset
+
+    typer.echo(f"🔀 Merging {len(input_dirs)} datasets")
+    typer.echo(f"   Output: {output_dir}\n")
+
+    try:
+        # Read all datasets
+        datasets = []
+        total_examples = 0
+
+        for input_dir in input_dirs:
+            dataset = read_dataset(input_dir)
+            count = len(dataset.train) + len(dataset.valid) + len(dataset.test)
+            typer.echo(f"📁 {input_dir}: {count} examples")
+            datasets.append(dataset)
+            total_examples += count
+
+        # Merge splits
+        all_train = []
+        all_valid = []
+        all_test = []
+
+        for dataset in datasets:
+            all_train.extend(dataset.train)
+            all_valid.extend(dataset.valid)
+            all_test.extend(dataset.test)
+
+        # Create merged dataset
+        merged = TrainingDataset(
+            name=name,
+            version="1.0",
+            train=tuple(all_train),
+            valid=tuple(all_valid),
+            test=tuple(all_test),
+        )
+
+        # Write output
+        write_dataset(merged, output_dir)
+
+        typer.secho(f"\n✅ Merge complete!", fg=typer.colors.GREEN)
+        typer.echo(f"\n📊 Total: {total_examples} examples")
+        typer.echo(f"   Train: {len(merged.train)}")
+        typer.echo(f"   Valid: {len(merged.valid)}")
+        typer.echo(f"   Test:  {len(merged.test)}")
+
+    except Exception as e:
+        typer.secho(f"❌ Merge failed: {e}", fg=typer.colors.RED, err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(1)
