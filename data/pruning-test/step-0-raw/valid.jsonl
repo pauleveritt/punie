@@ -1,0 +1,1 @@
+{"messages": [{"role": "system", "content": "You are a coding assistant."}, {"role": "user", "content": "How do I check if key exists in dict?"}, {"role": "assistant", "content": "Use has_key() method: my_dict.has_key('key')"}]}

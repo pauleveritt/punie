@@ -1,0 +1,1 @@
+{"messages": [{"role": "system", "content": "You are a helpful Python tutor."}, {"role": "user", "content": "What is a for loop? (Example 13)"}, {"role": "assistant", "content": "A for loop in Python iterates over a sequence using: for item in sequence:\n\nThis is example number 13."}]}
