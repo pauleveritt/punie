@@ -81,13 +81,16 @@ async def run_evaluation(config: EvalRunConfig) -> EvalReport:
                 # Run agent with prompt
                 result = await agent.run(prompt.prompt_text, deps=deps)
 
-                # Extract tool calls from tracker
-                # The tracker records all tool calls made during execution
-                # We extract the tool names from the tracker's call titles
-                tool_calls_made: tuple[str, ...] = ()
-                # Note: For now, we can't easily extract tool names from tracker
-                # This will be improved in integration testing
-                # For unit tests with TestModel, no tools are called anyway
+                # Extract tool calls from result messages
+                # Iterate through all messages and collect tool names from parts
+                tool_calls_list = []
+                if result.all_messages():
+                    for msg in result.all_messages():
+                        if hasattr(msg, "parts"):
+                            for part in msg.parts:
+                                if hasattr(part, "tool_name"):
+                                    tool_calls_list.append(part.tool_name)
+                tool_calls_made: tuple[str, ...] = tuple(tool_calls_list)
 
                 # Calculate duration
                 duration_ms = (time.perf_counter() - start_time) * 1000

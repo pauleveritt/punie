@@ -19,3 +19,11 @@ _build
 .coverage
 *.md.bak
 .claude/settings.local.json
+
+# Training artifacts
+adapters/
+data/downloaded/
+data/synthetic/
+
+# Evaluation reports
+/*.html

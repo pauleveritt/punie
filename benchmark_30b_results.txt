@@ -1,5 +1,0 @@
-Model: mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
-Iterations: 10
-Total time: 35.2s
-Time per iteration: 3.52s
-Peak memory: 0.03 GB

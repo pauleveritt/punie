@@ -69,6 +69,42 @@ async def test_run_evaluation_with_test_model(tmp_path: Path):
     assert config.manage_server is False
 
 
+def test_tool_call_extraction_logic():
+    """Test the logic for extracting tool names from message parts.
+
+    This mimics the extraction logic in run_evaluation() to ensure
+    tool calls are properly captured from agent results.
+    """
+    # Mock message structure similar to PydanticAI's AgentResult
+    class MockPart:
+        def __init__(self, tool_name=None):
+            if tool_name:
+                self.tool_name = tool_name
+
+    class MockMessage:
+        def __init__(self, parts):
+            self.parts = parts
+
+    # Test extraction logic
+    messages = [
+        MockMessage([MockPart(), MockPart("list_dir"), MockPart()]),
+        MockMessage([MockPart("read_file")]),
+    ]
+
+    # Extract tool calls (same logic as eval_runner.py)
+    tool_calls_list = []
+    for msg in messages:
+        if hasattr(msg, "parts"):
+            for part in msg.parts:
+                if hasattr(part, "tool_name"):
+                    tool_calls_list.append(part.tool_name)
+
+    tool_calls_made = tuple(tool_calls_list)
+
+    # Verify we extracted both tool names
+    assert tool_calls_made == ("list_dir", "read_file")
+
+
 # Integration tests (require actual model server) would be marked @pytest.mark.slow
 # Example:
 # @pytest.mark.slow

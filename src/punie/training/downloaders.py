@@ -10,30 +10,6 @@ from punie.training.dataset import ChatMessage, DatasetStats, TrainingExample
 from punie.training.dataset_io import write_jsonl
 
 
-def _convert_to_chat_format(text: str, is_code: bool = False) -> tuple[ChatMessage, ...]:
-    """Convert plain text to chat completion format.
-
-    Args:
-        text: Text content
-        is_code: Whether content is code (affects system message)
-
-    Returns:
-        Tuple of ChatMessage objects
-    """
-    if is_code:
-        system_msg = "You are a helpful coding assistant."
-        user_msg = "Write code to accomplish the following task:"
-    else:
-        system_msg = "You are a helpful assistant."
-        user_msg = "Please explain the following:"
-
-    return (
-        ChatMessage(role="system", content=system_msg),
-        ChatMessage(role="user", content=user_msg),
-        ChatMessage(role="assistant", content=text),
-    )
-
-
 def download_sample_dataset(
     output_dir: Path,
     max_examples: int = 100,

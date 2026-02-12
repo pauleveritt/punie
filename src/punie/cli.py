@@ -838,6 +838,137 @@ def train(
         raise typer.Exit(1)
 
 
+@app.command("eval")
+def eval_model(
+    model: str = typer.Option(
+        "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        "--model",
+        "-m",
+        help="Model to evaluate",
+    ),
+    adapter: Path | None = typer.Option(
+        None,
+        "--adapter",
+        "-a",
+        help="Path to LoRA adapter weights (optional)",
+    ),
+    port: int = typer.Option(
+        8080,
+        "--port",
+        "-p",
+        help="Server port",
+    ),
+    no_server: bool = typer.Option(
+        False,
+        "--no-server",
+        help="Don't manage server (use existing server)",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output path for HTML report (default: eval_TIMESTAMP.html)",
+    ),
+    workspace: Path = typer.Option(
+        Path.cwd(),
+        "--workspace",
+        "-w",
+        help="Workspace directory for file operations",
+    ),
+) -> None:
+    """Evaluate a model against the baseline prompt suite.
+
+    Runs the evaluation suite and generates an HTML report with scores.
+    By default, starts and manages the mlx_lm server automatically.
+
+    Examples:
+      punie eval --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit
+      punie eval --adapter adapters/my-adapter/
+      punie eval --no-server --port 8080  # Use existing server
+    """
+    from datetime import datetime, timezone
+    from punie.training.eval_prompts import get_baseline_suite
+    from punie.training.eval_runner import EvalRunConfig, run_evaluation
+    from punie.training.eval_html import generate_eval_html
+    from punie.training.server_config import ServerConfig
+
+    typer.echo(f"🔍 Evaluating model")
+    typer.echo(f"   Model: {model}")
+    if adapter:
+        typer.echo(f"   Adapter: {adapter}")
+    typer.echo(f"   Port: {port}")
+    if no_server:
+        typer.echo(f"   Using existing server")
+    typer.echo("")
+
+    # Create server config
+    server_config = ServerConfig(
+        model_path=model,
+        adapter_path=adapter,
+        port=port,
+    )
+
+    # Get baseline suite
+    suite = get_baseline_suite()
+
+    # Create eval config
+    eval_config = EvalRunConfig(
+        server_config=server_config,
+        suite=suite,
+        workspace=workspace,
+        manage_server=not no_server,
+    )
+
+    # Run evaluation
+    try:
+        report = asyncio.run(run_evaluation(eval_config))
+
+        # Generate output path if not provided
+        if output is None:
+            timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+            output = Path.cwd() / f"eval_{timestamp}.html"
+
+        # Generate HTML report
+        html = generate_eval_html(report)
+        output.write_text(html)
+
+        # Print summary
+        typer.secho(f"\n✅ Evaluation complete!", fg=typer.colors.GREEN)
+        typer.echo(f"\n📊 Results:")
+
+        # Calculate average score
+        total_score = sum(r.score for r in report.results)
+        avg_score = total_score / max(len(report.results), 1)
+        typer.echo(f"   Average score: {avg_score:.1%}")
+
+        # Count successes
+        successes = sum(1 for r in report.results if r.success)
+        typer.echo(f"   Successful: {successes}/{len(report.results)}")
+
+        # Show category breakdown
+        from collections import defaultdict
+        category_scores = defaultdict(list)
+        for result in report.results:
+            # Find matching prompt to get category
+            for prompt in suite.prompts:
+                if prompt.id == result.prompt_id:
+                    category_scores[prompt.category].append(result.score)
+                    break
+
+        typer.echo(f"\n   By category:")
+        for category, scores in sorted(category_scores.items()):
+            avg = sum(scores) / max(len(scores), 1)
+            typer.echo(f"     {category}: {avg:.1%}")
+
+        typer.echo(f"\n   Report saved to: {output}")
+
+    except Exception as e:
+        typer.secho(f"\n❌ Evaluation failed: {e}", fg=typer.colors.RED, err=True)
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(1)
+
+
 dataset_app = typer.Typer(help="Dataset management commands")
 app.add_typer(dataset_app, name="dataset")
 
@@ -936,7 +1067,7 @@ def dataset_download(
     """Download a dataset and convert to training format.
 
     Available datasets:
-      sample      - Tiny Shakespeare (for testing)
+      sample      - Synthetic Python Q&A (for testing)
       python-code - Python code examples from CodeSearchNet
     """
     from punie.training.downloaders import download_python_code_dataset, download_sample_dataset
