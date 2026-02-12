@@ -17,7 +17,10 @@ def build_server_command(config: ServerConfig) -> list[str]:
     Pure function - easily tested without launching a server.
     """
     cmd = [
-        "mlx_lm.server",
+        "python",
+        "-m",
+        "mlx_lm",
+        "server",
         "--model",
         config.model_path,
         "--port",

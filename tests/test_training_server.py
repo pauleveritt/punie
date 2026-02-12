@@ -12,7 +12,10 @@ def test_build_server_command_minimal():
     cmd = build_server_command(config)
 
     assert cmd == [
-        "mlx_lm.server",
+        "python",
+        "-m",
+        "mlx_lm",
+        "server",
         "--model",
         "test-model",
         "--port",
@@ -71,7 +74,10 @@ def test_build_server_command_all_parameters():
     cmd = build_server_command(config)
 
     expected = [
-        "mlx_lm.server",
+        "python",
+        "-m",
+        "mlx_lm",
+        "server",
         "--model",
         "mlx-community/Qwen3",
         "--port",

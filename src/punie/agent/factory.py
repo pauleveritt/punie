@@ -180,8 +180,8 @@ def create_server_model(config: "ServerConfig") -> Model:
     logger.info("Creating server model at %s", config.base_url)
 
     provider = OpenAIProvider(base_url=config.base_url)
-    # Model name is "default" for mlx_lm.server (it serves a single model)
-    return OpenAIChatModel("default", provider=provider)
+    # mlx_lm.server requires the actual model path in API requests
+    return OpenAIChatModel(config.model_path, provider=provider)
 
 
 def create_pydantic_agent(
