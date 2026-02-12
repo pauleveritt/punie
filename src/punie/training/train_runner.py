@@ -48,11 +48,13 @@ def build_train_command(config: LoRAConfig) -> list[str]:
         str(config.batch_size),
         "--learning-rate",
         str(config.learning_rate),
-        "--lora-layers",
+        "--num-layers",  # Number of layers to fine-tune
         str(config.lora_layers),
-        "--rank",  # LoRA rank (r parameter)
-        str(config.lora_rank),
     ]
+
+    # Note: LoRA rank must be set via config file, not command-line
+    # For now, mlx-lm uses default rank (typically 8)
+    # TODO: Implement config file support for custom rank
 
     return cmd
 
