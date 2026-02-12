@@ -144,15 +144,33 @@ async def run_command(
     Requests user permission before executing. Creates terminal, waits for
     completion, returns output.
 
+    Accepts either:
+    1. Separate command and args: command="grep", args=["-r", "pattern", "."]
+    2. Full command string: command="grep -r pattern ." (auto-split)
+
     Args:
         ctx: Run context with ACPDeps
-        command: Command to execute
-        args: Optional command arguments
+        command: Command to execute (or full command string to auto-split)
+        args: Optional command arguments (ignored if command contains spaces)
         cwd: Optional working directory
 
     Returns:
         Command output or denial message
     """
+    import shlex
+
+    # Auto-split if command contains spaces and no args provided
+    # This handles models that pass full command strings
+    if args is None and ' ' in command:
+        try:
+            parts = shlex.split(command)
+            if len(parts) > 1:
+                command = parts[0]
+                args = parts[1:]
+        except ValueError:
+            # shlex.split failed (unclosed quotes, etc.) - use as-is
+            pass
+
     tool_call_id = f"run_{command}"
 
     # Start tracking
