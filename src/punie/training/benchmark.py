@@ -78,18 +78,21 @@ async def run_training_benchmark(
         data_dir = temp_dir / "benchmark_data"
         create_dummy_dataset(data_dir, num_examples=5)
 
-    # Build training command
+    # Build training command (matches train_runner.py format)
     cmd = [
-        "mlx_lm.lora",
+        "python",
+        "-m",
+        "mlx_lm",
+        "lora",
         "--model",
         model_path,
+        "--train",
         "--data",
         str(data_dir),
         "--iters",
         str(num_iters),
         "--adapter-path",
         "/tmp/benchmark_adapter",  # Throw-away output
-        "--test",  # Run test split evaluation too
     ]
 
     # Run training and measure time
