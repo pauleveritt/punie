@@ -686,3 +686,166 @@ asyncio.run(main())
 - Include raw command output in experiment entries
 - Document any failures or unexpected behavior
 - Track dataset versions and adapter paths
+
+---
+
+## Phase 18: Deep Test and Parser Enhancement (2026-02-12)
+
+### Problem: Overnight Evaluation Failed with 0.0% Tool Calling
+
+**Root Cause Analysis:**
+1. Parser was deleted with MLX layer (commit a227ae9)
+2. No fallback to extract tool calls from text output
+3. 1.5B model outputs ```json code fences, not `<tool_call>` tags
+4. Parser only recognized `<tool_call>` tags
+
+### Solution: Multi-Format Parser Support
+
+**Enhanced parser to handle 4 formats:**
+1. JSON in `<tool_call>` tags (training template format)
+2. JSON in ` ```json ``` ` code fences (1.5B model format) - **NEW**
+3. XML format (legacy)
+4. Broken XML (missing opening tag)
+
+**Code added to `tool_call_parser.py`:**
+```python
+# Pattern 3: JSON in code fences (used by smaller models like 1.5B)
+fence_pattern = r"```json\s*\n(.*?)\n```"
+fence_matches = re.finditer(fence_pattern, text, re.DOTALL)
+```
+
+### Deep Testing Process
+
+**Test 1: Parser Standalone**
+- ✅ Extracts JSON in `<tool_call>` tags
+- ✅ Extracts JSON in code fences (new)
+- ✅ Extracts XML format
+- ✅ Handles multiple formats mixed in same text
+- **Result:** 17/17 parser tests pass
+
+**Test 2: Single Eval Prompt (30B Model)**
+- Input: "Read the file at src/punie/__init__.py"
+- Discovery: 30B uses PydanticAI structured calls (Method 1)
+- Text parser not needed for 30B
+- **Result:** Tool calls detected via structured parts
+
+**Test 3: Eval Runner Integration (30B Model)**
+- Minimal suite with 2 prompts
+- Overall score: 1.00 (perfect!)
+- **Result:** Pipeline works correctly
+
+**Test 4: 1.5B Model Format Detection**
+- Output: ```json code fences
+- Before fix: 0 tool calls detected
+- After fix: Tool calls detected via text parser (Method 2)
+- **Result:** Parser enhancement successful
+
+### Baseline Evaluation Results
+
+**Command:**
+```bash
+uv run punie eval --model mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
+uv run punie eval --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit --port 8766
+```
+
+**Results:**
+
+| Model | Overall | Success | Code Gen | Reasoning | Tool Call | Format | Size |
+|-------|---------|---------|----------|-----------|-----------|--------|------|
+| **Qwen2.5-1.5B** | **92.9%** | 7/7 | **100%** | **100%** | 83.3% | Code fences | 839 MB |
+| Qwen3-30B | 75.0% | 6/7 | 87.5% | 50.0% | 83.3% | Structured | 16 GB |
+
+**Surprising Discovery:** 1.5B model outperforms 30B overall!
+- Better at code generation (100% vs 87.5%)
+- Better at reasoning (100% vs 50.0%)
+- Same tool calling capability (83.3%)
+- 19x smaller (839 MB vs 16 GB)
+
+### Model Format Comparison
+
+**30B Model (Qwen3-Coder-30B-A3B-Instruct-4bit):**
+- Uses PydanticAI structured calls
+- Model output is tool call RESULT, not XML
+- Text parser fallback not needed
+- Example: Direct `read_file` call detected in message parts
+
+**1.5B Model (Qwen2.5-Coder-1.5B-Instruct-4bit):**
+- Outputs ```json code fences in text
+- Requires text parser fallback
+- Example:
+  ```json
+  {
+    "name": "read_file",
+    "arguments": {"path": "src/punie/__init__.py"}
+  }
+  ```
+
+### Verification
+
+**Files created:**
+- `test_tool_calling_deep.py` - Comprehensive deep test suite
+- `test_1.5b_tool_format.py` - Model format diagnostic tool
+- `docs/research/deep-test-findings.md` - Full analysis
+
+**Tests:**
+```bash
+uv run pytest tests/test_training_tool_call_parser.py -v  # 17 passed
+uv run python test_tool_calling_deep.py                    # All tests passed
+uv run python test_1.5b_tool_format.py                     # Confirmed code fence format
+```
+
+**Commits:**
+- `0630d98` - Restore tool call parser and fix training template format
+- `c60bdb8` - Add deep test suite for tool calling pipeline verification
+- *(next)* - Add code fence support and complete deep testing
+
+### Impact
+
+✅ **Pipeline Verified:**
+- Parser works for multiple formats
+- Eval runner uses correct fallback logic
+- Scores are accurate and trustworthy
+- HTML reports are reliable
+
+✅ **Baseline Established:**
+- 1.5B: 92.9% overall (recommended for training)
+- 30B: 75.0% overall (good for structured calls)
+- Both: 83.3% tool calling (identical capability)
+
+✅ **Ready for Training:**
+- Evaluation pipeline validated
+- Training templates aligned with parser
+- Model format differences understood
+- LoRA training can proceed with confidence
+
+### Recommendations
+
+1. **Use 1.5B model for LoRA training:**
+   - Higher baseline score (92.9% vs 75.0%)
+   - Much faster (839 MB vs 16 GB)
+   - Same tool calling capability
+   - Training will be faster and cheaper
+
+2. **Keep multi-format parser:**
+   - Different models use different formats
+   - Future-proof for new model releases
+   - Handles degraded output gracefully
+
+3. **Monitor fine-tuned output format:**
+   - Training templates use `<tool_call>` tags
+   - Fine-tuned models should match this format
+   - Use `test_1.5b_tool_format.py` to verify
+
+### Next Steps
+
+- [x] Restore parser
+- [x] Fix training template format
+- [x] Add code fence support
+- [x] Deep test all components
+- [x] Run baseline evaluations
+- [x] Document findings
+- [ ] Resume LoRA training with 1.5B model
+- [ ] Evaluate fine-tuned adapters
+- [ ] Compare fine-tuned vs base model scores
+
+**Status:** ✅ Evaluation pipeline production-ready. Ready to resume training.

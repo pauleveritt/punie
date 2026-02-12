@@ -197,3 +197,68 @@ def test_parse_tool_call_with_nested_json():
     assert len(calls) == 1
     assert calls[0]["name"] == "update_config"
     assert calls[0]["arguments"]["config"]["key2"]["nested"] is True
+
+
+def test_parse_json_code_fence():
+    """Parse JSON tool call in code fence (used by smaller models like 1.5B)."""
+    text = '''Let me read that file.
+
+```json
+{
+  "name": "read_file",
+  "arguments": {
+    "path": "src/main.py"
+  }
+}
+```'''
+    content, calls = parse_tool_calls(text)
+
+    assert "Let me read that file." in content
+    assert len(calls) == 1
+    assert calls[0]["name"] == "read_file"
+    assert calls[0]["arguments"]["path"] == "src/main.py"
+
+
+def test_parse_multiple_code_fences():
+    """Parse multiple JSON code fences."""
+    text = '''First, read the file:
+
+```json
+{
+  "name": "read_file",
+  "arguments": {"path": "test.py"}
+}
+```
+
+Then run the tests:
+
+```json
+{
+  "name": "run_command",
+  "arguments": {"command": "pytest"}
+}
+```'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 2
+    assert calls[0]["name"] == "read_file"
+    assert calls[1]["name"] == "run_command"
+
+
+def test_parse_mixed_formats():
+    """Parse both <tool_call> tags and code fences in same text."""
+    text = '''Using tags: <tool_call>{"name": "read_file", "arguments": {"path": "a.py"}}</tool_call>
+
+And code fence:
+
+```json
+{
+  "name": "write_file",
+  "arguments": {"path": "b.py", "content": "test"}
+}
+```'''
+    content, calls = parse_tool_calls(text)
+
+    assert len(calls) == 2
+    assert calls[0]["name"] == "read_file"
+    assert calls[1]["name"] == "write_file"

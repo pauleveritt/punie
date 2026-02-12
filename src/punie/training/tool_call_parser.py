@@ -4,9 +4,10 @@ This module extracts tool calls from model output text, supporting both
 JSON and XML formats commonly used by different language models.
 
 Supported formats:
-1. JSON: <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
-2. XML: <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
-3. Broken XML (missing opening tag): <function=name>...</function></tool_call>
+1. JSON in tags: <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
+2. JSON in code fence: ```json\n{"name": "function_name", "arguments": {...}}\n```
+3. XML: <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
+4. Broken XML (missing opening tag): <function=name>...</function></tool_call>
 """
 
 from __future__ import annotations
@@ -19,9 +20,10 @@ from typing import Any
 def parse_tool_calls(text: str) -> tuple[str, list[dict[str, Any]]]:
     """Extract tool calls from model output.
 
-    Supports two formats:
-    1. JSON: <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
-    2. XML: <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
+    Supports multiple formats:
+    1. JSON in tags: <tool_call>{"name": "function_name", "arguments": {...}}</tool_call>
+    2. JSON in code fence: ```json\n{"name": "function_name", "arguments": {...}}\n```
+    3. XML: <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
 
     Args:
         text: Model output possibly containing tool call blocks
@@ -80,6 +82,27 @@ def parse_tool_calls(text: str) -> tuple[str, list[dict[str, Any]]]:
         if xml_call:
             calls.append(xml_call)
             patterns_to_remove.append((start, end))
+
+    # Pattern 3: JSON in code fences (used by smaller models like 1.5B)
+    # Format: ```json\n{"name": "function_name", "arguments": {...}}\n```
+    fence_pattern = r"```json\s*\n(.*?)\n```"
+    fence_matches = re.finditer(fence_pattern, text, re.DOTALL)
+
+    for match in fence_matches:
+        # Check for overlaps
+        start, end = match.start(), match.end()
+        overlaps = any(s <= start < e or s < end <= e for s, e in patterns_to_remove)
+        if overlaps:
+            continue
+
+        json_content = match.group(1).strip()
+        try:
+            call = json.loads(json_content)
+            if "name" in call:
+                calls.append(call)
+                patterns_to_remove.append((start, end))
+        except json.JSONDecodeError:
+            pass
 
     # Remove matched patterns from text (in reverse order to preserve indices)
     patterns_to_remove.sort(reverse=True)
