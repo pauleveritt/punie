@@ -188,7 +188,11 @@ async def generate_training_example(
 
     try:
         start = time.perf_counter()
-        result = await agent.run(query, deps=deps)
+        # Add 90 second timeout to prevent hanging on stuck queries
+        result = await asyncio.wait_for(
+            agent.run(query, deps=deps),
+            timeout=90.0
+        )
         elapsed = time.perf_counter() - start
 
         # Extract tool calls
@@ -228,6 +232,9 @@ async def generate_training_example(
 
         return example
 
+    except asyncio.TimeoutError:
+        print(f"⏱️  Timeout (90s) generating example for '{query}'")
+        return None
     except Exception as e:
         print(f"❌ Failed to generate example for '{query}': {e}")
         return None
@@ -361,7 +368,7 @@ async def main():
     await generate_dataset(
         output_file=output_file,
         target_count=100,  # Start with 100 for quick MVP
-        batch_size=5,  # 5 concurrent queries
+        batch_size=2,  # 2 concurrent queries (reduced to avoid hangs)
     )
 
 

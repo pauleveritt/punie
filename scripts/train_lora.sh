@@ -85,7 +85,7 @@ uv run python -m mlx_lm.lora \
     --iters "$TOTAL_ITERATIONS" \
     --batch-size "$BATCH_SIZE" \
     --learning-rate "$LEARNING_RATE" \
-    --lora-layers 16 \
+    --num-layers 16 \
     --adapter-path "$OUTPUT_DIR/adapters" \
     --save-every 100 \
     --val-batches 5 \
