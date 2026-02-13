@@ -2,19 +2,20 @@
 
 **Purpose:** Track model size, memory usage, and performance improvements across training phases.
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 13, 2026 - Phase 1 Complete
 
 ---
 
-## Current Baseline (Phase 0)
+## Quick Reference Table - All Phases
 
-### Quick Reference Table
+| System | Model Size | Memory (Inference) | Speed | Autonomous Tools? | Accuracy | Status |
+|--------|------------|-------------------|-------|-------------------|----------|--------|
+| **Claude Code** | 0 (cloud) | 0 GB local | **2.41s** ⚡ | ✅ Yes | 100% | Baseline |
+| **30B Baseline** | ~60 GB | ~16 GB | **~27s** | ✅ Yes | 100% | Too slow |
+| **7B Phase 0** | 14 GB + 44MB adapter | ~6-8 GB | **21.06s** | ❌ No (memorized) | 100% | Broken |
+| **7B Phase 1** | 14 GB + 44MB adapter | Unknown | **N/A** (infinite loop) | ✅ **Yes!** (but loops) | N/A (no answer) | Progress! |
 
-| System | Model Size | Memory (Inference) | Speed | Autonomous Tools? | Accuracy |
-|--------|------------|-------------------|-------|-------------------|----------|
-| **Claude Code** | 0 (cloud) | 0 GB local | **2.41s** ⚡ | ✅ Yes | 100% |
-| **7B Distilled** | 14 GB + 44MB adapter | ~6-8 GB | **21.06s** | ❌ No (memorized) | 100% |
-| **30B Baseline** | ~60 GB | ~16 GB | **~27s** | ✅ Yes | 100% |
+### Phase 0 Baseline (Original Training)
 
 ### Detailed Metrics
 
