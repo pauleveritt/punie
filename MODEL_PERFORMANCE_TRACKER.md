@@ -84,10 +84,11 @@
 
 ---
 
-## Phase 1: Training Data Pipeline Fix (In Progress)
+## Phase 1: Training Data Pipeline Fix ✅ COMPLETED (With Issues)
 
 **Date:** February 13, 2026
 **Goal:** Fix critical tool-call format mismatch and prepare for proper tool-calling training
+**Status:** Training successful, but discovered new critical bug
 
 ### Changes Made
 
@@ -103,30 +104,123 @@
 
 3. **Wired stop_sequences:**
    - Local agents default to QWEN_STOP_SEQUENCES
-   - Should prevent garbage token generation
-   - Expected 30% speedup
+   - Added to config and factory
+   - (Results: NOT working - still generating garbage tokens)
 
-4. **Reduced memory requirements:**
-   - Batch size: 4 → 2
-   - Expected peak: ~12-14 GB (down from 23 GB)
-   - Should fit on 16GB Mac without swap
+4. **Memory requirements:**
+   - Had to use batch_size=1 (not 2) to avoid OOM
+   - Actual peak: 18.902 GB
+   - batch_size=2 crashed with "Insufficient Memory" error
 
-### Expected Improvements
+### Actual Results
 
-| Metric | Phase 0 | Phase 1 Target | Improvement |
-|--------|---------|----------------|-------------|
-| Training peak memory | 23.63 GB | ~12-14 GB | -40% |
-| Inference speed | 21.06s | ~15s | +30% (stop tokens) |
-| Tool-call format | Broken | Fixed | ✅ |
-| Converter in pipeline | Missing | Added | ✅ |
+| Metric | Phase 0 | Phase 1 Actual | Change | Status |
+|--------|---------|----------------|--------|--------|
+| Training loss | 1.269 → 0.246 | 1.077 → 0.096 | Better (91% vs 81%) | ✅ Improved |
+| Training peak memory | 23.63 GB | 18.902 GB | -20% (not -40%) | ⚠️ Less than expected |
+| Batch size | 4 | 1 (not 2!) | -75% | ❌ Slower training |
+| Training iterations | 50 | 206 | 4x more | ⚠️ Took longer |
+| **Autonomous tools?** | ❌ No (memorized) | ✅ **YES!** | Fixed! | 🎉 **BREAKTHROUGH** |
+| Tool execution | Direct answer | 20+ tool calls | Works but loops | ⚠️ New bug |
+| Stop sequences | N/A | Not working | No improvement | ❌ Failed |
 
-### Next Steps
+### 🎉 BREAKTHROUGH: Model Uses Tools!
 
-1. Re-run training with fixed pipeline
-2. Measure actual memory usage
-3. Test inference speed with stop sequences
-4. Verify tool-call format is preserved
-5. Update this tracker with results
+**Phase 0 behavior (broken):**
+```
+User: "Which classes subclass from Protocol?"
+Model: "Found 6 protocols: HttpAppFactory, Client, Agent..." [Direct answer - memorized]
+```
+
+**Phase 1 behavior (fixed but looping):**
+```
+User: "Which classes subclass from Protocol?"
+Model: run_command(grep -r 'class.*Protocol' .)
+Model: run_command(grep -r 'class.*Protocol' .)  [Repeats 20+ times]
+Model: run_command({})  [Empty args]
+Model: [Never gives final answer - stuck in loop]
+```
+
+### Critical Issues Discovered
+
+1. **✅ FIXED: Memorization → Tool Usage**
+   - Model now calls tools instead of memorizing
+   - Uses appropriate commands (`find`, `grep`)
+   - Correctly formatted tool calls with `"name"` key
+
+2. **❌ NEW BUG: Infinite Tool Loop**
+   - Model calls same tool 20+ times
+   - Doesn't process tool results
+   - Never stops to give final answer
+   - Some calls have empty arguments `{}`
+
+3. **❌ Stop Sequences Don't Work**
+   - Still generating `<|im_end|>` garbage tokens
+   - No speedup observed
+   - Need to investigate why stop_sequences aren't being applied
+
+4. **❌ Memory Higher Than Expected**
+   - Needed batch_size=1 instead of 2
+   - Peak 18.9 GB instead of target 12-14 GB
+   - 7B model + training might need more optimization
+
+### Root Cause Analysis
+
+**Why infinite loop?**
+
+The training data uses **placeholder tool results**:
+```
+Tool result: [Tool execution completed]
+```
+
+The model learned:
+1. ✅ When to call tools
+2. ✅ How to format tool calls
+3. ❌ How to interpret results
+4. ❌ When to stop and give answer
+
+**Evidence:** Converter warning we ignored:
+```
+⚠️  Note: Current data uses placeholder tool results.
+   Run generate_training_data.py with updated capture logic for real results.
+```
+
+### Training Details
+
+**Configuration:**
+- Model: Qwen2.5-Coder-7B-Instruct-4bit
+- Batch size: 1 (down from planned 2)
+- Learning rate: 1e-4
+- LoRA rank: 16
+- Iterations: 206 (up from 50)
+- Training time: ~20 minutes
+
+**Loss Progression:**
+- Train loss: 1.077 → 0.096 (91% reduction)
+- Val loss: 2.267 → 0.436 (81% reduction)
+- Test loss: 0.899, Test ppl: 2.458
+
+**Memory:**
+- Peak: 18.902 GB
+- Training tokens: 117,940
+
+### Next Steps (Phase 2)
+
+**Fix the infinite loop:**
+1. Generate training data with REAL tool results (not placeholders)
+2. Update `generate_training_data.py` to capture actual outputs
+3. Train model to recognize when tools have provided sufficient info
+4. Add examples of "now I have enough info, here's the answer" pattern
+
+**Fix stop sequences:**
+5. Debug why QWEN_STOP_SEQUENCES aren't being applied
+6. Verify they're passed to model inference correctly
+7. Test with simple example to confirm they work
+
+**Optimize memory:**
+8. Investigate why batch_size=2 causes OOM
+9. Try reducing sequence length or other parameters
+10. Consider using 3-bit quantization
 
 ---
 
