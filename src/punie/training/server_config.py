@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+# Default stop sequences for Qwen models to prevent garbage token generation
+QWEN_STOP_SEQUENCES = ("<|im_end|>", "<|endoftext|>")
+
 
 @dataclass(frozen=True)
 class ServerConfig:
@@ -17,6 +20,7 @@ class ServerConfig:
     adapter_path: str | None = None  # LoRA adapter directory (None = base model)
     max_kv_size: int | None = None  # KV cache limit (memory vs. context tradeoff)
     repetition_penalty: float | None = None  # Inference-time repetition penalty
+    stop_sequences: tuple[str, ...] | None = None  # Stop tokens to prevent garbage output
 
     @property
     def base_url(self) -> str:

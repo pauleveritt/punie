@@ -35,7 +35,7 @@ def test_lora_config_defaults():
     assert config.data_directory == Path("/data")
     assert config.output_directory == Path("/output")
     assert config.num_iters == 100
-    assert config.batch_size == 4
+    assert config.batch_size == 2  # Reduced from 4 to control memory usage
     assert config.learning_rate == 1e-5
     assert config.lora_rank == 8
     assert config.lora_layers == 16
@@ -87,7 +87,7 @@ def test_build_train_command_minimal():
         "--iters",
         "100",
         "--batch-size",
-        "4",
+        "2",  # Reduced from 4 to control memory usage
         "--learning-rate",
         "1e-05",
         "--num-layers",

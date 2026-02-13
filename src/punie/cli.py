@@ -805,7 +805,7 @@ def train(
         help="Number of training iterations",
     ),
     batch_size: int = typer.Option(
-        4,
+        2,
         "--batch-size",
         "-b",
         help="Training batch size",

@@ -51,6 +51,19 @@ def test_agent_config_custom_values():
     assert config.validate_python_syntax is True
 
 
+def test_agent_config_stop_sequences_default():
+    """AgentConfig should default to None for stop_sequences."""
+    config = AgentConfig()
+    assert config.stop_sequences is None
+
+
+def test_agent_config_stop_sequences_custom():
+    """AgentConfig should accept custom stop_sequences."""
+    stop_seqs = ("<|im_end|>", "<|endoftext|>")
+    config = AgentConfig(stop_sequences=stop_seqs)
+    assert config.stop_sequences == stop_seqs
+
+
 def test_factory_uses_config_instructions():
     """Factory should use config instructions when provided."""
     custom_instructions = "Test instructions"

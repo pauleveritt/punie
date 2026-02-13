@@ -1,6 +1,6 @@
 """Tests for server configuration dataclass."""
 
-from punie.training.server_config import ServerConfig
+from punie.training.server_config import QWEN_STOP_SEQUENCES, ServerConfig
 
 
 def test_server_config_frozen():
@@ -22,6 +22,7 @@ def test_server_config_defaults():
     assert config.adapter_path is None
     assert config.max_kv_size is None
     assert config.repetition_penalty is None
+    assert config.stop_sequences is None
 
 
 def test_server_config_base_url():
@@ -63,6 +64,15 @@ def test_server_config_with_repetition_penalty():
     assert config.repetition_penalty == 1.1
 
 
+def test_server_config_stop_sequences():
+    """ServerConfig can specify stop_sequences."""
+    config = ServerConfig(
+        model_path="test-model",
+        stop_sequences=QWEN_STOP_SEQUENCES,
+    )
+    assert config.stop_sequences == QWEN_STOP_SEQUENCES
+
+
 def test_server_config_all_parameters():
     """ServerConfig with all parameters specified."""
     config = ServerConfig(
@@ -72,6 +82,7 @@ def test_server_config_all_parameters():
         adapter_path="/adapters/step-a",
         max_kv_size=8192,
         repetition_penalty=1.2,
+        stop_sequences=QWEN_STOP_SEQUENCES,
     )
     assert config.model_path == "mlx-community/Qwen3-Coder-30B"
     assert config.port == 9000
@@ -79,4 +90,5 @@ def test_server_config_all_parameters():
     assert config.adapter_path == "/adapters/step-a"
     assert config.max_kv_size == 8192
     assert config.repetition_penalty == 1.2
+    assert config.stop_sequences == QWEN_STOP_SEQUENCES
     assert config.base_url == "http://192.168.1.1:9000/v1"

@@ -20,7 +20,7 @@ echo ""
 MODEL="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
 TRAINING_DATA="data/training_examples_1k.jsonl"
 OUTPUT_DIR="models/qwen25-7b-distilled"
-BATCH_SIZE=4
+BATCH_SIZE=2
 LEARNING_RATE=1e-4
 LORA_RANK=16
 EPOCHS=3

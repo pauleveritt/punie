@@ -236,6 +236,10 @@ def create_pydantic_agent(
         "max_tokens": config.max_tokens,
     }
 
+    # Add stop_sequences if provided
+    if config.stop_sequences is not None:
+        model_settings_dict["stop"] = config.stop_sequences
+
     agent = Agent[ACPDeps, str](
         model,
         deps_type=ACPDeps,

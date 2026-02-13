@@ -24,9 +24,10 @@ class TrainingExample:
 
     query: str
     reasoning: str  # Why tools are needed
-    tool_calls: list[dict]  # Tool name + args
+    tool_calls: list[dict]  # Tool name + args + results
     answer: str
-    metadata: dict  # Category, difficulty, etc.
+    messages: list[dict] | None = None  # Full conversation trace
+    metadata: dict | None = None  # Category, difficulty, etc.
 
 
 # Query templates for diverse training data
@@ -195,17 +196,34 @@ async def generate_training_example(
         )
         elapsed = time.perf_counter() - start
 
-        # Extract tool calls
+        # Extract full conversation trace with tool calls AND results
         tool_calls = []
+        messages = []
+
         if result.all_messages():
             for msg in result.all_messages():
+                # Store message for full trace
+                msg_dict = {
+                    "role": getattr(msg, "role", "unknown"),
+                    "content": getattr(msg, "content", ""),
+                }
+
+                # Extract tool calls and results
                 if hasattr(msg, "parts"):
                     for part in msg.parts:
                         if hasattr(part, "tool_name"):
+                            # Tool call
                             tool_calls.append({
                                 "tool": part.tool_name,
                                 "args": getattr(part, "args", {}),
+                                "result": None,  # Will be filled by next message
                             })
+                        elif hasattr(part, "content") and tool_calls:
+                            # Tool result (follows tool call)
+                            if tool_calls[-1]["result"] is None:
+                                tool_calls[-1]["result"] = part.content
+
+                messages.append(msg_dict)
 
         # Determine reasoning
         if category == "negative_examples":
@@ -221,6 +239,7 @@ async def generate_training_example(
             reasoning=reasoning,
             tool_calls=tool_calls,
             answer=result.output,
+            messages=messages,
             metadata={
                 **metadata,
                 "category": category,
@@ -356,6 +375,7 @@ def save_examples(examples: list[TrainingExample], output_file: Path) -> None:
                 "reasoning": ex.reasoning,
                 "tool_calls": ex.tool_calls,
                 "answer": ex.answer,
+                "messages": ex.messages,  # Include full conversation trace
                 "metadata": ex.metadata,
             }
             f.write(json.dumps(data) + "\n")

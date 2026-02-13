@@ -71,3 +71,4 @@ class AgentConfig:
     retries: int = 3
     output_retries: int = 2
     validate_python_syntax: bool = False  # off by default (ACP mode)
+    stop_sequences: tuple[str, ...] | None = None  # Stop tokens to prevent garbage output
