@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Testing results for 1.5B and 30B models on autonomous tool use, with comparison matrix and findings.
+---
+
 # Model Testing Results: Path to Production-Ready Agent
+
+*2026-02-12*
+
 
 **Date:** February 12, 2026
 **Goal:** Find a small, Python-focused model that autonomously uses tools

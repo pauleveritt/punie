@@ -1,8 +1,16 @@
+---
+date: 2026-02-13
+summary: Tracker of model size, memory, speed, tool use, and accuracy across phases with key findings.
+---
+
 # Model Performance Tracker
+
+*2026-02-13*
+
 
 **Purpose:** Track model size, memory usage, and performance improvements across training phases.
 
-**Last Updated:** February 13, 2026 - Phase 1 Complete
+**Last Updated:** February 13, 2026 - Phase 2 Discovery
 
 ---
 
@@ -225,9 +233,128 @@ The model learned:
 
 ---
 
+## Phase 2: Fix Infinite Loop with Real Tool Results ❌ FAILED (Critical Discovery)
+
+**Date:** February 13, 2026
+**Goal:** Train on examples with real tool results to fix infinite loop
+**Status:** Failed - discovered fundamental format mismatch
+
+### Changes Attempted
+
+**Step 1: Hand-Authored Examples (Failed)**
+1. Tried merging 30 hand-authored examples (with real tool results)
+2. Used `{messages}` format instead of `{text}` format
+3. Trained for 130 iterations with batch_size=1
+4. Training succeeded (val loss: 3.095 → 0.721)
+5. **Result: Model completely broken**
+
+### Critical Discovery: Format Mismatch
+
+**The hand-authored examples use MARKDOWN-formatted tool calls:**
+```json
+{
+  "role": "assistant",
+  "content": "I'll use the run_command tool.\n\n```json\n{\"name\": \"run_command\", ...}\n```"
+}
+```
+
+**This teaches the model to GENERATE markdown text, not USE the function calling API!**
+
+**Phase 2 behavior (worse than Phase 1):**
+```
+User: "What is Python?"
+Model: <hallucinates fake conversation>
+  I'll use the run_command tool...
+  <|im_start|>user
+  Tool result: Running main...
+  <|im_start|>assistant
+  The file runs successfully...
+  [Repeats infinitely - pure hallucination]
+```
+
+The model learned to:
+- ❌ Generate fake tool calls as text
+- ❌ Generate fake tool results as text
+- ❌ Generate fake conversation structure
+- ❌ Never actually call the function calling API
+- ❌ Loop infinitely in this hallucinated conversation
+
+### Root Cause
+
+1. **Phase 1** used `{text: ...}` format with Qwen tokens → model learned to CALL tools via API
+2. **Phase 2** used `{messages}` format with markdown → model learned to TALK ABOUT tools as text
+3. The hand-authored examples were written for HUMAN demonstration, not model training
+4. They teach markdown generation, not structured API usage
+
+### Format Comparison
+
+| Format | Phase | Tool Behavior | Result |
+|--------|-------|---------------|--------|
+| `{text}` + Qwen tokens | Phase 1 | ✅ Calls tools via API | Loops but calls real tools |
+| `{messages}` + markdown | Phase 2 | ❌ Generates markdown text | Hallucinates fake conversation |
+
+### Recovery Plan
+
+**Abandoned Approach:**
+- ❌ Hand-authored examples with markdown tool calls
+- ❌ `{messages}` format
+
+**Correct Approach:**
+- ✅ Keep `{text}` format with Qwen tokens (worked in Phase 1)
+- ✅ Fix `generate_training_data.py` to capture real tool results
+- ✅ Use generated examples WITH real results (not placeholder)
+- ✅ Regenerate training data from 30B server with fixed generator
+
+### Training Metrics (Before Failure Discovered)
+
+**Configuration:**
+- Model: Qwen2.5-Coder-7B-Instruct-4bit
+- Batch size: 1
+- Learning rate: 1e-4
+- Iterations: 130
+- Dataset: 40 train + 5 valid (45 total)
+
+**Loss Progression:**
+- Train loss: 1.283 → 0.141 (89% reduction)
+- Val loss: 3.095 → 0.721 (77% reduction)
+- Test loss: 2.455, Test ppl: 11.648
+
+**Memory:**
+- Peak: 7.285 GB (excellent - much better than Phase 1's 18.9 GB!)
+
+### Lessons Learned
+
+1. **Training data format matters critically**
+   - Markdown tool calls → teaches text generation
+   - Structured API format → teaches function calling
+
+2. **Human-readable ≠ Machine-learnable**
+   - Examples for docs/demos aren't suitable for training
+   - Need examples that match the actual API structure
+
+3. **The `{text}` format works**
+   - Phase 1 showed model CAN learn to call tools with this format
+   - Just need real results, not placeholders
+
+4. **Memory is NOT the bottleneck**
+   - Phase 2 used only 7.3 GB (vs Phase 1's 18.9 GB)
+   - Batch size and sequence length matter more than model size
+
+### Next Steps (Phase 2B)
+
+**Fix the generator (lines 212-224 in `generate_training_data.py`):**
+1. Bug: `hasattr(part, "tool_name")` matches both ToolCallPart AND ToolReturnPart
+2. Fix: Use `part_kind` discriminator to distinguish them
+3. Capture real tool results from `ToolReturnPart.content`
+4. Regenerate training data with 30B server
+5. Convert to `{text}` format (not `{messages}`)
+6. Retrain and verify infinite loop is fixed
+
+---
+
 ## Future Phases (Planned)
 
-### Phase 2: Scale Up Training Data (TODO)
+### Phase 3: Scale Up Training Data (TODO)
 - **Goal:** Generate 1,000+ examples from 10+ diverse codebases
 - **Target:** Achieve autonomous tool use (not memorization)
 - **Expected:** Slower than Claude, but works on new codebases

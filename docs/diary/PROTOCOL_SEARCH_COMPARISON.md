@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Comparison of protocol search results between a 1.5B model and Claude Code, highlighting tool-use differences.
+---
+
 # Protocol Subclass Search: 1.5B Model vs Claude Code
+
+*2026-02-12*
+
 
 **Question:** "Which classes in this codebase subclass from Protocol?"
 

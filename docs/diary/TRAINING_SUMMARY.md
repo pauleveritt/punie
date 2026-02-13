@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Deep testing summary showing base model outperforms fine-tuned adapters and key evaluation outcomes.
+---
+
 # Training Summary: Deep Testing Phase Complete
+
+*2026-02-12*
+
 
 **Date:** February 12, 2026
 **Branch:** local-model-training

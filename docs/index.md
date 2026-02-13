@@ -51,7 +51,9 @@ research/evolution
 research/architecture
 research/acp-sdk
 research/pydantic-ai
+diary/index
 ```
+
 
 ## Indices and tables
 

@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: End-to-end workflow for distilling 30B tool-use into 7B, covering phases, scripts, and monitoring steps.
+---
+
 # Knowledge Distillation Workflow: 30B → 7B
+
+*2026-02-12*
+
 
 **Complete end-to-end guide for training a 7B model with 30B-level autonomous reasoning**
 

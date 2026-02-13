@@ -393,7 +393,7 @@ async def main():
 
     await generate_dataset(
         output_file=output_file,
-        target_count=10,  # Test with 20 first
+        target_count=20,  # Test with 20 first
         batch_size=1,  # 1 at a time for 30B (too slow for parallel)
     )
 

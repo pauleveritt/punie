@@ -1,4 +1,12 @@
+---
+date: 2026-02-13
+summary: Summary of the 30B-to-7B distillation experiment, results, limitations, and lessons learned.
+---
+
 # Knowledge Distillation Experiment: 30B → 7B
+
+*2026-02-13*
+
 
 **Date:** February 12-13, 2026
 **Status:** ✅ Complete

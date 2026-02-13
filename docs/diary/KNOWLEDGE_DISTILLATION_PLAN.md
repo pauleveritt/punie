@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Detailed plan for distilling 30B reasoning into 7B, including dataset requirements, phases, and strategy.
+---
+
 # Knowledge Distillation Plan: 30B → 7B
+
+*2026-02-12*
+
 
 **Goal:** Train a 7B model to have 30B-level autonomous reasoning
 **Platform:** M1 Mac, 32GB RAM

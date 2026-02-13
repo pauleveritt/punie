@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Benchmark comparison of protocol search between Claude Code and a 30B model, showing Claude is faster and lighter with equal accuracy.
+---
+
 # Protocol Search Benchmark: Claude Code vs 30B
+
+*2026-02-12*
+
 
 **Date:** 2026-02-12
 **Query:** "What classes in this codebase implement a protocol?"

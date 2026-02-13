@@ -1,4 +1,12 @@
+---
+date: 2026-02-12
+summary: Checklist and instructions for running prepared experiments, with RAM requirements and expected outputs.
+---
+
 # Experiments Ready to Run! 🚀
+
+*2026-02-12*
+
 
 **Status:** Scripts prepared, waiting for you to return
 **Time:** Will take ~20-30 minutes total
