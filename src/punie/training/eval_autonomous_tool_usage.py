@@ -202,7 +202,7 @@ from punie.training.eval_runner import run_evaluation, EvalRunConfig
 from punie.training.server_config import ServerConfig
 
 # Create suite
-suite = create_autonomous_tool_usage()
+suite = create_autonomous_tool_suite()
 
 # Run evaluation
 config = EvalRunConfig(

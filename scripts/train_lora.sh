@@ -46,6 +46,20 @@ if [ "$EXAMPLE_COUNT" -lt 50 ]; then
     fi
 fi
 
+# Convert training data to MLX format
+echo ""
+echo "Converting training data to MLX format..."
+python3 scripts/convert_training_data.py
+if [ $? -ne 0 ]; then
+    echo "❌ Error: Failed to convert training data"
+    exit 1
+fi
+
+# Update training data path to use converted format
+TRAINING_DATA="data/mlx_format"
+echo "✅ Training data converted to $TRAINING_DATA"
+echo ""
+
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 

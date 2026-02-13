@@ -117,6 +117,16 @@ else
     exit 1
 fi
 
+# Convert training data to MLX format
+echo ""
+echo "Converting training data to MLX format..."
+if python3 scripts/convert_training_data.py; then
+    echo "✅ Training data converted to data/mlx_format"
+else
+    echo "❌ Failed to convert training data"
+    exit 1
+fi
+
 echo ""
 echo "========================================================================"
 echo "PHASE 2: LoRA Fine-Tuning"
@@ -130,7 +140,7 @@ echo ""
 
 # Training configuration
 MODEL="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
-TRAINING_DATA="data/training_examples_1k.jsonl"
+TRAINING_DATA="data/mlx_format"
 OUTPUT_DIR="models/qwen25-7b-distilled"
 BATCH_SIZE=2
 LEARNING_RATE=1e-4

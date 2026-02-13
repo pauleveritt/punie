@@ -281,7 +281,8 @@ def create_local_agent(
                Can use "test" for enhanced TestModel or any other model.
         workspace: Root directory for file operations. Defaults to current directory.
         config: Optional AgentConfig. If None, defaults to local-mode config with
-                PUNIE_LOCAL_INSTRUCTIONS and validate_python_syntax=True.
+                PUNIE_LOCAL_INSTRUCTIONS, validate_python_syntax=True, and
+                QWEN_STOP_SEQUENCES (since local mode always uses Qwen models).
         perf_collector: Optional PerformanceCollector for timing measurements.
 
     Returns:
@@ -289,11 +290,13 @@ def create_local_agent(
         ACPDeps(client_conn=client, session_id=..., tracker=...)
     """
     from punie.local import LocalClient
+    from punie.training.server_config import QWEN_STOP_SEQUENCES
 
     if config is None:
         config = AgentConfig(
             instructions=PUNIE_LOCAL_INSTRUCTIONS,
             validate_python_syntax=True,
+            stop_sequences=QWEN_STOP_SEQUENCES,
         )
 
     workspace = workspace or Path.cwd()

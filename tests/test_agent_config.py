@@ -64,6 +64,19 @@ def test_agent_config_stop_sequences_custom():
     assert config.stop_sequences == stop_seqs
 
 
+def test_factory_stop_sequences_flow_through():
+    """Factory should wire stop_sequences into ModelSettings.stop."""
+    stop_seqs = ("<|im_end|>", "<|endoftext|>")
+    config = AgentConfig(stop_sequences=stop_seqs)
+    agent = create_pydantic_agent(model="test", config=config)
+
+    # Verify the agent was created and has the stop sequences in model_settings
+    assert agent is not None
+    assert agent.model_settings is not None
+    # model_settings is a dict with the stop parameter
+    assert agent.model_settings.get("stop") == stop_seqs
+
+
 def test_factory_uses_config_instructions():
     """Factory should use config instructions when provided."""
     custom_instructions = "Test instructions"
@@ -128,6 +141,19 @@ def test_create_local_agent_uses_local_instructions():
     # Agent and client should be created successfully
     assert agent is not None
     assert client is not None
+
+
+def test_create_local_agent_defaults_stop_sequences():
+    """create_local_agent should default to QWEN_STOP_SEQUENCES."""
+    from punie.training.server_config import QWEN_STOP_SEQUENCES
+
+    agent, client = create_local_agent(model="test", workspace=Path.cwd())
+
+    # Verify QWEN_STOP_SEQUENCES is wired into model_settings
+    assert agent is not None
+    assert agent.model_settings is not None
+    # model_settings is a dict with the stop parameter
+    assert agent.model_settings.get("stop") == QWEN_STOP_SEQUENCES
 
 
 def test_resolve_mode_default_is_acp(monkeypatch):

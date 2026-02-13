@@ -23,21 +23,3 @@ def test_local_spec_parsing():
     spec = _parse_local_spec("http://localhost:8080/v1/custom")
     assert spec.base_url == "http://localhost:8080/v1"
     assert spec.model_name == "custom"
-
-
-def test_error_handling_preserves_non_local_errors():
-    """Non-local model errors should propagate normally."""
-    # This is tested by the adapter code - if model string doesn't contain "local",
-    # the exception is re-raised. This test documents the behavior.
-    pass
-
-
-def test_error_message_mentions_lm_studio():
-    """Error message should guide users to LM Studio."""
-    # The error message in adapter.py includes:
-    # - "Local model server not available"
-    # - LM Studio installation link
-    # - mlx-lm.server instructions
-    # - Fallback suggestions
-    # This is verified by code inspection in adapter.py lines 263-289
-    pass

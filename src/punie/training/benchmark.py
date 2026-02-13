@@ -3,6 +3,7 @@
 import asyncio
 import json
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -92,7 +93,7 @@ async def run_training_benchmark(
         "--iters",
         str(num_iters),
         "--adapter-path",
-        "/tmp/benchmark_adapter",  # Throw-away output
+        tempfile.mkdtemp(),  # Throw-away output (auto-cleaned by OS)
     ]
 
     # Run training and measure time

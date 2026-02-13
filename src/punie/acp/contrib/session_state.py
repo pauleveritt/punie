@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from .tool_calls import _copy_model_list
 from ..schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -37,12 +38,6 @@ class SessionSnapshotUnavailableError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("SessionAccumulator has not processed any notifications yet")
-
-
-def _copy_model_list(items: Sequence[Any] | None) -> list[Any] | None:
-    if items is None:
-        return None
-    return [item.model_copy(deep=True) for item in items]
 
 
 class _MutableToolCallState:

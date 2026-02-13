@@ -15,6 +15,10 @@ def build_server_command(config: ServerConfig) -> list[str]:
     """Build the mlx_lm.server command with all arguments.
 
     Pure function - easily tested without launching a server.
+
+    Note: config.stop_sequences is NOT added as a CLI flag because mlx_lm.server
+    handles stop sequences at the API request level (per-request via the "stop"
+    parameter in chat completion requests), not as server-level configuration.
     """
     cmd = [
         "python",

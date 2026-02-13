@@ -1175,10 +1175,10 @@ def dataset_filter(
         dataset = read_dataset(input_dir)
         typer.echo(f"📊 Input: {len(dataset.train) + len(dataset.valid) + len(dataset.test)} examples\n")
 
-        # Track statistics
-        train_kept, train_removed = dataset.train, ()
-        valid_kept, valid_removed = dataset.valid, ()
-        test_kept, test_removed = dataset.test, ()
+        # Initialize kept sets (filters will update these)
+        train_kept = dataset.train
+        valid_kept = dataset.valid
+        test_kept = dataset.test
 
         # Apply filters
         if language:

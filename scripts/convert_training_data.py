@@ -30,7 +30,8 @@ def format_tool_call(tool_name: str, tool_args: str | dict) -> str:
         args_dict = tool_args or {}
 
     # Format as markdown code fence (matches hand-authored examples)
-    tool_json = json.dumps({"tool": tool_name, "arguments": args_dict}, indent=2)
+    # Use "name" key to match tool_call_parser.py expectations (line 51)
+    tool_json = json.dumps({"name": tool_name, "arguments": args_dict}, indent=2)
     return f"I'll use the {tool_name} tool.\n\n```json\n{tool_json}\n```"
 
 
@@ -72,7 +73,8 @@ You are Punie, an AI coding assistant that helps with Python development via PyC
 
     # Add each tool call and its result (if available)
     for i, tool_call in enumerate(tool_calls):
-        tool_name = tool_call.get("tool", "")
+        # Handle both "name" (correct) and "tool" (legacy) keys for input data
+        tool_name = tool_call.get("name", tool_call.get("tool", ""))
         tool_args = tool_call.get("args", {})
 
         # Format tool call
