@@ -64,6 +64,19 @@ QUERY_TEMPLATES = {
         "Show me all {pattern} in {directory}",
         "What {pattern} exist in {directory}?",
     ],
+    "web_frontend": [
+        "Find all {html_element} elements in {web_directory}",
+        "List all CSS classes used in {web_directory}",
+        "What JavaScript functions are defined in {js_file}?",
+        "Find all React components in {web_directory}",
+        "Show me all CSS files that use {css_property}",
+    ],
+    "web_backend": [
+        "What routes are defined in {web_file}?",
+        "List all HTTP endpoints in {directory}",
+        "Find all template files in {directory}",
+        "What API endpoints exist in the codebase?",
+    ],
     "negative_examples": [
         "What is {num1} × {num2}?",
         "What are Python type hints?",
@@ -84,6 +97,12 @@ SUBSTITUTIONS = {
     "decorator": ["dataclass", "pytest.fixture", "contextmanager"],
     "num1": ["25", "17", "42"],
     "num2": ["4", "3", "7"],
+    # Web-related substitutions
+    "html_element": ["div", "button", "form", "input", "a"],
+    "web_directory": ["templates/", "static/", "frontend/", "public/"],
+    "js_file": ["app.js", "main.js", "index.js"],
+    "css_property": ["flex", "grid", "color", "margin"],
+    "web_file": ["app.py", "routes.py", "views.py", "server.py"],
 }
 
 
