@@ -24,6 +24,9 @@ _build
 adapters/
 data/downloaded/
 data/synthetic/
+fused_model/
+fused_model_f16/
+fused_model_8bit/
 
 # Logs and evaluation reports
 logs/
