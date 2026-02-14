@@ -1072,3 +1072,63 @@ punie serve --model local:http://localhost:8080/v1/default
 - [ ] Train for conciseness (shorter responses = fewer tokens)
 - [ ] Test max_tokens reduction
 - [ ] Test prompt caching / KV cache quantization
+
+---
+
+## 21. Inference Speed Optimization (Revisited)
+
+**Status:** 🚧 TODO (Next Phase)
+
+**Goal:** Reduce end-to-end latency from ~25s (tool-calling queries with 2 generation turns) to <10s while maintaining 100% discrimination accuracy.
+
+**Context:** Phase 20 achieved breakthrough quantization results (5-bit preserves LoRA signal). Now focus on inference speed improvements with higher ROI than vocabulary pruning.
+
+**Priority Tasks:**
+
+- [ ] 21.1 **Fuse Phase 8 adapter to 5-bit** (Highest Priority)
+  - **Effort:** <1 day (proven technique from Phase 18)
+  - **Expected gain:** 8-10x speedup vs adapter loading
+  - **Benchmark:** Phase 5c showed fused-8bit was 8.5x faster than adapter
+  - **Target:** Single 20GB model file, eliminate adapter overhead
+
+- [ ] 21.2 **Test speculative decoding with 1.5B draft model**
+  - **Effort:** 1 week (implementation + tuning)
+  - **Expected gain:** 2-3x speedup on generation
+  - **Approach:** Use Qwen2.5-Coder-1.5B as draft, Qwen3-30B as verifier
+  - **Risk:** Medium - requires careful acceptance threshold tuning
+
+- [ ] 21.3 **Train for conciseness**
+  - **Effort:** 3-5 days (data curation + training)
+  - **Expected gain:** 1.5-2x fewer tokens → 1.5-2x faster generation
+  - **Approach:** Add examples emphasizing concise tool usage and responses
+  - **Benefit:** Improves speed AND user experience (shorter responses)
+
+**Deferred/Lower Priority:**
+
+- [ ] 21.4 **Profile latency breakdown**
+  - Measure: generation time, tool execution time, overhead
+  - Identify actual bottlenecks before further optimization
+
+- [ ] 21.5 **Test max_tokens reduction**
+  - Cap response length at inference time
+  - Quick experiment, may help but less reliable than training
+
+- [ ] 21.6 **Vocabulary pruning** (Analyzed, not recommended)
+  - **Effort:** 2-3 weeks
+  - **Expected gain:** 3.6% size reduction (23GB → 22.2GB), ~2% speedup
+  - **ROI:** Low - significant effort for minimal speed improvement
+  - **Decision:** Skip unless shipping to resource-constrained devices
+  - **Alternative:** Non-uniform quantization (Python tokens 8-bit, rare tokens 3-bit) - similar savings, lower risk
+
+**Success Criteria:**
+- End-to-end latency <10s for tool-calling queries
+- Maintain 100% discrimination accuracy (5/5 queries)
+- Model fits in 32GB unified memory
+- No quality regression on Phase 8 test suite
+
+**Expected Timeline:**
+- Week 1: Task 21.1 (fusion) - immediate deployment
+- Week 2-3: Task 21.2 (speculative decoding) - major speedup
+- Week 3-4: Task 21.3 (conciseness training) - quality + speed win
+
+**Target:** Sub-10s latency achieved through fusion + one major optimization (speculative decoding OR conciseness training)
