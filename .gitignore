@@ -22,12 +22,19 @@ _build
 
 # Training artifacts
 adapters/
+adapters_phase*/
 data/downloaded/
 data/synthetic/
+data/repos/
+data/*_examples/
+data/phase*_format/
+data/*.jsonl
+data/*.log
 fused_model/
 fused_model_f16/
 fused_model_8bit/
 
 # Logs and evaluation reports
 logs/
+*.log
 /*.html
