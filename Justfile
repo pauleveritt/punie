@@ -116,3 +116,130 @@ enable-pre-push:
 disable-pre-push:
     @chmod -x .git/hooks/pre-push 2>/dev/null || true
     @echo "Pre-push hook disabled. Use 'just enable-pre-push' to re-enable."
+
+# Prepare model releases - compress adapters for distribution
+release-prepare:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Compressing Phase 7 adapter (Python + HTML)..."
+    tar -czf punie-phase7-adapter.tar.gz adapters_phase7/
+    echo "✓ Created punie-phase7-adapter.tar.gz ($(du -h punie-phase7-adapter.tar.gz | cut -f1))"
+
+    echo "Compressing Phase 6 adapter (Python only)..."
+    tar -czf punie-phase6-adapter.tar.gz adapters_phase6/
+    echo "✓ Created punie-phase6-adapter.tar.gz ($(du -h punie-phase6-adapter.tar.gz | cut -f1))"
+
+    echo ""
+    echo "Ready for release! Run: just release-create <version>"
+
+# Create GitHub Release with model artifacts
+# Usage: just release-create v1.0.0
+release-create VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if compressed files exist
+    if [ ! -f punie-phase7-adapter.tar.gz ] || [ ! -f punie-phase6-adapter.tar.gz ]; then
+        echo "Error: Compressed model files not found. Run 'just release-prepare' first."
+        exit 1
+    fi
+
+    # Check if gh CLI is installed
+    if ! command -v gh &> /dev/null; then
+        echo "Error: GitHub CLI (gh) is not installed."
+        echo "Install: brew install gh"
+        exit 1
+    fi
+
+    # Create release with notes
+    echo "Creating GitHub Release {{VERSION}}..."
+    gh release create {{VERSION}} \
+        --title "Punie {{VERSION}} - Multi-domain Local Model Training" \
+        --notes "$(cat <<'EOF'
+# Punie {{VERSION}} - Trained Models
+
+This release includes trained LoRA adapters for Punie's local coding agent.
+
+## 🏆 Phase 7 Adapter (Recommended)
+**Full-stack web development: Python + HTML**
+
+- **Accuracy:** 100% discrimination (tool vs direct-answer queries)
+- **Speed:** 11.96s avg inference, 0.68s load time
+- **Size:** 130 MB adapter
+- **Domains:** Python (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic, attrs, structlog) + HTML (semantic, forms, tables, accessibility)
+- **Training:** 824 examples (741 train, 83 valid)
+
+**Download:** `punie-phase7-adapter.tar.gz`
+
+## Phase 6 Adapter
+**Python-focused development**
+
+- **Accuracy:** 100% discrimination
+- **Speed:** 11.97s avg inference, 1.25s load time
+- **Size:** 130 MB adapter
+- **Domains:** Python only (10 popular frameworks)
+- **Training:** 794 examples (714 train, 80 valid)
+
+**Download:** `punie-phase6-adapter.tar.gz`
+
+## Installation
+
+1. **Download the model:**
+   ```bash
+   wget https://github.com/{{`gh api user --jq .login`}}/punie/releases/download/{{VERSION}}/punie-phase7-adapter.tar.gz
+   tar -xzf punie-phase7-adapter.tar.gz
+   ```
+
+2. **Start MLX server with adapter:**
+   ```bash
+   uv run python -m mlx_lm.server \
+     --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
+     --adapter-path adapters_phase7 \
+     --port 8080
+   ```
+
+3. **Run Punie:**
+   ```bash
+   uv run punie serve --model local
+   ```
+
+## Base Model
+
+Both adapters require the base model:
+- **Base:** `mlx-community/Qwen2.5-Coder-7B-Instruct-4bit`
+- **Size:** ~4 GB (downloaded automatically by MLX)
+
+## Performance Comparison
+
+| Model | Load Time | Inference | Accuracy | Domains |
+|-------|-----------|-----------|----------|---------|
+| Phase 7 | 0.68s | 11.96s | 100% | Python + HTML |
+| Phase 6 | 1.25s | 11.97s | 100% | Python only |
+
+## Documentation
+
+- [Model Performance Tracker](https://github.com/{{`gh api user --jq .login`}}/punie/blob/main/MODEL_PERFORMANCE_TRACKER.md)
+- [Training Methodology](https://github.com/{{`gh api user --jq .login`}}/punie/tree/main/agent-os/specs)
+- [Development Diary](https://github.com/{{`gh api user --jq .login`}}/punie/tree/main/docs/diary)
+
+For questions or issues, please visit the [GitHub repository](https://github.com/{{`gh api user --jq .login`}}/punie).
+EOF
+)" \
+        punie-phase7-adapter.tar.gz \
+        punie-phase6-adapter.tar.gz
+
+    echo ""
+    echo "✓ Release {{VERSION}} created successfully!"
+    echo "View at: https://github.com/$(gh api user --jq .login)/punie/releases/tag/{{VERSION}}"
+
+# Clean up compressed model files after release
+release-clean:
+    @rm -f punie-phase7-adapter.tar.gz punie-phase6-adapter.tar.gz
+    @echo "✓ Cleaned up compressed model files"
+
+# Full release workflow: prepare, create, and clean
+# Usage: just release v1.0.0
+release VERSION: release-prepare (release-create VERSION) release-clean
+    @echo ""
+    @echo "🎉 Release {{VERSION}} complete!"
+    @echo "Models are now available for download on GitHub."
