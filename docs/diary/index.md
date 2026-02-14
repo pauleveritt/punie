@@ -2,6 +2,9 @@
 
 Reverse-chronological notes from ongoing work. Each entry is summarized and dated.
 
+## 2026-02-13 - [Phase 5: Tool vs. Direct Answer Discrimination](phase5_summary.md)
+Expanded direct-answer training examples from 5 to 50, achieved 100% discrimination accuracy distinguishing tool-calling vs direct-answer queries, with benchmark showing +40pp quality improvement at cost of +53.7% slower generation.
+
 ## 2026-02-13 - [Phase 2 Final Summary - February 13, 2026](PHASE2_FINAL_SUMMARY.md)
 Final Phase 2 summary covering fixes, POC dataset, training results, and hardware limitations.
 

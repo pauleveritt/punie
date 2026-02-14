@@ -201,44 +201,93 @@ def generate_multi_file_examples() -> list[Example]:
 
 
 def generate_direct_answer_examples() -> list[Example]:
-    """Generate examples where no tool is needed."""
-    examples = [
-        Example(
-            user_query="What is Inject in svcs-di?",
-            tool_name=None,
-            tool_args=None,
-            tool_result=None,
-            final_response="Inject[T] is a type alias in svcs-di that marks a dataclass field for automatic dependency injection. When you use Inject[Database], svcs-di will automatically resolve and inject the Database service from the container.",
-        ),
-        Example(
-            user_query="Explain the difference between svcs and svcs-di",
-            tool_name=None,
-            tool_args=None,
-            tool_result=None,
-            final_response="svcs is the core service locator library that provides Registry and Container for manual service registration and retrieval. svcs-di builds on top of svcs to add automatic dependency injection via the Inject marker and auto() factory, eliminating boilerplate.",
-        ),
-        Example(
-            user_query="What is tdom?",
-            tool_name=None,
-            tool_args=None,
-            tool_result=None,
-            final_response="tdom is a Python library for building HTML components using PEP 750 t-strings (template strings). It provides a type-safe, composable way to create HTML without templates, leveraging Python's new interpolation syntax.",
-        ),
-        Example(
-            user_query="What does the @component decorator do?",
-            tool_name=None,
-            tool_args=None,
-            tool_result=None,
-            final_response="The @component decorator in tdom marks a function as a reusable UI component. It enables the function to return HTML via t-strings and makes it compatible with tdom's rendering pipeline.",
-        ),
-        Example(
-            user_query="What is Hopscotch?",
-            tool_name=None,
-            tool_args=None,
-            tool_result=None,
-            final_response="Hopscotch is an advanced dependency injection framework built on svcs-di. It adds features like category-based service resolution, package scanning for auto-discovery, and location-aware routing.",
-        ),
+    """Generate examples where no tool is needed - mined from real documentation."""
+    examples = []
+
+    # Category 1: Concept Questions (~15 examples)
+    # Source: svcs/docs/glossary.md, tdom-svcs/docs/core_concepts.md
+    concepts = [
+        ("What is dependency injection?", "Dependency injection means the service layer is called with all services it needs to do its job. Instead of constructing dependencies inside your functions, you pass them in as parameters, making your code testable and loosely coupled."),
+        ("What is a service locator?", "A service locator is an architectural pattern that provides a central registry of factories for services that aren't instantiated directly in your business code. Unlike dependency injection, it's imperative: you ask for services explicitly at runtime using get() instead of having them injected."),
+        ("What is inversion of control?", "Inversion of Control (IoC) describes the concept of your code being invoked by someone else based on configuration. It's sometimes called the Hollywood Principle: 'Don't call us, we'll call you.' A service locator is an example of IoC because you tell it how to create services and it invokes that factory when asked."),
+        ("What is a composition root?", "The composition root is the place that acquires all the services your application needs and calls into the service layer. Common types are web framework views, CLI command entry points, or test fixtures. It's where you use svcs to get services and pass them into your business logic."),
+        ("What is late binding?", "Late binding means the concrete instance type of a service is only determined when it's requested using container.get(). This makes your code very testable because you can easily replace services with test objects without brittle methods like monkey-patching."),
+        ("What is the service layer?", "The service layer (also called orchestration layer or use-case layer) is where your business logic meets your services. It coordinates database transactions, other services, and the domain model. If you pass in all the services it needs, it's dependency injection. If you look up services within it, it's service location."),
+        ("What is hexagonal architecture?", "Hexagonal architecture (also known as ports and adapters, onion architecture, or clean architecture) divides a system into loosely-coupled interchangeable components. The business code is in the middle and doesn't use services directly, but only through interfaces (ports). A service locator like svcs can register factories for those interfaces so business code can use services as adapters without knowing what they are."),
+        ("What is the dependency inversion principle?", "The dependency inversion principle is the D in SOLID and means 'program against interfaces, not implementations.' The goal is to achieve loose coupling by making code depend on interfaces instead of concrete implementations. In Python's dynamic environment, you're free to ignore type hints in tests."),
+        ("What is Inject[T] in svcs-di?", "Inject[T] is a type alias in svcs-di that marks a dataclass field for automatic dependency injection. When you use Inject[Database], svcs-di will automatically resolve and inject the Database service from the container. At runtime, svcs-di detects the Inject wrapper and resolves from the container."),
+        ("What is a HopscotchRegistry?", "HopscotchRegistry extends svcs.Registry with built-in ServiceLocator for multi-implementation support. It's application-scoped and defines service factories and component registrations. Unlike a basic Registry, it supports multiple implementations of the same service type with resource and location-based resolution."),
+        ("What is a HopscotchContainer?", "HopscotchContainer extends svcs.Container with a built-in inject() method for automatic dependency injection. It's request-scoped, created from a registry, and handles automatic dependency resolution. It supports resource-based and location-based service selection."),
+        ("What are class components in tdom-svcs?", "Class components are Python classes (typically dataclasses) that can be discovered via @injectable decorator and resolved directly from the container. They use Inject[] for automatic dependency injection, implement __call__() to render output, and are the recommended approach for production use."),
+        ("What is the Node type in tdom-svcs?", "The Node type from tdom provides a standard intermediate representation for HTML. It's a dataclass with tag, attrs, and children fields. Instead of producing HTML strings directly, templates produce Node trees which enable tools to inspect and act on structure before rendering."),
+        ("What is package scanning in svcs-di?", "Package scanning via scan() automatically discovers @injectable decorated classes and registers them in the registry. It scans specified packages for modules, finds decorated classes, extracts metadata (resource, location, categories), and validates all items are classes."),
+        ("What is the @injectable decorator?", "The @injectable decorator marks a class for automatic discovery by scan(). It can specify metadata like resource type, location, categories, and for_ (abstract interface). Only classes can be decorated with @injectable; functions cannot be discovered this way."),
     ]
+    for query, response in concepts:
+        examples.append(Example(user_query=query, tool_name=None, tool_args=None, tool_result=None, final_response=response))
+
+    # Category 2: Comparison Questions (~10 examples)
+    # Source: svcs/docs/glossary.md, svcs/docs/why.md, tdom-svcs/docs/core_concepts.md
+    comparisons = [
+        ("What is the difference between dependency injection and service location?", "Dependency injection means services are passed into your code as parameters from outside. Service location means your code actively asks for services at runtime using get(). Both achieve loose coupling, but DI is declarative while service location is imperative."),
+        ("What is the difference between a Registry and a Container?", "Registry is application-scoped and stores factory functions and value services - it lives for the entire application lifetime and is shared across all containers. Container is request-scoped, creates and caches service instances from registry factories, and handles cleanup when closed."),
+        ("What is the difference between Inject[T] and Resource[T]?", "Inject[T] resolves services from the registry/container - it gets services that were registered via register_factory or register_value. Resource[T] gets the current resource instance passed to the container constructor - it's the specific context object (like an HttpRequest) for the current request."),
+        ("What is the difference between class and function components?", "Class components can use Inject[], be discovered via @injectable, be resolved from container, and are recommended for production. Function components can use Inject[] but cannot be discovered via @injectable, must be called directly with an injector, and are limited to simple programmatic use."),
+        ("What is the difference between svcs and svcs-di?", "svcs is the core service locator library providing Registry and Container for manual service registration and retrieval. svcs-di builds on svcs to add automatic dependency injection via the Inject marker and auto() factory, eliminating boilerplate while preserving svcs patterns."),
+        ("What is the difference between register_value and register_factory?", "register_value registers a singleton instance that's shared across all container.get() calls. register_factory registers a function that creates instances on demand - each container.get() may create a new instance or return a cached one depending on the container's lifetime."),
+        ("What is the difference between resource-based and location-based resolution?", "Resource-based resolution selects implementations based on the current resource type (like CustomerContext vs AdminContext) - scored 100 for exact match, 10 for subclass. Location-based resolution selects based on URL path hierarchy (like /admin/users) - scored 1000 for match. Both can be combined for a total score up to 1100."),
+        ("How does service location differ from service discovery?", "Service location (implemented by svcs) is about finding local objects in your application at runtime. Service discovery is a completely unrelated concept for finding remote services like web services or database servers (e.g., Consul, etcd, ZooKeeper)."),
+        ("What is the difference between the Basic and Hopscotch patterns?", "The Basic pattern uses auto() wrapper with DefaultInjector for simple single-implementation services using standard svcs container. The Hopscotch pattern uses scan() with HopscotchRegistry for advanced features like multi-implementation support, resource/location-based resolution, and categories."),
+        ("What is the difference between HopscotchContainer and KeywordInjector?", "HopscotchContainer is production-ready with built-in inject() method, resource/location-based resolution, and async support. KeywordInjector is educational only, works with function components, has no resource/location resolution, and is not suitable for production class components."),
+    ]
+    for query, response in comparisons:
+        examples.append(Example(user_query=query, tool_name=None, tool_args=None, tool_result=None, final_response=response))
+
+    # Category 3: Best Practices (~10 examples)
+    # Source: svcs/docs/why.md, tdom-svcs/docs/how_it_works.md, svcs-di/docs/core-concepts.md
+    best_practices = [
+        ("When should I use svcs vs a DI framework?", "Use svcs when you want late binding, imperative service acquisition, and the flexibility to get services only when needed. The main trade-off is runtime verification vs compile-time. Use a DI framework like incant if you prefer declarative injection with ahead-of-time validation."),
+        ("When should I use class components vs function components?", "Always use class components for production. They can be discovered via @injectable, resolved from container, easily tested and composed. Use function components only for simple educational examples or direct programmatic use."),
+        ("How should I define services as dataclasses?", "Use frozen=True for immutability (thread-safe), kw_only=True for explicit call sites, and slots=True for memory efficiency. Keep services stateless with no business logic. Name them with a Service suffix. Services contain behavior but pass data back and forth - domain models make decisions."),
+        ("When should I use the Hopscotch pattern vs the Basic pattern?", "Use Hopscotch when you need multiple implementations of the same service type, resource or location-based service selection, category-based organization, or convention-based setup functions. Use Basic for simple single-implementation services or when working with existing svcs code."),
+        ("How should I test services in svcs-di?", "Use registry.register_value() to provide fakes (not mocks) for testing. Create fake implementations that behave like real services but use in-memory storage. This is better than mocking because fakes test actual behavior and interaction patterns."),
+        ("When should I use categories in svcs-di?", "Use categories for plugin discovery (get all services tagged 'plugin'), middleware loading (get all 'middleware' services to build pipeline), or feature flags (check if service has 'experimental' category). Categories are string tags for organizing and querying services."),
+        ("What is the recommended way to use svcs in views?", "Use svcs as a composition root in your views: call container.get() to acquire services, then pass them into your service layer via dependency injection. Don't use svcs directly in your service layer - keep business logic clean from framework code."),
+        ("Should I use mocks or fakes for testing services?", "Use fakes. Create real implementations that behave correctly but use in-memory storage (like a FakeCache with a dict). Fakes test actual behavior and interaction patterns, while mocks are brittle and don't test what you actually care about."),
+        ("When should I use scanning vs manual registration?", "Use scan() for production applications with many components - it automatically discovers @injectable classes and reduces boilerplate. Use manual registration for simple cases, tests, or when you need fine-grained control over registration order and configuration."),
+        ("What are best practices for field ordering in component dataclasses?", "Put Inject[] fields first (they have no defaults), then regular parameters with defaults. This is a Python dataclass requirement, not tdom-svcs specific. Fields without defaults must come before fields with defaults to avoid TypeError."),
+    ]
+    for query, response in best_practices:
+        examples.append(Example(user_query=query, tool_name=None, tool_args=None, tool_result=None, final_response=response))
+
+    # Category 4: Syntax/How-to Questions (~10 examples)
+    # Source: svcs-di/docs/core-concepts.md, tdom-svcs/docs/getting_started.md
+    how_to = [
+        ("How do I register a service in svcs-di?", "Use registry.register_value(Type, instance) for singletons shared across all containers, or registry.register_factory(Type, factory_function) for instances created on demand. The registry is application-scoped and should be created once at startup."),
+        ("How do I use Inject[] in a dataclass?", "Import Inject from svcs_di and use it as a type annotation: 'field: Inject[ServiceType]'. Put Inject[] fields before fields with defaults. The service will be automatically resolved from the container when you call container.inject(YourClass)."),
+        ("How do I create a component with dependency injection?", "Decorate your class with @injectable, make it a dataclass, use Inject[] for dependencies, and implement __call__() to render. Then scan(registry, package_name) to discover it, and use container.inject(ComponentType) to resolve with dependencies."),
+        ("How do I set up a HopscotchContainer?", "Create a HopscotchRegistry, register services with register_value/register_factory, scan packages with scan(registry, package_name), then create HopscotchContainer(registry). Use it as a context manager: 'with HopscotchContainer(registry) as container:' for automatic cleanup."),
+        ("How does the scan() function work?", "scan() takes a registry and package name (or __name__ for current module). It finds all modules in the package, looks for @injectable decorated classes, extracts metadata (resource, location, categories), and registers them automatically. Non-classes are skipped with a warning."),
+        ("How do I override a service in tests?", "Create your test registry, call registry.register_value(ServiceType, FakeService()) to register your fake implementation, then create a container from that registry. The fake will be injected instead of the real service."),
+        ("How do I register multiple implementations of a service?", "Use registry.register_implementation(ServiceType, ImplClass, resource=ResourceType, location=PurePath('/path')). Multiple implementations are scored based on resource (100 exact, 10 subclass) and location (1000) matching. Highest score wins, LIFO for ties."),
+        ("How do I use PEP 750 t-strings for HTML?", "Use t-strings with the t prefix: t'<div>{variable}</div>'. Pass them to html() function which converts to Node trees. PEP 750 t-strings provide template interpolation at the language level, making HTML construction type-safe and IDE-friendly."),
+        ("What Python version is needed for t-strings?", "Python 3.14 or later is required for PEP 750 template strings (t-strings). This is a language-level feature for template interpolation that tdom leverages for type-safe HTML construction."),
+        ("How do I use the @middleware decorator?", "Create a dataclass with a priority field (lower executes first) and __call__(self, component, props, context) method. Return props to continue the chain or None to halt. Register with manager.register_middleware(YourMiddleware()). Async middleware with async __call__ is supported via execute_async()."),
+    ]
+    for query, response in how_to:
+        examples.append(Example(user_query=query, tool_name=None, tool_args=None, tool_result=None, final_response=response))
+
+    # Category 5: Documentation/Architecture (~5 examples)
+    # Source: tdom-svcs/docs/node.md, various mission docs
+    architecture = [
+        ("What frameworks does svcs integrate with?", "svcs has official integrations for Flask, AIOHTTP, Starlette, FastAPI, and Pyramid. All integrations provide unified API for storing services on request objects and automatic cleanup. Most integrations are for async frameworks."),
+        ("What is the tdom-svcs ecosystem?", "The ecosystem includes: tdom (Node type and templating), svcs-di (dependency injection), aria-testing (Testing Library-style queries), Storyville (component catalog), and tdom-django (Django integration). All tools work with Node as the standard intermediate representation."),
+        ("How does tdom-django integrate with Django templates?", "tdom-django bridges Django templates with type-safe components. Components are dataclasses that become template tags automatically. You can use {% card title='Welcome' %} syntax in templates, and components can use Inject[] to request Django services from the container."),
+        ("What is the architecture of a tdom-svcs application?", "Request arrives, components resolve with dependencies injected and overrides applied, middleware runs for validation/logging/asset collection, Node tree is built (components return Nodes not strings), post-processing happens on the tree, and finally the Node tree converts to HTML once at the end."),
+        ("What problem does the Node standard solve?", "Python's web templating is fragmented - Jinja2, Mako, Django all produce strings directly, making it hard to test, compose tools, or analyze output. Node provides a standard intermediate representation so tools can inspect structure before rendering, enabling testing, validation, and asset collection."),
+    ]
+    for query, response in architecture:
+        examples.append(Example(user_query=query, tool_name=None, tool_args=None, tool_result=None, final_response=response))
 
     return examples
 
