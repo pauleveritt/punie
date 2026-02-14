@@ -238,7 +238,7 @@ def create_pydantic_agent(
 
     # Add stop_sequences if provided
     if config.stop_sequences is not None:
-        model_settings_dict["stop"] = config.stop_sequences
+        model_settings_dict["stop_sequences"] = list(config.stop_sequences)
 
     agent = Agent[ACPDeps, str](
         model,

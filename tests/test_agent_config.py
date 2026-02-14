@@ -73,8 +73,8 @@ def test_factory_stop_sequences_flow_through():
     # Verify the agent was created and has the stop sequences in model_settings
     assert agent is not None
     assert agent.model_settings is not None
-    # model_settings is a dict with the stop parameter
-    assert agent.model_settings.get("stop") == stop_seqs
+    # model_settings is a dict with the stop_sequences parameter
+    assert agent.model_settings.get("stop_sequences") == list(stop_seqs)
 
 
 def test_factory_uses_config_instructions():
@@ -152,8 +152,8 @@ def test_create_local_agent_defaults_stop_sequences():
     # Verify QWEN_STOP_SEQUENCES is wired into model_settings
     assert agent is not None
     assert agent.model_settings is not None
-    # model_settings is a dict with the stop parameter
-    assert agent.model_settings.get("stop") == QWEN_STOP_SEQUENCES
+    # model_settings is a dict with the stop_sequences parameter
+    assert agent.model_settings.get("stop_sequences") == list(QWEN_STOP_SEQUENCES)
 
 
 def test_resolve_mode_default_is_acp(monkeypatch):
