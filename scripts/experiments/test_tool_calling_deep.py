@@ -162,7 +162,7 @@ async def test_single_eval_prompt():
             print("✅ SUCCESS: read_file tool call detected!")
         else:
             print("❌ FAILURE: Expected read_file tool call not found")
-            print(f"   This suggests the model didn't call the tool or parser failed")
+            print("   This suggests the model didn't call the tool or parser failed")
 
         return success
 

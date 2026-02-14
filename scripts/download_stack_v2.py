@@ -14,7 +14,6 @@ This provides a corpus for generating tool-calling training examples.
 import json
 import random
 from pathlib import Path
-from typing import Iterator
 
 from datasets import load_dataset
 
@@ -143,7 +142,7 @@ def sample_diverse(items: list[dict], target_count: int = 500) -> list[dict]:
     num_categories = len(by_category)
     per_category = target_count // num_categories
 
-    print(f"\nCategory distribution (before sampling):")
+    print("\nCategory distribution (before sampling):")
     for category, items in sorted(by_category.items()):
         print(f"  {category}: {len(items)} files")
 
@@ -202,7 +201,7 @@ def main():
 
     print("✓ Dataset loaded in streaming mode\n")
     print("Filtering for high-quality, diverse Python files...")
-    print(f"  Quality threshold: 0.3/1.0")
+    print("  Quality threshold: 0.3/1.0")
     print(f"  Size range: {MIN_FILE_SIZE}-{MAX_FILE_SIZE} chars")
     print(f"  Line range: {MIN_LINES}-{MAX_LINES} lines")
     print()
@@ -237,14 +236,14 @@ def main():
             print(f"\n⚠️  Reached safety limit ({target * 3} files processed)")
             break
 
-    print(f"\n✓ Filtering complete!")
+    print("\n✓ Filtering complete!")
     print(f"  Processed: {processed}")
     print(f"  Passed filters: {len(filtered_items)}")
     print(f"  Rejected: {filtered_out}")
     print(f"  Pass rate: {len(filtered_items) / processed * 100:.1f}%")
 
     # Sample for diversity
-    print(f"\nSampling for diversity (target: 500 files)...")
+    print("\nSampling for diversity (target: 500 files)...")
     sampled = sample_diverse(filtered_items, target_count=500)
 
     print(f"\n✓ Sampled {len(sampled)} diverse files")
@@ -255,7 +254,7 @@ def main():
         cat = item["category"] or "other"
         category_counts[cat] = category_counts.get(cat, 0) + 1
 
-    print(f"\nFinal category distribution:")
+    print("\nFinal category distribution:")
     for category in sorted(category_counts.keys()):
         count = category_counts[category]
         print(f"  {category}: {count} files ({count/len(sampled)*100:.1f}%)")
@@ -263,7 +262,7 @@ def main():
     # Show quality distribution
     qualities = [item["quality"] for item in sampled]
     avg_quality = sum(qualities) / len(qualities)
-    print(f"\nQuality statistics:")
+    print("\nQuality statistics:")
     print(f"  Average: {avg_quality:.2f}")
     print(f"  Min: {min(qualities):.2f}")
     print(f"  Max: {max(qualities):.2f}")

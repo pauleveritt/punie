@@ -52,9 +52,27 @@ def build_train_command(config: LoRAConfig) -> list[str]:
         str(config.lora_layers),
     ]
 
-    # Note: LoRA rank must be set via config file, not command-line
-    # For now, mlx-lm uses default rank (typically 8)
-    # TODO: Implement config file support for custom rank
+    # Optional flags
+    if config.save_every is not None:
+        cmd.extend(["--save-every", str(config.save_every)])
+
+    if config.val_batches is not None:
+        cmd.extend(["--val-batches", str(config.val_batches)])
+
+    if config.test:
+        cmd.append("--test")
+
+    if config.steps_per_report is not None:
+        cmd.extend(["--steps-per-report", str(config.steps_per_report)])
+
+    if config.steps_per_eval is not None:
+        cmd.extend(["--steps-per-eval", str(config.steps_per_eval)])
+
+    if config.grad_checkpoint:
+        cmd.append("--grad-checkpoint")
+
+    if config.config_file is not None:
+        cmd.extend(["--config", str(config.config_file)])
 
     return cmd
 

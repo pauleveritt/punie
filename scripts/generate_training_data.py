@@ -357,7 +357,7 @@ async def generate_dataset(
     with_tools = len([ex for ex in examples if ex.tool_calls])
     without_tools = len(examples) - with_tools
 
-    print(f"\nTool usage:")
+    print("\nTool usage:")
     print(f"  With tools: {with_tools} ({with_tools/len(examples)*100:.1f}%)")
     print(f"  Without tools: {without_tools} ({without_tools/len(examples)*100:.1f}%)")
 

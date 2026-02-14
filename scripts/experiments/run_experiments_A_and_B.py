@@ -13,7 +13,7 @@ RAM usage: ~16GB peak
 import asyncio
 from pathlib import Path
 
-from test_30b_real_tasks import REAL_TASKS, test_task, main as run_30b_suite
+from test_30b_real_tasks import test_task, main as run_30b_suite
 
 
 async def run_experiment_A():
@@ -61,7 +61,6 @@ async def run_experiment_B():
     from punie.training.server_config import ServerConfig
     from punie.training.server import ServerProcess
     from punie.local import LocalClient
-    import time
 
     workspace = Path.cwd()
 

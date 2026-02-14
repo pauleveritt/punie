@@ -29,7 +29,7 @@ def main():
     phase6_valid = Path("data/phase6_format/valid.jsonl")
 
     if phase6_train.exists() and phase6_valid.exists():
-        print(f"Loading Phase 6 data...")
+        print("Loading Phase 6 data...")
         with phase6_train.open() as f:
             for line in f:
                 item = json.loads(line)
@@ -49,14 +49,14 @@ def main():
         phase6_count = len(all_examples)
         print(f"  ✓ Loaded {phase6_count} Phase 6 examples")
     else:
-        print(f"  ⚠️  Phase 6 data not found")
-        print(f"     Run scripts/merge_phase6_data.py first")
+        print("  ⚠️  Phase 6 data not found")
+        print("     Run scripts/merge_phase6_data.py first")
         phase6_count = 0
 
     # Load HTML examples
     html_file = Path("data/html_examples/training_examples.jsonl")
     if html_file.exists():
-        print(f"\nLoading HTML examples...")
+        print("\nLoading HTML examples...")
         with html_file.open() as f:
             for line in f:
                 item = json.loads(line)
@@ -65,8 +65,8 @@ def main():
         html_count = len(all_examples) - phase6_count
         print(f"  ✓ Loaded {html_count} HTML examples")
     else:
-        print(f"\n  ⚠️  HTML examples not found")
-        print(f"     Run scripts/generate_html_examples.py first")
+        print("\n  ⚠️  HTML examples not found")
+        print("     Run scripts/generate_html_examples.py first")
         html_count = 0
 
     total = len(all_examples)
@@ -79,12 +79,12 @@ def main():
     tool_examples = sum(1 for ex in all_examples if '"name":' in ex["text"])
     direct_examples = total - tool_examples
 
-    print(f"\nTool vs Direct:")
+    print("\nTool vs Direct:")
     print(f"  Tool-calling: {tool_examples} ({tool_examples/total*100:.1f}%)")
     print(f"  Direct: {direct_examples} ({direct_examples/total*100:.1f}%)")
 
     # Shuffle and split
-    print(f"\nShuffling...")
+    print("\nShuffling...")
     random.shuffle(all_examples)
 
     split_idx = int(len(all_examples) * 0.9)

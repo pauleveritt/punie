@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, 'scripts')
 
-from convert_public_datasets import parse_glaive_conversation, has_tool_pattern, filter_example
+from convert_public_datasets import parse_glaive_conversation, has_tool_pattern
 from datasets import load_dataset
 
 dataset = load_dataset("glaiveai/glaive-function-calling-v2", split="train")
@@ -71,7 +71,7 @@ print(f"\nResults from {checked} examples with <functioncall>:")
 print(f"  Passed parse: {passed_parse} ({passed_parse/checked*100:.1f}%)")
 print(f"  Passed pattern check: {passed_pattern} ({passed_pattern/checked*100:.1f}%)")
 print(f"  Passed filter: {passed_filter} ({passed_filter/checked*100:.1f}%)")
-print(f"\nFailure reasons:")
+print("\nFailure reasons:")
 for reason, count in failed_reasons.items():
     if count > 0:
         print(f"  {reason}: {count} ({count/checked*100:.1f}%)")

@@ -322,7 +322,7 @@ def main():
     read_examples = generate_read_examples()
     direct_examples = generate_direct_examples()
 
-    print(f"Generated:")
+    print("Generated:")
     print(f"  Grep examples: {len(grep_examples)}")
     print(f"  Read examples: {len(read_examples)}")
     print(f"  Direct examples: {len(direct_examples)}")

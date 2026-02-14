@@ -12,9 +12,7 @@ Target: 500+ high-quality examples from diverse Python projects.
 import ast
 import json
 import random
-import re
 from pathlib import Path
-from typing import Iterator
 
 
 MIN_FILE_SIZE = 200  # Skip tiny files
@@ -44,7 +42,7 @@ def get_python_files(repo_dir: Path) -> list[Path]:
                 continue
 
             files.append(py_file)
-        except:
+        except (OSError, UnicodeDecodeError):
             continue
 
     return files

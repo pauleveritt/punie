@@ -101,7 +101,7 @@ def convert_to_qwen_format(messages: list[dict]) -> str | None:
         if role == 'SYSTEM':
             # Replace glaive system prompt with Punie's
             qwen_messages.append(
-                f"<|im_start|>system\nYou are Punie, an AI coding assistant that helps with Python development via PyCharm.<|im_end|>"
+                "<|im_start|>system\nYou are Punie, an AI coding assistant that helps with Python development via PyCharm.<|im_end|>"
             )
 
         elif role == 'USER':
@@ -133,7 +133,7 @@ def convert_to_qwen_format(messages: list[dict]) -> str | None:
                         args_str = args_str.replace('\\"', '"')
                         try:
                             arguments = json.loads(args_str)
-                        except:
+                        except (json.JSONDecodeError, ValueError):
                             # If it's not valid JSON, use it as is
                             arguments = args_str
                     else:
@@ -281,7 +281,7 @@ def main():
 
     skipped = skipped_tools + skipped_direct
 
-    print(f"\n✓ Processed examples:")
+    print("\n✓ Processed examples:")
     print(f"  Tool-calling (with results): {len(tool_calling_examples)}")
     print(f"  Direct answers (no tools): {len(direct_answer_examples)}")
     print(f"  Skipped (quality/parse issues): {skipped}")
@@ -297,7 +297,7 @@ def main():
     if len(direct_answer_examples) > 100:
         direct_answer_examples = random.sample(direct_answer_examples, 100)
 
-    print(f"\n✓ Sampled:")
+    print("\n✓ Sampled:")
     print(f"  Tool-calling: {len(tool_calling_examples)}")
     print(f"  Direct answers: {len(direct_answer_examples)}")
     print(f"  Total: {len(tool_calling_examples) + len(direct_answer_examples)}")

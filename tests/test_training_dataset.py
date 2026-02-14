@@ -1,6 +1,5 @@
 """Tests for training dataset dataclasses."""
 
-import pytest
 
 from punie.training.dataset import ChatMessage, DatasetStats, TrainingDataset, TrainingExample
 

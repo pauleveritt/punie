@@ -33,7 +33,7 @@ async def main():
     workspace = Path.cwd()
     model_name = "local:http://127.0.0.1:8080/v1/qwen/qwen3-14b"
 
-    print(f"\nModel: qwen/qwen3-14b")
+    print("\nModel: qwen/qwen3-14b")
     print(f"Query: {PROTOCOL_SEARCH_QUERY}\n")
 
     agent_config = AgentConfig(temperature=0.0)
@@ -83,12 +83,12 @@ async def main():
         print(f"   Tools used: {', '.join(tool_calls)}")
     print(f"🎯 Accuracy: {accuracy:.1%} ({len(found)}/{len(EXPECTED_CLASSES)})")
 
-    print(f"\n📋 Classes found:")
+    print("\n📋 Classes found:")
     for cls in EXPECTED_CLASSES:
         status = "✅" if cls in found else "❌"
         print(f"   {status} {cls}")
 
-    print(f"\n📝 Response:")
+    print("\n📝 Response:")
     print("-" * 80)
     print(result.output)
     print("-" * 80)
@@ -127,7 +127,7 @@ async def main():
     with open("test_14b_protocol_results.txt", "w") as f:
         f.write("14B Model: Protocol Search Results\n")
         f.write("=" * 80 + "\n\n")
-        f.write(f"Model: qwen/qwen3-14b\n")
+        f.write("Model: qwen/qwen3-14b\n")
         f.write(f"Execution time: {execution_time:.2f}s\n")
         f.write(f"Tool calls: {len(tool_calls)}\n")
         f.write(f"Accuracy: {accuracy:.1%}\n")
@@ -135,7 +135,7 @@ async def main():
         f.write("Response:\n")
         f.write(result.output)
 
-    print(f"\n💾 Results saved to: test_14b_protocol_results.txt")
+    print("\n💾 Results saved to: test_14b_protocol_results.txt")
 
 
 if __name__ == "__main__":

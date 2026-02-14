@@ -58,7 +58,7 @@ async def main():
 
         question = "Which classes in this codebase subclass from Protocol?"
 
-        print(f"\nQuestion (NO explicit instructions):")
+        print("\nQuestion (NO explicit instructions):")
         print(question)
         print("\nRunning agent...\n")
 

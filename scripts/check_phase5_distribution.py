@@ -63,7 +63,7 @@ total = total_with_tools + total_without_tools
 pct_with = (total_with_tools / total * 100) if total > 0 else 0
 pct_without = (total_without_tools / total * 100) if total > 0 else 0
 
-print(f"📈 OVERALL DISTRIBUTION:")
+print("📈 OVERALL DISTRIBUTION:")
 print(f"   Total examples: {total}")
 print(f"   With tools: {total_with_tools} ({pct_with:.1f}%)")
 print(f"   Without tools: {total_without_tools} ({pct_without:.1f}%)")

@@ -70,7 +70,7 @@ overall_pct_with = (overall_with / overall_total * 100) if overall_total > 0 els
 overall_pct_without = (overall_without / overall_total * 100) if overall_total > 0 else 0
 
 print("\n" + "=" * 80)
-print(f"📈 OVERALL DISTRIBUTION:")
+print("📈 OVERALL DISTRIBUTION:")
 print(f"   Total examples: {overall_total}")
 print(f"   With tools: {overall_with} ({overall_pct_with:.1f}%)")
 print(f"   Without tools (direct answers): {overall_without} ({overall_pct_without:.1f}%)")
@@ -84,6 +84,6 @@ if target_min <= overall_pct_without <= target_max:
 else:
     print(f"⚠️  Off target: Need {target_min}-{target_max}% direct answers, got {overall_pct_without:.1f}%")
 
-print(f"\n🎯 Phase 5 Goal: Model should learn to discriminate:")
-print(f"   • 'Find all classes...' → use tool (search/read needed)")
-print(f"   • 'What is dependency injection?' → direct answer (concept question)")
+print("\n🎯 Phase 5 Goal: Model should learn to discriminate:")
+print("   • 'Find all classes...' → use tool (search/read needed)")
+print("   • 'What is dependency injection?' → direct answer (concept question)")

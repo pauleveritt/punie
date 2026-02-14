@@ -342,7 +342,7 @@ def init(
         try:
             existing = json.loads(output.read_text())
             final_config = merge_acp_config(existing, punie_config)
-        except json.JSONDecodeError, KeyError:
+        except (json.JSONDecodeError, KeyError):
             typer.secho(
                 f"Warning: Could not parse existing {output}, overwriting",
                 fg=typer.colors.YELLOW,
@@ -713,7 +713,7 @@ def stop_all(
                 # Skip the current stop-all command process
                 if "stop-all" not in " ".join(cmdline):
                     punie_processes.append(proc)
-        except psutil.NoSuchProcess, psutil.AccessDenied:
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
     if not punie_processes:
@@ -725,7 +725,7 @@ def stop_all(
         try:
             cmdline = " ".join(proc.cmdline())
             typer.echo(f"  PID {proc.pid}: {cmdline[:80]}...")
-        except psutil.NoSuchProcess, psutil.AccessDenied:
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
     # Terminate processes gracefully
@@ -824,7 +824,7 @@ def train(
     from punie.training.lora_config import LoRAConfig
     from punie.training.train_runner import run_training
 
-    typer.echo(f"🚀 Starting LoRA training")
+    typer.echo("🚀 Starting LoRA training")
     typer.echo(f"   Model: {model}")
     typer.echo(f"   Data: {data_dir}")
     typer.echo(f"   Output: {output}")
@@ -841,7 +841,7 @@ def train(
 
     try:
         adapter_path = asyncio.run(run_training(config))
-        typer.secho(f"\n✅ Training complete!", fg=typer.colors.GREEN)
+        typer.secho("\n✅ Training complete!", fg=typer.colors.GREEN)
         typer.echo(f"   Adapter saved to: {adapter_path}")
     except Exception as e:
         typer.secho(f"\n❌ Training failed: {e}", fg=typer.colors.RED, err=True)
@@ -902,13 +902,13 @@ def eval_model(
     from punie.training.eval_report import generate_eval_html_report
     from punie.training.server_config import ServerConfig
 
-    typer.echo(f"🔍 Evaluating model")
+    typer.echo("🔍 Evaluating model")
     typer.echo(f"   Model: {model}")
     if adapter:
         typer.echo(f"   Adapter: {adapter}")
     typer.echo(f"   Port: {port}")
     if no_server:
-        typer.echo(f"   Using existing server")
+        typer.echo("   Using existing server")
     typer.echo("")
 
     # Create server config
@@ -943,8 +943,8 @@ def eval_model(
         output.write_text(html)
 
         # Print summary
-        typer.secho(f"\n✅ Evaluation complete!", fg=typer.colors.GREEN)
-        typer.echo(f"\n📊 Results:")
+        typer.secho("\n✅ Evaluation complete!", fg=typer.colors.GREEN)
+        typer.echo("\n📊 Results:")
 
         # Calculate average score
         total_score = sum(r.score for r in report.results)
@@ -965,7 +965,7 @@ def eval_model(
                     category_scores[prompt.category].append(result.score)
                     break
 
-        typer.echo(f"\n   By category:")
+        typer.echo("\n   By category:")
         for category, scores in sorted(category_scores.items()):
             avg = sum(scores) / max(len(scores), 1)
             typer.echo(f"     {category}: {avg:.1%}")
@@ -1044,7 +1044,7 @@ def dataset_stats(
         stats = compute_stats(dataset)
 
         typer.echo(f"Total examples: {stats.total_examples}")
-        typer.echo(f"\nSplit breakdown:")
+        typer.echo("\nSplit breakdown:")
         typer.echo(f"  Train: {stats.train_count} ({stats.train_count / max(stats.total_examples, 1) * 100:.1f}%)")
         typer.echo(f"  Valid: {stats.valid_count} ({stats.valid_count / max(stats.total_examples, 1) * 100:.1f}%)")
         typer.echo(f"  Test:  {stats.test_count} ({stats.test_count / max(stats.total_examples, 1) * 100:.1f}%)")
@@ -1100,14 +1100,14 @@ def dataset_download(
     try:
         stats = downloaders[name](output, max_examples=max_examples)
 
-        typer.secho(f"\n✅ Download complete!", fg=typer.colors.GREEN)
-        typer.echo(f"\n📊 Statistics:")
+        typer.secho("\n✅ Download complete!", fg=typer.colors.GREEN)
+        typer.echo("\n📊 Statistics:")
         typer.echo(f"   Total: {stats.total_examples} examples")
         typer.echo(f"   Train: {stats.train_count}")
         typer.echo(f"   Valid: {stats.valid_count}")
         typer.echo(f"   Test:  {stats.test_count}")
         typer.echo(f"   Avg messages: {stats.avg_messages_per_example:.1f}")
-        typer.echo(f"\n💡 Next steps:")
+        typer.echo("\n💡 Next steps:")
         typer.echo(f"   Validate: punie dataset validate {output}")
         typer.echo(f"   Train:    punie train {output}")
 
@@ -1217,7 +1217,7 @@ def dataset_filter(
         # Write output
         write_dataset(filtered, output_dir)
 
-        typer.secho(f"\n✅ Filtering complete!", fg=typer.colors.GREEN)
+        typer.secho("\n✅ Filtering complete!", fg=typer.colors.GREEN)
         typer.echo(f"\n📊 Output: {len(filtered.train) + len(filtered.valid) + len(filtered.test)} examples")
         typer.echo(f"   Train: {len(filtered.train)}")
         typer.echo(f"   Valid: {len(filtered.valid)}")
@@ -1307,7 +1307,7 @@ def dataset_merge(
         # Write output
         write_dataset(merged, output_dir)
 
-        typer.secho(f"\n✅ Merge complete!", fg=typer.colors.GREEN)
+        typer.secho("\n✅ Merge complete!", fg=typer.colors.GREEN)
         typer.echo(f"\n📊 Total: {total_examples} examples")
         typer.echo(f"   Train: {len(merged.train)}")
         typer.echo(f"   Valid: {len(merged.valid)}")

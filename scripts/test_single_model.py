@@ -96,7 +96,7 @@ def main():
     print(f"✓ Loaded in {load_time:.2f}s")
 
     # Get memory usage
-    memory_gb = mx.get_active_memory() / 1024**3
+    memory_gb = mx.metal.get_active_memory() / 1024**3
     print(f"  Runtime memory: {memory_gb:.2f} GB")
 
     # Run test queries

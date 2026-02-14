@@ -12,7 +12,7 @@ from pathlib import Path
 from punie.training.eval_prompts import EvalPrompt, EvalSuite
 from punie.training.eval_report import generate_eval_html_report
 from punie.training.eval_results import EvalReport, EvalResult
-from punie.training.eval_runner import EvalRunConfig, run_evaluation
+from punie.training.eval_runner import EvalRunConfig
 from punie.training.server_config import ServerConfig
 
 
@@ -54,7 +54,7 @@ async def demo_with_test_model():
     )
 
     print("\n⚙️  Configuration:")
-    print(f"   Model: test (TestModel - no LLM calls)")
+    print("   Model: test (TestModel - no LLM calls)")
     print(f"   Server management: {config.manage_server}")
     print(f"   Workspace: {config.workspace}")
 
@@ -176,7 +176,7 @@ The evaluation harness will:
 
 async def main():
     """Run the demo."""
-    report = await demo_with_test_model()
+    await demo_with_test_model()
     await show_real_model_usage()
 
 

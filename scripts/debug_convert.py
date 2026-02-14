@@ -51,6 +51,6 @@ for item in dataset:
     if checked >= 100:
         break
 
-print(f"\nResults:")
+print("\nResults:")
 print(f"  Passed conversion: {passed_convert}")
 print(f"  Failed conversion: {failed_convert}")

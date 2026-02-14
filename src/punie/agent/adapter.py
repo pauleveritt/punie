@@ -69,7 +69,7 @@ def _get_agent_tool_names(agent: PydanticAgent[Any, Any]) -> list[str]:
     names: list[str] = []
     for ts in agent._user_toolsets:
         if hasattr(ts, "tools"):
-            names.extend(ts.tools.keys())
+            names.extend(ts.tools.keys())  # type: ignore[attr-defined]
     return names
 
 

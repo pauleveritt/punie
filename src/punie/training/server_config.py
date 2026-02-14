@@ -18,9 +18,11 @@ class ServerConfig:
     port: int = 8080
     host: str = "127.0.0.1"
     adapter_path: str | None = None  # LoRA adapter directory (None = base model)
-    max_kv_size: int | None = None  # KV cache limit (memory vs. context tradeoff)
-    repetition_penalty: float | None = None  # Inference-time repetition penalty
-    stop_sequences: tuple[str, ...] | None = None  # Stop tokens to prevent garbage output
+    temp: float | None = None  # Default sampling temperature (--temp)
+    top_p: float | None = None  # Nucleus sampling parameter (--top-p)
+    max_tokens: int | None = None  # Maximum generation length (--max-tokens)
+    chat_template_args: str | None = None  # Chat template args JSON (--chat-template-args)
+    stop_sequences: tuple[str, ...] | None = None  # Stop tokens (per-request, not CLI flag)
 
     @property
     def base_url(self) -> str:

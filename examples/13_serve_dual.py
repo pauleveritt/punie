@@ -12,8 +12,8 @@ from punie.http.app import create_app
 
 async def main():
     print("=== Creating agent and HTTP app ===")
-    agent = PunieAgent(model="test", name="dual-agent")
-    app = create_app()
+    PunieAgent(model="test", name="dual-agent")
+    create_app()
 
     print("\n=== Starting dual protocol mode ===")
     print("ACP stdio: Ready for PyCharm connection")

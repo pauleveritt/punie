@@ -20,8 +20,10 @@ def test_server_config_defaults():
     assert config.port == 8080
     assert config.host == "127.0.0.1"
     assert config.adapter_path is None
-    assert config.max_kv_size is None
-    assert config.repetition_penalty is None
+    assert config.temp is None
+    assert config.top_p is None
+    assert config.max_tokens is None
+    assert config.chat_template_args is None
     assert config.stop_sequences is None
 
 
@@ -46,22 +48,40 @@ def test_server_config_with_adapter():
     assert config.adapter_path == "/path/to/adapter"
 
 
-def test_server_config_with_kv_size():
-    """ServerConfig can specify max KV cache size."""
+def test_server_config_with_temp():
+    """ServerConfig can specify temperature."""
     config = ServerConfig(
         model_path="test-model",
-        max_kv_size=4096,
+        temp=0.7,
     )
-    assert config.max_kv_size == 4096
+    assert config.temp == 0.7
 
 
-def test_server_config_with_repetition_penalty():
-    """ServerConfig can specify repetition penalty."""
+def test_server_config_with_top_p():
+    """ServerConfig can specify top_p."""
     config = ServerConfig(
         model_path="test-model",
-        repetition_penalty=1.1,
+        top_p=0.9,
     )
-    assert config.repetition_penalty == 1.1
+    assert config.top_p == 0.9
+
+
+def test_server_config_with_max_tokens():
+    """ServerConfig can specify max_tokens."""
+    config = ServerConfig(
+        model_path="test-model",
+        max_tokens=512,
+    )
+    assert config.max_tokens == 512
+
+
+def test_server_config_with_chat_template_args():
+    """ServerConfig can specify chat_template_args."""
+    config = ServerConfig(
+        model_path="test-model",
+        chat_template_args='{"enable_thinking":false}',
+    )
+    assert config.chat_template_args == '{"enable_thinking":false}'
 
 
 def test_server_config_stop_sequences():
@@ -80,15 +100,19 @@ def test_server_config_all_parameters():
         port=9000,
         host="192.168.1.1",
         adapter_path="/adapters/step-a",
-        max_kv_size=8192,
-        repetition_penalty=1.2,
+        temp=0.8,
+        top_p=0.95,
+        max_tokens=1024,
+        chat_template_args='{"enable_thinking":false}',
         stop_sequences=QWEN_STOP_SEQUENCES,
     )
     assert config.model_path == "mlx-community/Qwen3-Coder-30B"
     assert config.port == 9000
     assert config.host == "192.168.1.1"
     assert config.adapter_path == "/adapters/step-a"
-    assert config.max_kv_size == 8192
-    assert config.repetition_penalty == 1.2
+    assert config.temp == 0.8
+    assert config.top_p == 0.95
+    assert config.max_tokens == 1024
+    assert config.chat_template_args == '{"enable_thinking":false}'
     assert config.stop_sequences == QWEN_STOP_SEQUENCES
     assert config.base_url == "http://192.168.1.1:9000/v1"

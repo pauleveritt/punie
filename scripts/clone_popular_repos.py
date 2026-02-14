@@ -57,13 +57,13 @@ def clone_repo(repo: dict, base_dir: Path) -> bool:
             check=True,
             timeout=300,  # 5 minute timeout
         )
-        print(f"    ✓ Cloned successfully")
+        print("    ✓ Cloned successfully")
         return True
     except subprocess.CalledProcessError as e:
         print(f"    ✗ Failed: {e.stderr.decode()}")
         return False
     except subprocess.TimeoutExpired:
-        print(f"    ✗ Timed out")
+        print("    ✗ Timed out")
         return False
 
 
@@ -100,7 +100,7 @@ def main():
             py_files = list(repo_dir.rglob("*.py"))
             print(f"  • {repo['name']:20} ({repo['category']:8}) - {len(py_files)} Python files")
 
-    print(f"\nNext step: Run scripts/generate_repo_examples.py")
+    print("\nNext step: Run scripts/generate_repo_examples.py")
     print("=" * 80)
 
 

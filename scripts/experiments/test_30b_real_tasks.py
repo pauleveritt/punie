@@ -163,7 +163,7 @@ async def main():
         print(f"Total tool calls: {total_tool_calls}")
         print(f"Average tool calls per task: {total_tool_calls/total_tasks:.1f}")
 
-        print(f"\nPer-task breakdown:")
+        print("\nPer-task breakdown:")
         for r in results:
             status = "✅" if r['success'] else "❌"
             concepts = f"{r['found_concepts']}/{r['total_concepts']}"
@@ -171,7 +171,7 @@ async def main():
 
         # Save results
         with open("/tmp/30b_real_tasks_results.txt", "w") as f:
-            f.write(f"30B Real Task Testing Results\n")
+            f.write("30B Real Task Testing Results\n")
             f.write(f"{'=' * 80}\n\n")
             f.write(f"Success rate: {successful}/{total_tasks} ({successful/total_tasks*100:.1f}%)\n")
             f.write(f"Average time: {avg_time:.2f}s\n")

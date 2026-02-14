@@ -158,7 +158,7 @@ async def main():
     print(f"Total tool calls: {total_tool_calls}")
     print(f"Average tool calls per task: {total_tool_calls/total_tasks:.1f}")
 
-    print(f"\nPer-task breakdown:")
+    print("\nPer-task breakdown:")
     for r in results:
         status = "✅" if r['success'] else "❌"
         concepts = f"{r['found_concepts']}/{r['total_concepts']}"
@@ -166,16 +166,16 @@ async def main():
 
     # Save results
     with open("30b_existing_server_results.txt", "w") as f:
-        f.write(f"30B Real Task Testing Results (Existing Server)\n")
+        f.write("30B Real Task Testing Results (Existing Server)\n")
         f.write(f"{'=' * 80}\n\n")
-        f.write(f"Model: qwen3-30b-a3b-instruct-2507-mlx\n")
+        f.write("Model: qwen3-30b-a3b-instruct-2507-mlx\n")
         f.write(f"Success rate: {successful}/{total_tasks} ({successful/total_tasks*100:.1f}%)\n")
         f.write(f"Average time: {avg_time:.2f}s\n")
         f.write(f"Average tool calls: {total_tool_calls/total_tasks:.1f}\n\n")
         for r in results:
             f.write(f"{r['id']}: {r}\n")
 
-    print(f"\n💾 Results saved to: 30b_existing_server_results.txt")
+    print("\n💾 Results saved to: 30b_existing_server_results.txt")
 
 
 if __name__ == "__main__":

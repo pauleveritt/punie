@@ -36,11 +36,17 @@ def build_server_command(config: ServerConfig) -> list[str]:
     if config.adapter_path:
         cmd.extend(["--adapter-path", config.adapter_path])
 
-    if config.max_kv_size is not None:
-        cmd.extend(["--max-kv-size", str(config.max_kv_size)])
+    if config.temp is not None:
+        cmd.extend(["--temp", str(config.temp)])
 
-    if config.repetition_penalty is not None:
-        cmd.extend(["--repetition-penalty", str(config.repetition_penalty)])
+    if config.top_p is not None:
+        cmd.extend(["--top-p", str(config.top_p)])
+
+    if config.max_tokens is not None:
+        cmd.extend(["--max-tokens", str(config.max_tokens)])
+
+    if config.chat_template_args is not None:
+        cmd.extend(["--chat-template-args", config.chat_template_args])
 
     return cmd
 

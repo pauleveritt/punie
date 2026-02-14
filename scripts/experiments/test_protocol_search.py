@@ -130,7 +130,7 @@ async def main():
             for i, call in enumerate(tool_calls, 1):
                 f.write(f"  {i}. {call['tool']}\n")
 
-        print(f"\nResults saved to /tmp/punie_1.5b_result.txt")
+        print("\nResults saved to /tmp/punie_1.5b_result.txt")
 
     finally:
         print("\nStopping server...")

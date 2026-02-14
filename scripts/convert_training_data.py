@@ -235,7 +235,7 @@ def main():
     all_examples.extend(public_examples)
     all_examples.extend(generated_examples)
 
-    print(f"\n✓ Combined dataset:")
+    print("\n✓ Combined dataset:")
     print(f"  Domain (t-strings repos): {len(domain_examples)}")
     print(f"  POC (Punie-specific tools): {len(poc_examples)}")
     print(f"  Public (tool-calling patterns): {len(public_examples)}")
@@ -251,7 +251,7 @@ def main():
     train_examples = all_examples[:split_idx]
     valid_examples = all_examples[split_idx:]
 
-    print(f"\n✓ Split 90/10:")
+    print("\n✓ Split 90/10:")
     print(f"  Train: {len(train_examples)} examples")
     print(f"  Valid: {len(valid_examples)} examples")
 
@@ -267,12 +267,12 @@ def main():
         for text in valid_examples:
             f.write(json.dumps({"text": text}) + "\n")
 
-    print(f"\n✅ Training data saved:")
+    print("\n✅ Training data saved:")
     print(f"  {train_file} ({len(train_examples)} examples)")
     print(f"  {valid_file} ({len(valid_examples)} examples)")
     print("\n📝 Format: {{text: ...}} with Qwen chat tokens")
     print("   Same format that worked in Phase 1-3")
-    print(f"\n✅ Dataset includes:")
+    print("\n✅ Dataset includes:")
     print(f"  • {len(domain_examples)} domain-specific examples (svcs-di, tdom-svcs, etc.)")
     print(f"  • {len(poc_examples)} Punie-specific tool examples")
     print(f"  • {len(public_examples)} generic tool-calling patterns")

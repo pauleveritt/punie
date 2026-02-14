@@ -351,7 +351,7 @@ def main():
     tool_count = sum(1 for ex in all_examples if categorize_example(ex) == "tool")
     direct_count = len(all_examples) - tool_count
 
-    print(f"Step 5: Combined dataset statistics")
+    print("Step 5: Combined dataset statistics")
     print(f"  Total: {len(all_examples)} examples")
     print(f"  Tool: {tool_count} ({tool_count/len(all_examples)*100:.1f}%)")
     print(f"  Direct: {direct_count} ({direct_count/len(all_examples)*100:.1f}%)")
@@ -377,7 +377,7 @@ def main():
     test_examples = all_examples[valid_split:]
 
     print()
-    print(f"Step 6: Saving Phase 8 data")
+    print("Step 6: Saving Phase 8 data")
     print(f"  Train: {len(train_examples)} examples")
     print(f"  Valid: {len(valid_examples)} examples")
     print(f"  Test: {len(test_examples)} examples")

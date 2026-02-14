@@ -2,10 +2,9 @@
 
 from pathlib import Path
 
-import pytest
 
 from punie.training.eval_prompts import EvalPrompt, EvalSuite
-from punie.training.eval_runner import EvalRunConfig, run_evaluation
+from punie.training.eval_runner import EvalRunConfig
 from punie.training.server_config import ServerConfig
 
 

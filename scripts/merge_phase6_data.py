@@ -29,7 +29,7 @@ def main():
     phase5_valid = Path("data/mlx_format/valid.jsonl")
 
     if phase5_train.exists():
-        print(f"Loading Phase 5 training data...")
+        print("Loading Phase 5 training data...")
         with phase5_train.open() as f:
             for line in f:
                 item = json.loads(line)
@@ -49,13 +49,13 @@ def main():
         phase5_count = len(all_examples)
         print(f"  ✓ Loaded {phase5_count} Phase 5 examples")
     else:
-        print(f"  ⚠️  Phase 5 data not found, skipping")
+        print("  ⚠️  Phase 5 data not found, skipping")
         phase5_count = 0
 
     # Load repo examples
     repos_file = Path("data/repos_examples/training_examples.jsonl")
     if repos_file.exists():
-        print(f"\nLoading repo examples...")
+        print("\nLoading repo examples...")
         with repos_file.open() as f:
             for line in f:
                 item = json.loads(line)
@@ -64,8 +64,8 @@ def main():
         repos_count = len(all_examples) - phase5_count
         print(f"  ✓ Loaded {repos_count} repo examples")
     else:
-        print(f"\n  ⚠️  Repo examples not found")
-        print(f"     Run scripts/generate_repo_examples.py first")
+        print("\n  ⚠️  Repo examples not found")
+        print("     Run scripts/generate_repo_examples.py first")
         repos_count = 0
 
     total = len(all_examples)
@@ -78,12 +78,12 @@ def main():
     tool_examples = sum(1 for ex in all_examples if '"name":' in ex["text"])
     direct_examples = total - tool_examples
 
-    print(f"\nTool vs Direct:")
+    print("\nTool vs Direct:")
     print(f"  Tool-calling: {tool_examples} ({tool_examples/total*100:.1f}%)")
     print(f"  Direct: {direct_examples} ({direct_examples/total*100:.1f}%)")
 
     # Shuffle and split
-    print(f"\nShuffling...")
+    print("\nShuffling...")
     random.shuffle(all_examples)
 
     split_idx = int(len(all_examples) * 0.9)

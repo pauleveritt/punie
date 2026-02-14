@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pytest
 
 from punie.training.lora_config import LoRAConfig
 from punie.training.train_runner import build_train_command
@@ -39,6 +38,13 @@ def test_lora_config_defaults():
     assert config.learning_rate == 1e-5
     assert config.lora_rank == 8
     assert config.lora_layers == 16
+    assert config.save_every is None
+    assert config.val_batches is None
+    assert config.test is False
+    assert config.steps_per_report is None
+    assert config.steps_per_eval is None
+    assert config.grad_checkpoint is False
+    assert config.config_file is None
 
 
 def test_lora_config_all_parameters():
@@ -135,3 +141,137 @@ def test_build_train_command_paths_are_strings():
     assert "/data/train" in cmd
     assert "/adapters/v1" in cmd
     assert not any(isinstance(item, Path) for item in cmd)
+
+
+def test_build_train_command_with_save_every():
+    """build_train_command includes --save-every flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        save_every=50,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--save-every" in cmd
+    assert "50" in cmd
+
+
+def test_build_train_command_with_val_batches():
+    """build_train_command includes --val-batches flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        val_batches=10,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--val-batches" in cmd
+    assert "10" in cmd
+
+
+def test_build_train_command_with_test():
+    """build_train_command includes --test flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        test=True,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--test" in cmd
+
+
+def test_build_train_command_with_steps_per_report():
+    """build_train_command includes --steps-per-report flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        steps_per_report=10,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--steps-per-report" in cmd
+    assert "10" in cmd
+
+
+def test_build_train_command_with_steps_per_eval():
+    """build_train_command includes --steps-per-eval flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        steps_per_eval=25,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--steps-per-eval" in cmd
+    assert "25" in cmd
+
+
+def test_build_train_command_with_grad_checkpoint():
+    """build_train_command includes --grad-checkpoint flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        grad_checkpoint=True,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--grad-checkpoint" in cmd
+
+
+def test_build_train_command_with_config_file():
+    """build_train_command includes --config flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        config_file=Path("/config/lora.yaml"),
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--config" in cmd
+    assert "/config/lora.yaml" in cmd
+
+
+def test_build_train_command_with_all_optional_flags():
+    """build_train_command with all optional flags."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        save_every=50,
+        val_batches=10,
+        test=True,
+        steps_per_report=10,
+        steps_per_eval=25,
+        grad_checkpoint=True,
+        config_file=Path("/config/lora.yaml"),
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--save-every" in cmd
+    assert "50" in cmd
+    assert "--val-batches" in cmd
+    assert "10" in cmd
+    assert "--test" in cmd
+    assert "--steps-per-report" in cmd
+    assert "10" in cmd
+    assert "--steps-per-eval" in cmd
+    assert "25" in cmd
+    assert "--grad-checkpoint" in cmd
+    assert "--config" in cmd
+    assert "/config/lora.yaml" in cmd

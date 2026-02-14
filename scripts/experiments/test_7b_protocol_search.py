@@ -147,12 +147,12 @@ async def test_7b_protocol_search():
             print(f"   Tools used: {', '.join(tool_calls)}")
         print(f"🎯 Accuracy: {accuracy:.1%} ({len(classes_found)}/{len(EXPECTED_CLASSES)} classes found)")
 
-        print(f"\n📋 Classes found:")
+        print("\n📋 Classes found:")
         for cls in EXPECTED_CLASSES:
             found = "✅" if cls in classes_found else "❌"
             print(f"   {found} {cls}")
 
-        print(f"\n📝 Response:")
+        print("\n📝 Response:")
         print("-" * 80)
         print(result.output)
         print("-" * 80)
@@ -172,7 +172,7 @@ async def test_7b_protocol_search():
         speedup_vs_30b = 93.49 / execution_time
         slowdown_vs_claude = execution_time / 10.76
 
-        print(f"\n📊 Speed Analysis:")
+        print("\n📊 Speed Analysis:")
         print(f"   vs 30B: {speedup_vs_30b:.2f}x FASTER ✅")
         print(f"   vs Claude Code: {slowdown_vs_claude:.2f}x SLOWER")
 
@@ -185,7 +185,7 @@ async def test_7b_protocol_search():
             print("   Model didn't use tools or hallucinated answer")
 
         # Viability assessment
-        print(f"\n🎯 Production Viability:")
+        print("\n🎯 Production Viability:")
         viable = (
             execution_time < 30  # Under 30s
             and accuracy == 1.0  # 100% accurate

@@ -98,7 +98,7 @@ async def demo_agent() -> None:
         print()
         print(f"Tool calls made: {len(tracker._calls)}")
         for call_id, call_info in tracker._calls.items():
-            print(f"  - {call_info.name}")
+            print(f"  - {call_info.title}")
 
     except Exception as e:
         print(f"Error: {e}")

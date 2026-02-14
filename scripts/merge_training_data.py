@@ -79,12 +79,12 @@ def main():
     tool_examples = sum(1 for ex in all_examples if '"name":' in ex["text"])
     direct_examples = total - tool_examples
 
-    print(f"\nTool vs Direct distribution:")
+    print("\nTool vs Direct distribution:")
     print(f"  Tool-calling: {tool_examples} ({tool_examples/total*100:.1f}%)")
     print(f"  Direct answers: {direct_examples} ({direct_examples/total*100:.1f}%)")
 
     # Shuffle
-    print(f"\nShuffling examples...")
+    print("\nShuffling examples...")
     random.shuffle(all_examples)
 
     # Split 90/10 for train/valid
@@ -114,17 +114,17 @@ def main():
     print(f"✓ Saved {len(train_examples)} training examples to {train_file}")
     print(f"✓ Saved {len(valid_examples)} validation examples to {valid_file}")
 
-    print(f"\n✅ Phase 6 training data ready!")
+    print("\n✅ Phase 6 training data ready!")
     print(f"   Total: {total} examples ({tool_examples} tool, {direct_examples} direct)")
-    print(f"   Train/Valid split: 90/10")
+    print("   Train/Valid split: 90/10")
     print()
     print("Next step: Train Phase 6 model with:")
-    print(f"  uv run python -m mlx_lm.lora \\")
-    print(f"    --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \\")
-    print(f"    --train --data data/phase6_format \\")
-    print(f"    --iters 500 --batch-size 2 --learning-rate 1e-4 \\")
-    print(f"    --num-layers 16 --adapter-path adapters_phase6 \\")
-    print(f"    --save-every 250 --val-batches 10 --test")
+    print("  uv run python -m mlx_lm.lora \\")
+    print("    --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \\")
+    print("    --train --data data/phase6_format \\")
+    print("    --iters 500 --batch-size 2 --learning-rate 1e-4 \\")
+    print("    --num-layers 16 --adapter-path adapters_phase6 \\")
+    print("    --save-every 250 --val-batches 10 --test")
     print("=" * 80)
 
 

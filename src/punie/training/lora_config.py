@@ -19,3 +19,10 @@ class LoRAConfig:
     learning_rate: float = 1e-5  # Learning rate
     lora_rank: int = 8  # LoRA rank (r) - adapter capacity
     lora_layers: int = 16  # Number of layers to adapt
+    save_every: int | None = None  # Save checkpoint every N iterations (--save-every)
+    val_batches: int | None = None  # Number of validation batches (--val-batches)
+    test: bool = False  # Run test after training (--test)
+    steps_per_report: int | None = None  # Log training stats every N steps (--steps-per-report)
+    steps_per_eval: int | None = None  # Run validation every N steps (--steps-per-eval)
+    grad_checkpoint: bool = False  # Use gradient checkpointing to reduce memory (--grad-checkpoint)
+    config_file: Path | None = None  # YAML config file for lora_rank and other settings (--config)

@@ -25,9 +25,9 @@ class FakeToolset(AbstractToolset[ACPDeps]):
         """Return toolset ID."""
         return "fake-toolset"
 
-    def get_tools(self) -> list[ToolsetTool[ACPDeps]]:
-        """Return empty tool list."""
-        return []
+    def get_tools(self) -> dict[str, ToolsetTool[ACPDeps]]:
+        """Return empty tool dict."""
+        return {}
 
     async def call_tool(
         self,

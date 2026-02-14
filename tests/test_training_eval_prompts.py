@@ -1,6 +1,5 @@
 """Tests for evaluation prompt dataclasses."""
 
-import pytest
 
 from punie.training.eval_prompts import EvalPrompt, EvalSuite
 

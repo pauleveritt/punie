@@ -37,28 +37,52 @@ def test_build_server_command_with_adapter():
     assert "/path/to/adapter" in cmd
 
 
-def test_build_server_command_with_kv_size():
-    """build_server_command includes max KV size."""
+def test_build_server_command_with_temp():
+    """build_server_command includes temperature."""
     config = ServerConfig(
         model_path="test-model",
-        max_kv_size=4096,
+        temp=0.7,
     )
     cmd = build_server_command(config)
 
-    assert "--max-kv-size" in cmd
-    assert "4096" in cmd
+    assert "--temp" in cmd
+    assert "0.7" in cmd
 
 
-def test_build_server_command_with_repetition_penalty():
-    """build_server_command includes repetition penalty."""
+def test_build_server_command_with_top_p():
+    """build_server_command includes top_p."""
     config = ServerConfig(
         model_path="test-model",
-        repetition_penalty=1.1,
+        top_p=0.9,
     )
     cmd = build_server_command(config)
 
-    assert "--repetition-penalty" in cmd
-    assert "1.1" in cmd
+    assert "--top-p" in cmd
+    assert "0.9" in cmd
+
+
+def test_build_server_command_with_max_tokens():
+    """build_server_command includes max_tokens."""
+    config = ServerConfig(
+        model_path="test-model",
+        max_tokens=512,
+    )
+    cmd = build_server_command(config)
+
+    assert "--max-tokens" in cmd
+    assert "512" in cmd
+
+
+def test_build_server_command_with_chat_template_args():
+    """build_server_command includes chat_template_args."""
+    config = ServerConfig(
+        model_path="test-model",
+        chat_template_args='{"enable_thinking":false}',
+    )
+    cmd = build_server_command(config)
+
+    assert "--chat-template-args" in cmd
+    assert '{"enable_thinking":false}' in cmd
 
 
 def test_build_server_command_all_parameters():
@@ -68,8 +92,10 @@ def test_build_server_command_all_parameters():
         port=9000,
         host="0.0.0.0",
         adapter_path="/adapters/step-a",
-        max_kv_size=8192,
-        repetition_penalty=1.2,
+        temp=0.8,
+        top_p=0.95,
+        max_tokens=1024,
+        chat_template_args='{"enable_thinking":false}',
     )
     cmd = build_server_command(config)
 
@@ -86,10 +112,14 @@ def test_build_server_command_all_parameters():
         "0.0.0.0",
         "--adapter-path",
         "/adapters/step-a",
-        "--max-kv-size",
-        "8192",
-        "--repetition-penalty",
-        "1.2",
+        "--temp",
+        "0.8",
+        "--top-p",
+        "0.95",
+        "--max-tokens",
+        "1024",
+        "--chat-template-args",
+        '{"enable_thinking":false}',
     ]
     assert cmd == expected
 

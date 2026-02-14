@@ -340,7 +340,7 @@ def main():
 
     total_generated = len(grep_examples) + len(read_examples) + len(direct_examples)
 
-    print(f"\n✓ Generation complete!")
+    print("\n✓ Generation complete!")
     print(f"  Grep examples: {len(grep_examples)}")
     print(f"  Read examples: {len(read_examples)}")
     print(f"  Direct examples: {len(direct_examples)}")
@@ -360,7 +360,7 @@ def main():
     print(f"   {len(all_examples)} examples ready for training")
 
     # Show distribution
-    print(f"\nType distribution:")
+    print("\nType distribution:")
     print(f"  Tool-calling (grep + read): {len(grep_examples) + len(read_examples)} ({(len(grep_examples) + len(read_examples))/total_generated*100:.1f}%)")
     print(f"  Direct answers: {len(direct_examples)} ({len(direct_examples)/total_generated*100:.1f}%)")
 

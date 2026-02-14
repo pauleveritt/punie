@@ -194,9 +194,9 @@ def main():
     print(f"   Train: {len(train_examples)} examples")
     print(f"   Valid: {len(valid_examples)} examples")
     print(f"   Test: {len(test_examples)} examples")
-    print(f"\nNext steps:")
+    print("\nNext steps:")
     print(f"1. Train: uv run punie train {output_dir}/ --output adapters/qwen-tool-calling/ --iters 50")
-    print(f"2. Eval:  uv run punie eval --adapter adapters/qwen-tool-calling/ --output eval_qwen_tools.html")
+    print("2. Eval:  uv run punie eval --adapter adapters/qwen-tool-calling/ --output eval_qwen_tools.html")
 
 
 if __name__ == "__main__":
