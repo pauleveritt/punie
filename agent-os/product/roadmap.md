@@ -937,3 +937,104 @@ punie serve --model local:http://localhost:8080/v1/default
 ```
 
 **Next:** Download real tool-calling dataset for final baseline, then ready to merge.
+
+---
+
+## 17. Knowledge Distillation & Tool-Calling Training
+
+**Status:** ✅ Completed (2026-02-13)
+
+**Goal:** Build training pipeline to teach 7B model proper tool usage, fixing memorization and infinite loop issues.
+
+**Completed Tasks:**
+- [x] 17.1 Establish baselines (30B model, 7B base, Claude Code)
+- [x] 17.2 Fix tool-call format (from `"tool"` key to `"name"` key)
+- [x] 17.3 Fix stop sequences (`"stop"` → `"stop_sequences"` key mismatch in factory.py)
+- [x] 17.4 Add domain training data (svcs-di, tdom-svcs repositories)
+- [x] 17.5 Balance tool vs direct-answer examples (5 → 50 direct answers)
+
+**Results:**
+- ✅ Fixed memorization: Model now calls tools instead of giving memorized answers
+- ✅ Fixed infinite loop: Stop sequences now working correctly
+- ✅ 100% discrimination accuracy (5/5 queries)
+- ✅ Training: 244 examples (219 train, 25 valid)
+- ✅ Loss: Initial 2.140 → Final 0.815 (62% improvement)
+- ✅ Speed: ~12s avg inference time
+
+**Key Learning:** Training data composition matters. 32.8% direct-answer examples enabled proper tool/direct-answer discrimination.
+
+---
+
+## 18. Model Fusion Optimization
+
+**Status:** ✅ Completed (2026-02-13)
+
+**Goal:** Resolve fused model regression where 4-bit fusion destroyed fine-tuning signal.
+
+**Completed Tasks:**
+- [x] 18.1 Identify root cause: 4-bit re-quantization destroys LoRA deltas
+- [x] 18.2 Implement dequantized fusion (float16 without re-quantization)
+- [x] 18.3 Test 8-bit re-quantization (256 levels vs 16 preserves signal)
+- [x] 18.4 Benchmark 4 configurations (base, adapter, fused-f16, fused-8bit)
+
+**Results:**
+- ✅ **8-bit fused model is the winner:** 100% accuracy, 14.27s avg, 7.55 GB
+- ✅ Speed improvements: 2.7x faster than base, 8.5x faster than adapter
+- ✅ Root cause confirmed: 4-bit quantization (16 levels) rounds away LoRA perturbations
+- ✅ 8-bit quantization (256 levels) preserves fine-tuning while reducing size
+
+**Key Learning:** Quantization level matters for LoRA fusion. 8-bit is the sweet spot for quality/speed/memory.
+
+---
+
+## 19. Training Data Scaling
+
+**Status:** ✅ Completed (2026-02-14)
+
+**Goal:** Scale from domain-specific (244 examples) to diverse Python frameworks (794 examples), then add HTML support (824 examples).
+
+**Completed Tasks:**
+- [x] 19.1 Clone 10 popular Python repos (fastapi, flask, pytest, typer, click, httpx, starlette, pydantic, attrs, structlog)
+- [x] 19.2 Generate 550 examples via AST parsing (grep/read/direct patterns)
+- [x] 19.3 Add 30 HTML examples (semantic HTML, forms, tables, accessibility)
+- [x] 19.4 Train Phase 6 (794 examples: Python only)
+- [x] 19.5 Train Phase 7 (824 examples: Python + HTML)
+- [x] 19.6 Benchmark all phases (5-model comparison)
+
+**Results - Phase 6:**
+- ✅ 100% accuracy maintained
+- ✅ 1.3% faster than Phase 5 (11.97s vs 12.13s)
+- ✅ 67% smaller adapter (0.13 GB vs 0.39 GB)
+- ✅ 3.3x more training data (794 vs 244 examples)
+
+**Results - Phase 7:**
+- ✅ **100% accuracy maintained**
+- ✅ **Fastest inference: 11.96s avg** (0.08% faster than Phase 6)
+- ✅ **Fastest load time: 0.68s** (45% faster than Phase 6)
+- ✅ **Multi-domain: Python + HTML with zero performance penalty**
+- ✅ **0.13 GB adapter size** (same as Phase 6)
+
+**Key Learning:** More diverse training data improves generalization and speed. Multi-domain training (Python + HTML) doesn't hurt performance.
+
+---
+
+## 20. Inference Speed Optimization
+
+**Status:** 🚧 TODO (Next Phase)
+
+**Goal:** Reduce end-to-end latency from ~25s (12s gen + tool + 12s gen) to <10s.
+
+**Context:** Tool-calling queries require ~2 generation turns. Current bottleneck is generation speed (12s per turn), not tool execution.
+
+**Planned Tasks:**
+- [ ] 20.1 Profile end-to-end latency breakdown (generation vs tool vs overhead)
+- [ ] 20.2 Fuse Phase 7 adapter to 8-bit (eliminate adapter loading overhead, proved effective in Phase 18)
+- [ ] 20.3 Test speculative decoding with 1.5B draft model (if Phase 20.2 insufficient)
+- [ ] 20.4 Train for conciseness (shorter responses = fewer tokens = faster generation)
+- [ ] 20.5 Test max_tokens reduction (cap response length at inference time)
+- [ ] 20.6 Explore 3B base model with Phase 7 training data (smaller model = faster)
+- [ ] 20.7 Test prompt caching / KV cache quantization (if memory-bound)
+
+**Target:** <10s end-to-end for tool-calling queries, maintaining 100% discrimination accuracy.
+
+**Priority:** High - current 25s latency is too slow for interactive use.

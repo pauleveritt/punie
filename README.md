@@ -18,9 +18,78 @@ uv pip install punie
 
 ## Usage
 
-### Local Models (LM Studio)
+### Quick Start with Trained Models
 
-Run Punie completely offline using LM Studio or mlx-lm.server:
+**Option 1: Phase 7 Full-Stack Model (Recommended)**
+
+Best for web development with Python + HTML support:
+
+```bash
+# Terminal 1: Start MLX server with Phase 7 model
+uv run python -m mlx_lm.server \
+  --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
+  --adapter-path adapters_phase7 \
+  --port 8080
+
+# Terminal 2: Run Punie
+uv run punie serve --model local
+```
+
+**Option 2: Phase 6 Python-Only Model**
+
+Best for Python-focused development:
+
+```bash
+# Terminal 1: Start MLX server with Phase 6 model
+uv run python -m mlx_lm.server \
+  --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
+  --adapter-path adapters_phase6 \
+  --port 8080
+
+# Terminal 2: Run Punie
+uv run punie serve --model local
+```
+
+**Model Capabilities:**
+- **Phase 7:** Python (FastAPI, pytest, Flask, etc.) + HTML (forms, semantic HTML)
+- **Phase 6:** Python only (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic)
+- **Phase 5:** Python (svcs-di, tdom-svcs) - domain-specific baseline
+
+### Configuration Options
+
+**Environment Variable:**
+```bash
+# Set default model
+export PUNIE_MODEL=local
+uv run punie serve
+
+# Or inline
+PUNIE_MODEL=local uv run punie serve
+```
+
+**Custom Server URL:**
+```bash
+# Use specific port/endpoint
+uv run punie serve --model "local:http://localhost:8080/v1/default"
+```
+
+**Via Configuration File:**
+
+Create `~/.jetbrains/acp.json`:
+```json
+{
+  "model": "local:http://localhost:8080/v1/default"
+}
+```
+
+Then simply run:
+```bash
+uv run punie serve
+```
+
+### Alternative: LM Studio
+
+For users who prefer a GUI:
 
 ```bash
 # 1. Start LM Studio (https://lmstudio.ai/)
@@ -28,43 +97,41 @@ Run Punie completely offline using LM Studio or mlx-lm.server:
 #    - Load a model in the UI
 #    - Start the local server (default: http://localhost:1234)
 
-# 2. Use the default local model
-punie serve --model local
-
-# Or set via environment variable
-PUNIE_MODEL=local punie serve
-
-# Use a specific model name
-punie serve --model local:my-model
-
-# Use a custom server URL
-punie serve --model "local:http://localhost:8080/v1/custom-model"
+# 2. Run Punie
+uv run punie serve --model local
 ```
 
-**Alternative: mlx-lm.server**
+### Model Selection Guide
 
-For Apple Silicon users who prefer command-line tools:
+| Model | Use Case | Accuracy | Speed | Domains |
+|-------|----------|----------|-------|---------|
+| **Phase 7** | Full-stack web dev | 100% | ~12s | Python + HTML |
+| **Phase 6** | Python projects | 100% | ~12s | Python (10+ frameworks) |
+| **Phase 5** | Domain-specific | 100% | ~12s | svcs-di, tdom-svcs |
+| Base (untrained) | Not recommended | 60% | ~8s | Generic (poor quality) |
 
-```bash
-# Install mlx-lm
-uv pip install mlx-lm
+**Recommendation:** Start with **Phase 7** for maximum flexibility. It handles both Python and HTML with no performance penalty compared to Phase 6.
 
-# Start the server
-mlx-lm.server --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+**Training Data:**
+- **Phase 7:** 824 examples (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic, attrs, structlog + HTML)
+- **Phase 6:** 794 examples (same Python frameworks, no HTML)
+- **Phase 5:** 244 examples (svcs-di, tdom-svcs only)
 
-# Then use Punie (in another terminal)
-punie serve --model "local:http://localhost:8080/v1/default"
-```
+**📊 For detailed performance metrics and training history, see [`MODEL_PERFORMANCE_TRACKER.md`](MODEL_PERFORMANCE_TRACKER.md)**
 
-**Benefits:**
-- Zero API costs
-- Privacy-sensitive codebases stay local
-- No internet required (after initial model download)
-- Fast response times (no API latency)
-- Full tool calling support (read/write files, run commands)
-- Works with any OpenAI-compatible server
+### Benefits of Local Models
 
-**Recommended models for LM Studio:**
+- ✅ Zero API costs
+- ✅ Privacy-sensitive codebases stay local
+- ✅ No internet required (after initial model download)
+- ✅ Fast response times (no API latency)
+- ✅ Full tool calling support (read/write files, run commands)
+- ✅ Works with any OpenAI-compatible server
+- ✅ 100% discrimination accuracy (tool vs direct answer)
+
+### Alternative Models (LM Studio)
+
+If not using our trained models:
 - Qwen2.5-Coder series (7B, 14B)
 - DeepSeek-Coder series
 - CodeLlama series
@@ -72,17 +139,49 @@ punie serve --model "local:http://localhost:8080/v1/default"
 
 ### PyCharm Integration
 
-1. Generate ACP configuration:
-   ```bash
-   punie init
-   ```
+**Step 1: Start the model server**
 
-2. Start the agent:
-   ```bash
-   punie serve --model local
-   ```
+Choose your model:
+```bash
+# Full-stack (Python + HTML) - Recommended
+uv run python -m mlx_lm.server \
+  --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
+  --adapter-path adapters_phase7 \
+  --port 8080
 
-3. In PyCharm, select Punie as your AI assistant
+# OR Python-only
+uv run python -m mlx_lm.server \
+  --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
+  --adapter-path adapters_phase6 \
+  --port 8080
+```
+
+**Step 2: Generate ACP configuration**
+```bash
+uv run punie init
+```
+
+This creates `~/.jetbrains/acp.json` with the Punie agent configuration.
+
+**Step 3: Start Punie**
+```bash
+# Uses model server running on localhost:8080
+uv run punie serve --model local
+
+# Or with explicit URL
+uv run punie serve --model "local:http://localhost:8080/v1/default"
+
+# Or via environment variable
+export PUNIE_MODEL=local
+uv run punie serve
+```
+
+**Step 4: Connect PyCharm**
+
+In PyCharm:
+1. Go to Settings → Tools → AI Assistant
+2. Select "Punie" as your AI assistant
+3. Start coding! The agent will use your local model.
 
 ### Programmatic Usage
 
@@ -173,6 +272,21 @@ Punie aims to be fast even on lower-end hardware. How? We'd like to investigate:
     - Extensive use of Python linters, formatters, and type checkers
     - Perhaps extend *those* by making it easy to add custom policies as "skills" but on the deterministic side
     - Explore Pydantic Monty for tool-running
+
+## Documentation
+
+### Project Documentation
+
+- **[Model Performance Tracker](MODEL_PERFORMANCE_TRACKER.md)** — Complete training history, benchmarks, and phase comparisons (Phases 0-7)
+- **[Product Roadmap](agent-os/product/roadmap.md)** — Project roadmap with completed and planned phases
+- **[Development Diary](docs/diary/)** — Phase results and development notes
+- **[Research Notes](docs/research/)** — Training methodology, datasets, and tools research
+
+### Architecture & Training Specs
+
+- **[Knowledge Distillation (Phase 17)](agent-os/specs/2026-02-13-knowledge-distillation/)** — Tool-calling training pipeline
+- **[Model Fusion (Phase 18)](agent-os/specs/2026-02-13-model-fusion/)** — 8-bit fusion for optimal speed/memory
+- **[Training Data Scaling (Phase 19)](agent-os/specs/2026-02-14-training-data-scaling/)** — Multi-domain training (Python + HTML)
 
 ## Research
 
