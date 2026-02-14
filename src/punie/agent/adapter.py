@@ -271,7 +271,7 @@ class PunieAgent:
                         "2. **Start mlx-lm.server:**\n"
                         "   ```bash\n"
                         "   uv pip install mlx-lm\n"
-                        "   mlx-lm.server --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit\n"
+                        "   mlx-lm.server --model mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit\n"
                         "   ```\n\n"
                         "3. **Use the test model (recommended for development):**\n"
                         "   ```bash\n"

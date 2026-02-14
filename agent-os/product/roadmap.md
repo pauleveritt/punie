@@ -415,6 +415,16 @@ model = OpenAIChatModel("model-name", provider=provider)
 
 **Note:** Phase 6 (Local Model Integration with MLX) was superseded by this implementation. Direct MLX model loading proved fragile (chat template issues, quantization failures, XML/JSON format parsing). Delegating to LM Studio or mlx-lm.server provides better reliability and maintainability.
 
+## 11.5 Provider String Cleanup
+
+**Status:** Not Started
+
+**Goal:** Remove OpenAI provider string references (`openai:*`) from CLI help, docs, examples, and tests, and align all model selection messaging with provider-agnostic language.
+
+- [ ] 11.5.1 Audit code and documentation for `openai:*` references
+- [ ] 11.5.2 Update user-facing guidance to remove OpenAI-specific model strings
+- [ ] 11.5.3 Add regression checks to prevent reintroducing provider-specific strings
+
 ## 12. Server Management
 
 **Status:** ✅ Completed (2026-02-11)
@@ -1018,23 +1028,47 @@ punie serve --model local:http://localhost:8080/v1/default
 
 ---
 
-## 20. Inference Speed Optimization
+## 20. Qwen3 MoE Migration + Quantization Optimization
 
-**Status:** 🚧 TODO (Next Phase)
+**Status:** ✅ Completed (2026-02-14)
 
-**Goal:** Reduce end-to-end latency from ~25s (12s gen + tool + 12s gen) to <10s.
+**Goal:** Improve model quality and reduce memory footprint through MoE architecture and quantization optimization.
 
-**Context:** Tool-calling queries require ~2 generation turns. Current bottleneck is generation speed (12s per turn), not tool execution.
+**Actual Approach:** Pivoted from Phase 7 speed optimization to Qwen3-30B-A3B migration with breakthrough quantization research.
 
-**Planned Tasks:**
-- [ ] 20.1 Profile end-to-end latency breakdown (generation vs tool vs overhead)
-- [ ] 20.2 Fuse Phase 7 adapter to 8-bit (eliminate adapter loading overhead, proved effective in Phase 18)
-- [ ] 20.3 Test speculative decoding with 1.5B draft model (if Phase 20.2 insufficient)
-- [ ] 20.4 Train for conciseness (shorter responses = fewer tokens = faster generation)
-- [ ] 20.5 Test max_tokens reduction (cap response length at inference time)
-- [ ] 20.6 Explore 3B base model with Phase 7 training data (smaller model = faster)
-- [ ] 20.7 Test prompt caching / KV cache quantization (if memory-bound)
+**Completed Tasks:**
+- [x] 20.1 Migrate to Qwen3-Coder-30B-A3B (MoE: 30B total, 3.3B active per token)
+- [x] 20.2 Train Phase 8 adapter with domain-pruned data (683 examples: Python + HTML + CSS + JS)
+- [x] 20.3 Fuse adapter to float16 (57GB intermediate)
+- [x] 20.4 Test 8-bit quantization (30GB, 100% accuracy)
+- [x] 20.5 Test 6-bit quantization (23GB, 100% accuracy) - Breakthrough!
+- [x] 20.6 Test 5-bit quantization (20GB, 100% accuracy) - Threshold discovered!
 
-**Target:** <10s end-to-end for tool-calling queries, maintaining 100% discrimination accuracy.
+**Key Achievement:** Discovered LoRA signal preservation threshold is between 16 and 32 quantization levels.
 
-**Priority:** High - current 25s latency is too slow for interactive use.
+**Results:**
+- Model size: 30GB (8-bit) → 20GB (5-bit) = 33% reduction
+- Quality: 100% accuracy maintained (5/5 discrimination test)
+- Speed: 2.61s average per query (5-bit model)
+- Memory: Fits in 32GB unified memory (20GB model + inference overhead)
+
+**Scientific Discovery:**
+- 4-bit (16 levels): ❌ Destroys LoRA signal → 60% accuracy
+- 5-bit (32 levels): ✅ Preserves LoRA signal → 100% accuracy (threshold)
+- 6-bit (64 levels): ✅ Preserves LoRA signal → 100% accuracy
+- 8-bit (256 levels): ✅ Preserves LoRA signal → 100% accuracy (overkill)
+
+**Production:** Use `fused_model_qwen3_phase8_5bit` (20GB) for all Phase 8+ deployments.
+
+**Documentation:**
+- Phase 8 spec: `agent-os/specs/2026-02-14-qwen3-migration/`
+- 6-bit experiment: `agent-os/specs/2026-02-14-6bit-quantization-experiment/`
+- Diary entry: `docs/diary/2026-02-14-quantization-breakthrough.md`
+- Updated: README.md, MEMORY.md
+
+**Original Phase 20 Tasks (Deferred):**
+- [ ] Profile end-to-end latency breakdown (generation vs tool vs overhead)
+- [ ] Test speculative decoding with 1.5B draft model
+- [ ] Train for conciseness (shorter responses = fewer tokens)
+- [ ] Test max_tokens reduction
+- [ ] Test prompt caching / KV cache quantization

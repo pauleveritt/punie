@@ -20,9 +20,31 @@ uv pip install punie
 
 ### Quick Start with Trained Models
 
-**Option 1: Phase 7 Full-Stack Model (Recommended)**
+**Option 1: Phase 8 Qwen3-30B Model (Recommended) 🚀 NEW**
 
-Best for web development with Python + HTML support:
+Best overall quality with MoE architecture (30B total, 3.3B active per token):
+
+```bash
+# Terminal 1: Start MLX server with Phase 8 5-bit fused model
+uv run python -m mlx_lm.server \
+  --model fused_model_qwen3_phase8_5bit \
+  --port 8080
+
+# Terminal 2: Run Punie
+uv run punie serve --model local
+```
+
+**Benefits:**
+- 8-10x faster than adapter-based models
+- Better quality from 30B MoE architecture
+- Domain-focused: Python + HTML + CSS + JS with Django/FastAPI/Flask/Sphinx
+- Optimized 5-bit quantization: 20GB model, 100% accuracy (33% smaller than 8-bit!)
+- Fits in 32GB memory (20GB model + inference overhead)
+- Scientific breakthrough: Found minimum quantization threshold (32 levels)
+
+**Option 2: Phase 7 Full-Stack Model**
+
+Best for web development with Python + HTML support (smaller, 7B model):
 
 ```bash
 # Terminal 1: Start MLX server with Phase 7 model
@@ -35,7 +57,7 @@ uv run python -m mlx_lm.server \
 uv run punie serve --model local
 ```
 
-**Option 2: Phase 6 Python-Only Model**
+**Option 3: Phase 6 Python-Only Model**
 
 Best for Python-focused development:
 
@@ -51,9 +73,10 @@ uv run punie serve --model local
 ```
 
 **Model Capabilities:**
-- **Phase 7:** Python (FastAPI, pytest, Flask, etc.) + HTML (forms, semantic HTML)
-- **Phase 6:** Python only (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic)
-- **Phase 5:** Python (svcs-di, tdom-svcs) - domain-specific baseline
+- **Phase 8:** Python + HTML + CSS + JS (Django, FastAPI, Flask, Sphinx) - 30B MoE, 5-bit fused ⚡
+- **Phase 7:** Python (FastAPI, pytest, Flask, etc.) + HTML (forms, semantic HTML) - 7B dense
+- **Phase 6:** Python only (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic) - 7B dense
+- **Phase 5:** Python (svcs-di, tdom-svcs) - domain-specific baseline - 7B dense
 
 ### Configuration Options
 

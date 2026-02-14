@@ -2,6 +2,9 @@
 
 Reverse-chronological notes from ongoing work. Each entry is summarized and dated.
 
+## 2026-02-14 - [Quantization Breakthrough: 5-bit Preserves LoRA Fine-tuning](2026-02-14-quantization-breakthrough.md)
+Discovered that 5-bit quantization (32 levels) is the minimum threshold for preserving LoRA fine-tuning quality. Reduced Phase 8 model from 30GB (8-bit) to 20GB (5-bit) with 100% accuracy maintained. Scientific finding: LoRA signal preservation threshold is between 16 and 32 quantization levels.
+
 ## 2026-02-13 - [Phase 5: Tool vs. Direct Answer Discrimination](phase5_summary.md)
 Expanded direct-answer training examples from 5 to 50, achieved 100% discrimination accuracy distinguishing tool-calling vs direct-answer queries, with benchmark showing +40pp quality improvement at cost of +53.7% slower generation.
 

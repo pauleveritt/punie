@@ -33,6 +33,11 @@ data/*.log
 fused_model/
 fused_model_f16/
 fused_model_8bit/
+fused_model_qwen3_phase8_f16/
+fused_model_qwen3_phase8_8bit/
+fused_model_qwen3_phase8_6bit/
+fused_model_qwen3_phase8_5bit/
+archived_models/
 
 # Logs and evaluation reports
 logs/
