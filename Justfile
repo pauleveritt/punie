@@ -151,12 +151,14 @@ release-create VERSION:
         exit 1
     fi
 
+    # Get GitHub username
+    GH_USER=$(gh api user --jq .login)
+
     # Create release with notes
     echo "Creating GitHub Release {{VERSION}}..."
     gh release create {{VERSION}} \
         --title "Punie {{VERSION}} - Multi-domain Local Model Training" \
-        --notes "$(cat <<'EOF'
-# Punie {{VERSION}} - Trained Models
+        --notes "# Punie {{VERSION}} - Trained Models
 
 This release includes trained LoRA adapters for Punie's local coding agent.
 
@@ -169,7 +171,7 @@ This release includes trained LoRA adapters for Punie's local coding agent.
 - **Domains:** Python (FastAPI, pytest, Flask, typer, click, httpx, starlette, pydantic, attrs, structlog) + HTML (semantic, forms, tables, accessibility)
 - **Training:** 824 examples (741 train, 83 valid)
 
-**Download:** `punie-phase7-adapter.tar.gz`
+**Download:** \`punie-phase7-adapter.tar.gz\`
 
 ## Phase 6 Adapter
 **Python-focused development**
@@ -180,33 +182,33 @@ This release includes trained LoRA adapters for Punie's local coding agent.
 - **Domains:** Python only (10 popular frameworks)
 - **Training:** 794 examples (714 train, 80 valid)
 
-**Download:** `punie-phase6-adapter.tar.gz`
+**Download:** \`punie-phase6-adapter.tar.gz\`
 
 ## Installation
 
 1. **Download the model:**
-   ```bash
-   wget https://github.com/{{`gh api user --jq .login`}}/punie/releases/download/{{VERSION}}/punie-phase7-adapter.tar.gz
+   \`\`\`bash
+   wget https://github.com/$GH_USER/punie/releases/download/{{VERSION}}/punie-phase7-adapter.tar.gz
    tar -xzf punie-phase7-adapter.tar.gz
-   ```
+   \`\`\`
 
 2. **Start MLX server with adapter:**
-   ```bash
-   uv run python -m mlx_lm.server \
-     --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \
-     --adapter-path adapters_phase7 \
+   \`\`\`bash
+   uv run python -m mlx_lm.server \\
+     --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \\
+     --adapter-path adapters_phase7 \\
      --port 8080
-   ```
+   \`\`\`
 
 3. **Run Punie:**
-   ```bash
+   \`\`\`bash
    uv run punie serve --model local
-   ```
+   \`\`\`
 
 ## Base Model
 
 Both adapters require the base model:
-- **Base:** `mlx-community/Qwen2.5-Coder-7B-Instruct-4bit`
+- **Base:** \`mlx-community/Qwen2.5-Coder-7B-Instruct-4bit\`
 - **Size:** ~4 GB (downloaded automatically by MLX)
 
 ## Performance Comparison
@@ -218,19 +220,17 @@ Both adapters require the base model:
 
 ## Documentation
 
-- [Model Performance Tracker](https://github.com/{{`gh api user --jq .login`}}/punie/blob/main/MODEL_PERFORMANCE_TRACKER.md)
-- [Training Methodology](https://github.com/{{`gh api user --jq .login`}}/punie/tree/main/agent-os/specs)
-- [Development Diary](https://github.com/{{`gh api user --jq .login`}}/punie/tree/main/docs/diary)
+- [Model Performance Tracker](https://github.com/$GH_USER/punie/blob/main/MODEL_PERFORMANCE_TRACKER.md)
+- [Training Methodology](https://github.com/$GH_USER/punie/tree/main/agent-os/specs)
+- [Development Diary](https://github.com/$GH_USER/punie/tree/main/docs/diary)
 
-For questions or issues, please visit the [GitHub repository](https://github.com/{{`gh api user --jq .login`}}/punie).
-EOF
-)" \
+For questions or issues, please visit the [GitHub repository](https://github.com/$GH_USER/punie)." \
         punie-phase7-adapter.tar.gz \
         punie-phase6-adapter.tar.gz
 
     echo ""
     echo "✓ Release {{VERSION}} created successfully!"
-    echo "View at: https://github.com/$(gh api user --jq .login)/punie/releases/tag/{{VERSION}}"
+    echo "View at: https://github.com/$GH_USER/punie/releases/tag/{{VERSION}}"
 
 # Clean up compressed model files after release
 release-clean:
