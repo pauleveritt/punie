@@ -82,6 +82,20 @@ MODEL_CONFIGS = {
         "adapter_path": None,
         "disk_path": "./fused_model_8bit",
     },
+    "adapter-phase6": {
+        "name": "Phase 6 Adapter",
+        "description": "Base + LoRA adapters (794 examples, diverse Python)",
+        "model_path": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+        "adapter_path": "./adapters_phase6",
+        "disk_path": "./adapters_phase6",
+    },
+    "adapter-phase7": {
+        "name": "Phase 7 Adapter",
+        "description": "Base + LoRA adapters (824 examples, Python + HTML)",
+        "model_path": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+        "adapter_path": "./adapters_phase7",
+        "disk_path": "./adapters_phase7",
+    },
 }
 
 # Default configs to run (excludes broken fused-4bit)

@@ -23,13 +23,27 @@ async def test_poc_model():
     #     --adapter-path models/qwen25-7b-distilled/adapters \
     #     --port 8080
 
-    model = "local:http://127.0.0.1:8080/v1/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+    # For local MLX server, we need to specify the model name
+    # The factory will parse local:MODEL_NAME and use default base URL
+    # OR we can directly create the model string
     workspace = Path.cwd()
 
+    # Use openai: prefix with explicit base_url
+    import os
+    os.environ["OPENAI_API_KEY"] = "dummy"  # Required but not used
+    os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:8080/v1"
+
+    model = "openai:mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+
     print(f"\nModel: {model}")
+    print(f"Base URL: http://127.0.0.1:8080/v1")
     print(f"Workspace: {workspace}")
 
-    agent, client = create_local_agent(model=model, workspace=workspace)
+    # Create agent
+    agent, client = create_local_agent(
+        model=model,
+        workspace=workspace
+    )
 
     # Test query: Should call grep once or twice, then give answer
     query = "Find all classes that inherit from Protocol in this codebase"
@@ -49,17 +63,21 @@ async def test_poc_model():
         print("=" * 80)
         print("RESULT")
         print("=" * 80)
-        print(result.data)
+        # Use .output attribute from AgentRunResult
+        output_text = result.output[:500] if len(result.output) > 500 else result.output
+        print(output_text)
+        if len(result.output) > 500:
+            print(f"... ({len(result.output)} total characters)")
         print()
 
         # Check tool calls
-        tool_count = len(deps.tracker.calls)
+        tool_count = len(deps.tracker.tool_calls)
         print(f"\nTool calls made: {tool_count}")
-        for i, call in enumerate(deps.tracker.calls, 1):
-            print(f"  {i}. {call.tool_name}({list(call.args.keys())})")
+        for i, call in enumerate(deps.tracker.tool_calls, 1):
+            print(f"  {i}. {call.tool_name}")
 
         # Success criteria
-        if 1 <= tool_count <= 3 and result.data:
+        if 1 <= tool_count <= 3 and result.output:
             print("\n✅ SUCCESS - Model called tools and gave final answer!")
             print("   (No infinite loop!)")
             return True
@@ -67,7 +85,7 @@ async def test_poc_model():
             print(f"\n❌ FAILED - Model looped ({tool_count} calls)")
             return False
         else:
-            print(f"\n⚠️  UNCLEAR - Unusual pattern ({tool_count} calls, answer: {bool(result.data)})")
+            print(f"\n⚠️  UNCLEAR - Unusual pattern ({tool_count} calls, answer: {bool(result.output)})")
             return False
 
     except Exception as e:

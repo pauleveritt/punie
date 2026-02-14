@@ -851,10 +851,10 @@ def train(
 @app.command("eval")
 def eval_model(
     model: str = typer.Option(
-        "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+        "fused_model_8bit",
         "--model",
         "-m",
-        help="Model to evaluate",
+        help="Model to evaluate (use 'fused_model_8bit' for best performance)",
     ),
     adapter: Path | None = typer.Option(
         None,
@@ -914,7 +914,7 @@ def eval_model(
     # Create server config
     server_config = ServerConfig(
         model_path=model,
-        adapter_path=adapter,
+        adapter_path=str(adapter) if adapter else None,
         port=port,
     )
 
