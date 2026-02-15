@@ -355,7 +355,7 @@ def save_results(results: list[BenchmarkResult]) -> Path:
 
     data = {
         "timestamp": datetime.now().isoformat(),
-        "model_path": "fused_model_qwen3_phase8_5bit",
+        "model_path": "fused_model_qwen3_phase21_xml_5bit",
         "draft_model": "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
         "results": [
             {
@@ -398,12 +398,12 @@ def main():
     print("  3. Speculative with 3 draft tokens")
     print("  4. Speculative with 5 draft tokens")
     print()
-    print("Model: fused_model_qwen3_phase8_5bit (Qwen3-30B-A3B)")
+    print("Model: fused_model_qwen3_phase21_xml_5bit (Qwen3-30B-A3B)")
     print("Draft: mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit")
     print()
 
     # Check if main model exists
-    model_path = "fused_model_qwen3_phase8_5bit"
+    model_path = "fused_model_qwen3_phase21_xml_5bit"
     if not Path(model_path).exists():
         print(f"Error: Model not found at {model_path}")
         print("Please ensure the 5-bit fused model is available.")
