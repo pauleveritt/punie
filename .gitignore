@@ -39,6 +39,14 @@ fused_model_qwen3_phase8_6bit/
 fused_model_qwen3_phase8_5bit/
 fused_model_qwen3_phase21_xml_f16/
 fused_model_qwen3_phase21_xml_5bit/
+fused_model_qwen3_phase22_code_f16/
+fused_model_qwen3_phase22_code_5bit/
+fused_model_qwen3_phase23_ty_f16/
+fused_model_qwen3_phase23_ty_5bit/
+fused_model_qwen25_phase25_7b_f16/
+fused_model_qwen25_phase25_7b_5bit/
+fused_model_qwen25_phase25b_7b_f16/
+fused_model_qwen25_phase25b_7b_6bit/
 archived_models/
 
 # Logs and evaluation reports

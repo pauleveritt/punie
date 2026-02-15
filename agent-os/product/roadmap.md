@@ -1384,9 +1384,569 @@ if result.error_count > 0:
 - Domain-specific tools (svcs-di, tdom-svcs patterns)
 
 **Implementation Path:**
-1. Phase 23: Add `ty` as first typed tool
-2. Phase 24: Add `ruff` and `pytest`
-3. Phase 25: Training data collection infrastructure
-4. Phase 26: Automatic curation and retraining pipeline
+1. Phase 23: Add `ty` as first typed tool ✅
+2. Phase 24: Add `ruff` and `pytest` (planned)
+3. Phase 25: 7B model experiment (in progress)
+4. Phase 26: LSP-based tool architecture (planned)
+5. Phase 27: Training data collection infrastructure (planned)
+6. Phase 28: Automatic curation and retraining pipeline (planned)
 
 **Key Principle:** Start with standard Python tools (ty, ruff, pytest) to establish the pattern, then expand to domain-specific tools.
+
+---
+
+## 25. Model Size Experiment (7B vs 30B)
+
+**Status:** ⚠️ Inconclusive - Setup Flawed (2026-02-15)
+
+**Goal:** Test if Qwen2.5-Coder-7B (dense, 7B params) can match Qwen3-30B-A3B (MoE, 30B params, 3B active) when fine-tuned with Code Mode data.
+
+**Result:** ⚠️ **Experiment inconclusive due to 5 critical setup flaws.** Cannot conclude whether 7B architecture is viable.
+
+**Observed Performance:**
+- 7B accuracy: 35% (7/20 queries, 0/13 tool queries)
+- 30B accuracy: 100% (20/20 queries)
+- 7B speed: 19.15s avg (surprisingly 10x slower than 30B!)
+- 30B speed: 1.94s avg
+
+**5 Critical Setup Flaws:**
+
+1. **`<tool_response>` token doesn't exist in Qwen2.5** (CRITICAL)
+   - 58% of training data uses `<tool_response>` / `</tool_response>`
+   - Qwen3 has as single tokens, Qwen2.5 tokenizes as ~5 subword pieces
+   - Multi-turn tool pattern corrupted during training
+
+2. **Tool call format mismatch** (CRITICAL)
+   - Training data uses Qwen3 XML: `<function=name><parameter=key>value`
+   - Qwen2.5 expects JSON: `{"name": "...", "arguments": {...}}`
+   - Fine-tuning fights base model priors
+
+3. **Two conflicting formats in training data** (MODERATE)
+   - Format A (419 examples): Qwen3 XML wrapper
+   - Format B (62 examples): Bare Python code
+   - 7B model cannot resolve ambiguity
+
+4. **Test script missing tool instructions** (MODERATE)
+   - No tool definitions or function signatures in system prompt
+   - 30B internalized from training, 7B needs runtime guidance
+
+5. **eos_token_id mismatch** (MINOR)
+   - Fused config uses wrong token (151643 vs 151645)
+   - Model generates until max_tokens → 19s uniform times
+
+**Verdict:** Cannot conclude 7B architecture is insufficient. Setup was so broken that we have no signal on 7B's actual capability.
+
+**What Fair Retest Would Require:**
+1. Convert training data to Qwen2.5 JSON format
+2. Replace `<tool_response>` with Qwen2.5 convention
+3. Unify to single format (no XML/Python mix)
+4. Add tool definitions to system prompt
+5. Fix eos_token_id in fused config
+6. Consider 6-bit quantization (proven) vs 5-bit (unproven on 7B)
+
+**Decision:** Stick with Qwen3-30B-A3B (`fused_model_qwen3_phase23_ty_5bit` - 20 GB, 100% accuracy, 1.94s avg)
+
+**Infrastructure Validated:**
+- ✅ Training pipeline works at any scale (7B to 30B)
+- ✅ 5-bit quantization preserved training signal
+- ✅ Comparison framework detected issues immediately
+- ✅ Learned what NOT to do in cross-model training
+
+**Files Cleaned Up:**
+- Removed `fused_model_qwen25_phase25_7b_f16/` (14 GB)
+- Removed `fused_model_qwen25_phase25_7b_5bit/` (4.9 GB)
+- Removed `adapters_phase25_7b/` (308 MB)
+- Total reclaimed: 19.2 GB
+
+**Documentation:**
+- Diary: `docs/diary/2026-02-15-phase25-7b-experiment-failed.md` (root cause analysis)
+- Spec: `agent-os/specs/2026-02-14-phase25-7b-experiment/`
+- MEMORY.md: Updated with 5 setup flaws
+
+**Key Learning:** Training data format, tokenization, and system prompt must match target model. Cross-model training requires careful adaptation.
+
+---
+
+## 26. LSP-Based Tool Architecture
+
+**Status:** Planned (2026-02-15)
+
+**Goal:** Replace text-based tools (grep, read_file, write_file) with LSP operations for precise, semantic code manipulation.
+
+**Context:** Current tools are text-based:
+- `grep "class Foo"` → finds strings in comments, docstrings, etc.
+- `read_file` → returns full text (no context about symbols)
+- `write_file` → overwrites entire file (no semantic edits)
+
+LSP operations are semantic:
+- Go to definition → finds actual symbol declarations
+- Find references → traces usage across codebase
+- Rename → safe refactoring with awareness
+- Code actions → semantic fixes (add import, extract method, etc.)
+
+**Benefits:**
+- **Precision:** Symbol-based vs text-based search
+- **Safety:** Semantic edits vs text replacement
+- **Context:** Type information, hover docs, signature help
+- **Efficiency:** Incremental parsing vs full file reads
+
+**LSP Operations to Implement:**
+
+**Navigation:**
+- `goto_definition(symbol)` → file path + line number
+- `find_references(symbol)` → list of usage locations
+- `find_implementations(interface)` → concrete classes
+
+**Search:**
+- `find_symbol(name)` → workspace symbol search
+- `document_symbols(file)` → outline (classes, functions, etc.)
+- `workspace_symbols(query)` → cross-file symbol search
+
+**Edits:**
+- `rename_symbol(old, new)` → safe refactoring
+- `apply_code_action(action)` → semantic fixes
+- `organize_imports(file)` → sort/remove unused imports
+
+**Information:**
+- `hover(file, position)` → type info, docstring
+- `signature_help(file, position)` → function parameters
+- `completion(file, position)` → autocomplete suggestions
+
+**Architecture:**
+
+```python
+# New typed tool: lsp_query()
+result = lsp_query("goto_definition", symbol="AgentConfig", file="src/punie/agent/config.py")
+# Returns: LSPResult(
+#   operation="goto_definition",
+#   file="src/punie/agent/config.py",
+#   line=42,
+#   symbol_type="class",
+#   docstring="..."
+# )
+```
+
+**Integration with ty:**
+- `ty` LSP server already running for type checking
+- Reuse existing connection for navigation/refactoring
+- Unified interface for all LSP operations
+
+**Training Data Strategy:**
+1. Generate examples using real LSP queries on Punie codebase
+2. Show model using LSP for precise operations
+3. Contrast with text-based approaches (demonstrate when each is appropriate)
+4. Multi-step workflows (LSP query → read → edit → verify)
+
+**Implementation Path:**
+1. Add `lsp_query()` typed tool with LSPResult Pydantic model
+2. Implement LSP client (reuse ty connection + add Python LSP server)
+3. Generate 100+ LSP training examples
+4. Retrain with LSP examples
+5. Benchmark: LSP precision vs text-based tools
+
+**Success Criteria:**
+- Model chooses LSP for symbol operations, text tools for content search
+- Refactoring operations succeed (rename, extract, etc.)
+- No false positives (text matches in comments/strings)
+- Training data demonstrates clear LSP advantages
+
+**Future:** Expand to other languages (TypeScript, Rust, Go) using same LSP architecture.
+
+---
+
+## 27. Domain Typed Tools (Holy Grail Part B)
+
+**Status:** Planned (2026-02-15)
+
+**Goal:** Implement tools that think in domain vocabulary (components, services, middleware) instead of code syntax (classes, functions, decorators). This enables the model to reason about **design decisions**, not just code correctness.
+
+**Context:**
+
+Current tools validate *existing* code:
+- `ty check` → finds type errors
+- `ruff check` → finds style violations
+- `pytest` → runs tests
+
+Domain tools guide *future* code design:
+- `validate_component(spec)` → checks if component design follows tdom rules
+- `check_dependency_graph(registry)` → validates service architecture
+- `validate_middleware_chain(chain)` → ensures correct middleware ordering
+
+**Key Insight:**
+
+The model stops thinking in "code" and starts thinking in **domain concepts that happen to be implemented as code**.
+
+Example workflow:
+```python
+# User asks: "Add authentication to this tdom-svcs app"
+
+# Model thinks in domain terms:
+# 1. Need auth service with request lifecycle
+# 2. Need auth middleware with correct priority
+# 3. Need DI bindings in templates
+
+# Validate service registration
+result = validate_service_registration({
+    "factory": "create_auth_service",
+    "lifecycle": "request",
+    "protocol": "AuthProtocol"
+})
+# → ValidationResult(valid=False, errors=["AuthProtocol missing check_permissions method"])
+
+# Fix protocol, then validate middleware
+result = validate_middleware_chain([
+    {"name": "auth", "priority": 100},
+    {"name": "logging", "priority": 50}
+])
+# → ValidationResult(valid=True)
+
+# Write the code knowing the design is valid
+```
+
+**Domain Tools to Implement:**
+
+**tdom domain:**
+- `validate_component(spec)` → Component structure, props, children, escaping
+- `check_render_tree(template)` → Node hierarchy, no dangling refs
+- `validate_escape_context(node)` → XSS prevention rules
+
+**svcs + svcs-di domain:**
+- `validate_service_registration(reg)` → Factory type, lifecycle, protocol conformance
+- `check_dependency_graph(registry)` → No circular deps, layer violations
+- `validate_injection_site(location)` → Service is registered before injection
+
+**tdom-svcs domain:**
+- `validate_middleware_chain(chain)` → Priority ordering, no conflicts
+- `check_di_template_binding(template)` → All injected services are registered
+- `validate_route_pattern(pattern)` → Route syntax, parameter types
+
+**Domain Vocabulary vs Code Vocabulary:**
+
+| Domain Concept | Code Implementation | Domain Tool Checks |
+|---------------|--------------------|--------------------|
+| Component | Python function with t-string return | Props are JSON-serializable, children are valid |
+| Service | Class/function registered with svcs | Lifecycle is valid, protocol is implemented |
+| Middleware | Function with priority decorator | Priority ordering, no conflicts |
+| Route | URL pattern with parameter types | Syntax is valid, types are supported |
+| DI Binding | Template variable injection | Service is registered |
+
+**Architecture:**
+
+```python
+# Domain Pydantic models (nouns)
+class ComponentSpec(BaseModel):
+    name: str
+    props: dict[str, type]
+    children: list[str]
+    escaping: str  # "auto" | "manual" | "none"
+
+class ServiceRegistration(BaseModel):
+    factory: str
+    lifecycle: str  # "request" | "session" | "app"
+    protocol: str
+    dependencies: list[str]
+
+# Domain validation functions (verbs)
+def validate_component(spec: ComponentSpec) -> ValidationResult:
+    """Check if component spec follows tdom rules."""
+    errors = []
+    # Rule 1: Props must be JSON-serializable
+    # Rule 2: Children must be valid component names
+    # Rule 3: Escaping must be correct for context
+    return ValidationResult(valid=len(errors) == 0, errors=errors)
+
+# Sandbox integration (same pattern as LSP/ty/ruff)
+def sync_validate_component(spec_dict: dict) -> str:
+    spec = ComponentSpec(**spec_dict)
+    result = validate_component(spec)
+    return json.dumps(result.model_dump())
+```
+
+**Training Data Strategy:**
+
+1. Mine domain repos (tdom, svcs, svcs-di, tdom-svcs) for patterns
+2. Create 150 examples showing domain reasoning workflows:
+   - Component design with validation (30 examples)
+   - Service architecture with dependency checking (40 examples)
+   - Middleware ordering and conflicts (30 examples)
+   - Full app design (50 examples showing multi-tool workflows)
+3. Contrast with code-first approaches (show why domain tools catch design errors)
+4. Multi-step workflows: validate design → write code → validate code → test
+
+**Implementation Path:**
+
+1. Define domain Pydantic models (ComponentSpec, ServiceRegistration, MiddlewareChain, etc.)
+2. Implement deterministic validation functions (no side effects, return ValidationResult)
+3. Add to sandbox as callable tools (sync_validate_component, etc. in toolset.py)
+4. Add to stubs.py for system prompt
+5. Generate 150 training examples
+6. Retrain with domain tool examples
+7. Benchmark: does model think in domain terms?
+
+**Success Criteria:**
+
+- Model reasons in domain vocabulary (components, services, middleware) not code vocabulary (classes, functions, decorators)
+- Domain tools catch design errors before code is written
+- Training data demonstrates domain-driven design workflows
+- Model uses domain tools for architectural decisions, validation tools for code correctness
+
+**Why This is Higher Impact Than LSP:**
+
+| Dimension | LSP | Domain Tools |
+|-----------|-----|--------------|
+| Navigation | ✅ Precise symbol lookup | ✅ Semantic understanding |
+| Refactoring | ✅ Safe renames | ✅ Domain-aware refactoring |
+| Design decisions | ❌ Still thinks in code | ✅ Thinks in domain concepts |
+| Architectural guardrails | ❌ No constraints | ✅ Validates invariants |
+| Learning curve | Modest | Transformative |
+
+**Key Difference from Validation Tools:**
+
+- Validation tools (ty, ruff, pytest): Check *existing* code for errors (reactive)
+- Domain tools: Guide *future* code design (proactive)
+
+Domain tools shift reasoning from **"How do I write this code?"** to **"What design should I implement?"**
+
+This is the difference between a junior developer (writes code that compiles) and a senior architect (designs systems that scale).
+
+**Future:** Expand to other domains as Punie's scope grows (API design, database schema, deployment configs, etc.).
+
+---
+
+## 28. Full Retrain + Training Data Flywheel
+
+**Status:** Planned (2026-02-15)
+
+**Goal:** Retrain on complete dataset (~1265 examples) with all tool categories, then establish automatic training data collection from real Punie usage.
+
+**Context:**
+
+After Phases 26 (LSP) and 27 (Domain Tools), Punie will have:
+- Text-based tools (grep, read, write, run_command)
+- Validation tools (ty, ruff, pytest)
+- Semantic tools (LSP navigation, type queries, refactoring)
+- Domain tools (component/service/middleware validation)
+
+This phase completes the training data and establishes the self-improvement loop.
+
+**Dataset Composition (~1265 examples):**
+
+| Category | Count | Purpose |
+|----------|-------|---------|
+| Phase 22 base | 707 | Text tools, direct answers, multi-step workflows |
+| Phase 24 (ruff, pytest, ty) | 100 | Validation tool calling |
+| Domain examples (agent-os) | 158 | Domain knowledge Q&A |
+| Phase 26 (LSP) | 100 | Semantic navigation and refactoring |
+| Phase 27 (Domain Tools) | 150 | Domain reasoning and design validation |
+| **Total** | **1215** | Complete tool ecosystem |
+
+**Training Configuration:**
+
+- Iterations: 800 (more data → more iterations for full convergence)
+- Batch size: 2 (proven effective for 7B/30B models)
+- LoRA layers: 16 for 7B (57% coverage), 8 for 30B (16% coverage)
+- Learning rate: 1e-4 (proven optimal)
+- Quantization: 5-bit (proven LoRA preservation)
+
+**Retrain Goals:**
+
+1. **Tool selection mastery** — Model chooses the right tool for each task:
+   - Text tools for content search
+   - LSP for symbol navigation
+   - Validation tools for code correctness
+   - Domain tools for design decisions
+
+2. **Multi-tool workflows** — Complex tasks require tool sequencing:
+   - LSP to explore → read to understand → domain tool to validate → write to implement → validation tool to verify → test
+
+3. **Domain reasoning** — Model thinks in domain vocabulary:
+   - "Add auth service" → validate_service_registration → validate_middleware_chain → validate_di_template_binding → write code
+
+**Training Data Flywheel:**
+
+The holy grail vision: **automatic training data collection from real usage**.
+
+**Phase 1: Capture**
+
+```python
+# Every Punie interaction is logged:
+{
+    "query": "Add authentication to this app",
+    "code": [
+        "result = validate_service_registration(...)",
+        "result = validate_middleware_chain(...)",
+        "write_file(...)"
+    ],
+    "tool_results": [...],
+    "outcome": "success",  # or "error"
+    "timestamp": "2026-03-15T10:30:00Z"
+}
+```
+
+**Phase 2: Filter**
+
+Automatic quality checks:
+- ✅ Successful outcome (no errors, tools used correctly)
+- ✅ Novel pattern (not duplicate of existing examples)
+- ✅ No sensitive data (no API keys, personal info)
+- ✅ Clear intent (query is understandable)
+- ✅ Correct tool usage (tools called with valid parameters)
+
+**Phase 3: Curate**
+
+Manual review for edge cases:
+- Complex multi-tool workflows
+- Novel domain patterns
+- Error handling examples
+- Teaching moments (model made mistake → learned)
+
+**Phase 4: Retrain**
+
+Scheduled retraining on growing dataset:
+- Monthly retrain with new examples
+- Track perplexity and benchmark scores over time
+- A/B test new models before deployment
+- Keep best-performing model
+
+**Phase 5: Deploy**
+
+- Roll out new model to production
+- Monitor performance on real queries
+- Collect more usage data
+- Repeat
+
+**Infrastructure Requirements:**
+
+1. **Logging system**
+   - Capture all Punie interactions (query, code, results)
+   - Store in structured format (JSONL)
+   - Respect privacy (opt-in, no sensitive data)
+
+2. **Filtering pipeline**
+   - Automatic quality checks
+   - Deduplication
+   - Diversity balancing (don't over-represent common patterns)
+
+3. **Curation tools**
+   - UI for manual review
+   - Tagging and categorization
+   - Example editing and annotation
+
+4. **Retraining pipeline**
+   - Automatic dataset merging
+   - Training script generation
+   - Benchmark evaluation
+   - Model versioning
+
+5. **Deployment system**
+   - A/B testing infrastructure
+   - Rollback capability
+   - Performance monitoring
+
+**Success Criteria:**
+
+- ✅ Model performs well on all tool categories (text, validation, LSP, domain)
+- ✅ Multi-tool workflows succeed (>=80% on 20-query benchmark)
+- ✅ Domain reasoning is evident (model uses domain vocabulary)
+- ✅ Training data collection is automatic (no manual example writing)
+- ✅ Retraining happens regularly (monthly)
+- ✅ Model improves continuously (perplexity decreases, benchmark scores increase)
+
+**The Flywheel Vision:**
+
+```
+Real usage → Capture → Filter → Curate → Retrain → Deploy → Better model
+                                                              ↓
+                                                        More usage ← ← ←
+```
+
+This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes training data. The model gets smarter with use.
+
+**Key Insight:**
+
+The flywheel only works if the tools are *rich enough* to be worth learning from:
+- Text tools: Limited learning (everyone knows grep)
+- Validation tools: Some learning (how to fix specific errors)
+- LSP: Good learning (semantic navigation patterns)
+- Domain tools: **Rich learning** (architectural design patterns)
+
+Domain tools are the key to the flywheel — they capture **design knowledge**, not just code mechanics.
+
+**Future Enhancements:**
+
+- Active learning (model requests examples for weak areas)
+- Multi-user learning (aggregate patterns across users)
+- Domain expansion (new tools for new domains)
+- Cross-domain transfer (patterns from one domain inform another)
+
+---
+
+## 29. Flywheel Architecture Implementation
+
+**Status:** Planned (after Phase 28)
+
+**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the self-improvement loop.
+
+**Context:**
+
+Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the architecture described in flywheel.md and holy-grail-architecture.md. This is when the self-improving loop becomes reality.
+
+**Key Components:**
+
+- **Skills Framework** — Progressive disclosure (list → load → execute)
+- **Monty Tool** — Model generates domain-specific tool implementations
+- **Schema Validation** — Pydantic models + AST/libcst validation layers
+- **Training Collector** — Automatic JSONL capture of all generations
+- **Bootstrap Dataset** — 30 tdom components, 20 svcs services as seed data
+- **Self-Improvement Loop** — Capture → Filter → Augment → Retrain → Deploy
+
+**Implementation Path:**
+
+**Milestone 1: Skills Framework (1 week)**
+- `punie/skills/` directory structure
+- Skill loader implementing list/load/execute pattern
+- SKILL.md parser with YAML frontmatter
+- Initial skills: tdom-components, svcs-services, middleware
+
+**Milestone 2: Monty Tool + Validation (1 week)**
+- `generate_artifact` tool implementation
+- Schema registry (tdom, svcs, middleware)
+- Pydantic validators for each artifact type
+- ModelRetry integration for validation errors
+- Layered validation: ast → libcst matchers → libcst transformers → ty
+
+**Milestone 3: Training Data Collector (3 days)**
+- `TrainingCollector` class in `punie.training`
+- Automatic trace recording on every generation
+- JSONL output format with full context
+- Conversion to ChatML training examples
+- Filtering for `validation_passed=True` only
+
+**Milestone 4: Bootstrap Dataset (1 week)**
+- 30 reference tdom components (varied complexity)
+- 20 reference svcs services (lifecycle patterns)
+- 15 reference middleware implementations
+- Annotations + descriptions for each example
+- Fine-tune initial adapter with bootstrap data
+
+**Milestone 5: Self-Improvement Loop (ongoing)**
+- Automated data collection during daily work
+- Weekly fine-tuning jobs (continuous improvement)
+- Metrics dashboard (validation rates, retry counts, velocity)
+- A/B testing: Phase N vs Phase N+1
+
+**Success Criteria:**
+
+- ✅ Skills load dynamically (no upfront token cost for all skills)
+- ✅ Monty generates valid domain artifacts (>70% validation pass rate)
+- ✅ Training collector captures all generations automatically
+- ✅ Model learns from corrections (retry count decreases over time)
+- ✅ Development velocity improves (faster time-to-working-code)
+
+**References:**
+
+- [Flywheel Architecture](../../docs/flywheel.md)
+- [Holy Grail Architecture Spec](../specs/2026-02-15-pydantic-ai-skills-analysis/holy-grail-architecture.md)
+- [Example tdom Skill](../specs/2026-02-15-pydantic-ai-skills-analysis/example-tdom-skill.md)
+
+---
