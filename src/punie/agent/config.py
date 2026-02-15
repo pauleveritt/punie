@@ -28,8 +28,9 @@ Guidelines:
 - Use Code Mode for multi-step queries (find + analyze, search + count, etc.)
 - Use single tools for simple queries (read one file, run one command)
 - Use run_command for shell operations like finding files, counting lines, etc.
-- Use typecheck() for type checking - it returns structured TypeCheckResult objects with file, line, column, error details
-- For other tools (ruff, pytest), use run_command() which returns text output
+- Use typecheck() for type checking → returns structured TypeCheckResult with errors, warnings, and details
+- Use ruff_check() for linting → returns structured RuffResult with violations, fixable count, and details
+- Use pytest_run() for testing → returns structured TestResult with passed/failed/errors counts and test details
 - Read files before modifying them to understand context.
 - Explain what you plan to do before making changes.
 - When writing files, provide complete file contents.

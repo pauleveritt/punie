@@ -103,9 +103,14 @@ async def test_model_with_call_tools_all_would_attempt_tool_calls():
     """Demonstrate that call_tools='all' causes tool calls.
 
     This test shows why we use call_tools=[] instead. With call_tools='all',
-    the model attempts to call tools, which in a real ACP scenario would
-    cause a deadlock.
+    the model attempts to call ALL available tools, which can cause failures
+    when tools receive invalid input (like execute_code getting 'a' as code).
+
+    In a real ACP scenario with actual tool execution, this would either
+    deadlock or cause tool execution errors.
     """
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+
     # Create a test model that WILL call tools (opposite of our fixed config)
     model_that_calls_tools = TestModel(
         custom_output_text="I tried to call tools!",
@@ -120,12 +125,13 @@ async def test_model_with_call_tools_all_would_attempt_tool_calls():
         tracker=ToolCallTracker(),
     )
 
-    # Run the agent - it will attempt to call tools
-    result = await agent.run("Do something", deps=deps)
+    # Run the agent - it will attempt to call tools and fail
+    # because TestModel passes 'a' as code to execute_code, causing NameError
+    with pytest.raises(UnexpectedModelBehavior) as exc_info:
+        await agent.run("Do something", deps=deps)
 
-    # The agent will have attempted tool calls (can see in logs)
-    # In a real ACP scenario, this would deadlock
-    assert result.output == "I tried to call tools!"
+    # Verify it failed due to execute_code being called with invalid input
+    assert "execute_code" in str(exc_info.value)
 
 
 def test_call_tools_empty_vs_none():

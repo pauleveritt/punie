@@ -201,18 +201,19 @@ async def test_fake_client_kill_terminal():
     assert terminal_id not in fake_client.terminals
 
 
-def test_toolset_has_all_seven_tools():
-    """create_toolset() should return toolset with all 7 tools."""
+def test_toolset_has_all_eight_tools():
+    """create_toolset() should return toolset with all 8 tools."""
     toolset = create_toolset()
 
     # toolset.tools is a dict mapping tool names to Tool objects
     tool_names = set(toolset.tools.keys())
 
-    # Verify all 7 tools are present
+    # Verify all 8 tools are present
     expected_tools = {
         "read_file",
         "write_file",
         "run_command",
+        "execute_code",
         "get_terminal_output",
         "release_terminal",
         "wait_for_terminal_exit",
@@ -264,7 +265,9 @@ def test_factory_has_output_validator():
 async def test_output_validator_accepts_valid():
     """Output validator should accept non-empty responses."""
     # Create agent with TestModel that returns valid output
-    agent = create_pydantic_agent(model=TestModel(custom_output_text="Valid response"))
+    agent = create_pydantic_agent(
+        model=TestModel(custom_output_text="Valid response", call_tools=[])
+    )
 
     # Create fake dependencies
     fake_client = FakeClient()
@@ -282,7 +285,9 @@ async def test_output_validator_accepts_valid():
 async def test_output_validator_rejects_empty():
     """Output validator should reject empty responses and exhaust retries."""
     # Create agent with TestModel that returns empty output
-    agent = create_pydantic_agent(model=TestModel(custom_output_text=""))
+    agent = create_pydantic_agent(
+        model=TestModel(custom_output_text="", call_tools=[])
+    )
 
     # Create fake dependencies
     fake_client = FakeClient()
@@ -300,7 +305,9 @@ async def test_output_validator_rejects_empty():
 async def test_adapter_handles_agent_error():
     """PunieAgent should catch agent errors and send via session_update."""
     # Create agent that will fail validation (empty output)
-    pydantic_agent = create_pydantic_agent(model=TestModel(custom_output_text=""))
+    pydantic_agent = create_pydantic_agent(
+        model=TestModel(custom_output_text="", call_tools=[])
+    )
     adapter = PunieAgent(pydantic_agent, name="test-agent")
 
     # Connect to fake client

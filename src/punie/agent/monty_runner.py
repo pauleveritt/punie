@@ -17,20 +17,22 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from punie.agent.typed_tools import TypeCheckResult
+    from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
 
 
 @dataclass(frozen=True)
 class ExternalFunctions:
     """Registry of external functions available in sandbox.
 
-    These functions bridge from the sandbox back to ACP tools.
+    These functions bridge from the sandbox back to ACP tools and typed tools.
     """
 
     read_file: Callable[[str], str]
     write_file: Callable[[str, str], str]
     run_command: Callable[[str, list[str] | None, str | None], str]
     typecheck: Callable[[str], TypeCheckResult]
+    ruff_check: Callable[[str], RuffResult]
+    pytest_run: Callable[[str], TestResult]
 
 
 class CodeExecutionError(Exception):
@@ -117,13 +119,20 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         CodeExecutionError: If code validation or execution fails
 
     Example:
+        >>> from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
         >>> def fake_read(path: str) -> str:
         ...     return "test content"
         >>> def fake_write(path: str, content: str) -> str:
         ...     return "success"
         >>> def fake_run(cmd: str, args=None, cwd=None) -> str:
         ...     return "output"
-        >>> funcs = ExternalFunctions(fake_read, fake_write, fake_run)
+        >>> def fake_typecheck(path: str) -> TypeCheckResult:
+        ...     return TypeCheckResult(success=True, error_count=0, warning_count=0, errors=[])
+        >>> def fake_ruff(path: str) -> RuffResult:
+        ...     return RuffResult(success=True, violation_count=0, fixable_count=0, violations=[])
+        >>> def fake_pytest(path: str) -> TestResult:
+        ...     return TestResult(success=True, passed=0, failed=0, errors=0, skipped=0, duration=0.0, tests=[])
+        >>> funcs = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest)
         >>> result = run_code('content = read_file("test.txt"); print(content)', funcs)
         >>> result.strip()
         'test content'
@@ -140,6 +149,8 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         "write_file": external_functions.write_file,
         "run_command": external_functions.run_command,
         "typecheck": external_functions.typecheck,
+        "ruff_check": external_functions.ruff_check,
+        "pytest_run": external_functions.pytest_run,
         "json": json,  # Available directly, no import needed
     }
 

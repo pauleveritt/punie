@@ -325,13 +325,14 @@ async def test_fake_client_discover_tools():
     assert result["tools"] == catalog_data
 
 
-def test_default_toolset_has_all_7_tools():
-    """create_toolset() returns all 7 static tools (Tier 3 fallback)."""
+def test_default_toolset_has_all_8_tools():
+    """create_toolset() returns all 8 static tools (Tier 3 fallback)."""
     toolset = create_toolset()
-    assert len(toolset.tools) == 7
+    assert len(toolset.tools) == 8
 
     assert "read_file" in toolset.tools
     assert "write_file" in toolset.tools
+    assert "execute_code" in toolset.tools
     assert "run_command" in toolset.tools
     assert "get_terminal_output" in toolset.tools
     assert "release_terminal" in toolset.tools

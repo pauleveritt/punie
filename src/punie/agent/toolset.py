@@ -346,12 +346,68 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_typecheck(), loop)
             return future.result(timeout=30)
 
+        def sync_ruff_check(path: str):  # type: ignore[no-untyped-def]
+            """Bridge from sync sandbox to async ruff linter via terminal."""
+            from punie.agent.typed_tools import RuffResult, parse_ruff_output
+
+            # Use terminal workflow to run ruff check
+            async def _run_ruff() -> RuffResult:
+                term = await ctx.deps.client_conn.create_terminal(
+                    command="ruff",
+                    args=["check", path],
+                    cwd=None,
+                    session_id=ctx.deps.session_id,
+                )
+                await ctx.deps.client_conn.wait_for_terminal_exit(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                output_resp = await ctx.deps.client_conn.terminal_output(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                await ctx.deps.client_conn.release_terminal(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                # Parse text output into RuffResult
+                return parse_ruff_output(output_resp.output)
+
+            future = asyncio.run_coroutine_threadsafe(_run_ruff(), loop)
+            return future.result(timeout=30)
+
+        def sync_pytest_run(path: str):  # type: ignore[no-untyped-def]
+            """Bridge from sync sandbox to async pytest via terminal."""
+            from punie.agent.typed_tools import TestResult, parse_pytest_output
+
+            # Use terminal workflow to run pytest with verbose output
+            async def _run_pytest() -> TestResult:
+                term = await ctx.deps.client_conn.create_terminal(
+                    command="pytest",
+                    args=[path, "-v", "--tb=short"],
+                    cwd=None,
+                    session_id=ctx.deps.session_id,
+                )
+                await ctx.deps.client_conn.wait_for_terminal_exit(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                output_resp = await ctx.deps.client_conn.terminal_output(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                await ctx.deps.client_conn.release_terminal(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                # Parse verbose output into TestResult
+                return parse_pytest_output(output_resp.output)
+
+            future = asyncio.run_coroutine_threadsafe(_run_pytest(), loop)
+            return future.result(timeout=30)
+
         # Execute code in sandbox (runs in thread pool to not block event loop)
         external_functions = ExternalFunctions(
             read_file=sync_read_file,
             write_file=sync_write_file,
             run_command=sync_run_command,
             typecheck=sync_typecheck,
+            ruff_check=sync_ruff_check,
+            pytest_run=sync_pytest_run,
         )
         output = await loop.run_in_executor(None, run_code, code, external_functions)
 
@@ -589,6 +645,7 @@ def create_toolset_from_catalog(catalog: ToolCatalog) -> FunctionToolset[ACPDeps
         "read_file": read_file,
         "write_file": write_file,
         "run_command": run_command,
+        "execute_code": execute_code,
         "get_terminal_output": get_terminal_output,
         "release_terminal": release_terminal,
         "wait_for_terminal_exit": wait_for_terminal_exit,

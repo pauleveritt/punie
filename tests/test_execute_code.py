@@ -5,7 +5,7 @@ from pydantic_ai import RunContext
 
 from punie.agent.deps import ACPDeps
 from punie.agent.monty_runner import ExternalFunctions, run_code
-from punie.agent.typed_tools import TypeCheckResult
+from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
 
 
 def test_execute_code_tool_exists():
@@ -55,7 +55,13 @@ def test_execute_code_runs_simple_python():
     def fake_typecheck(path: str) -> TypeCheckResult:
         return TypeCheckResult(success=True, error_count=0, warning_count=0, errors=[])
 
-    external_functions = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck)
+    def fake_ruff(path: str) -> RuffResult:
+        return RuffResult(success=True, violation_count=0, fixable_count=0, violations=[])
+
+    def fake_pytest(path: str) -> TestResult:
+        return TestResult(success=True, passed=0, failed=0, errors=0, skipped=0, duration=0.0, tests=[])
+
+    external_functions = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest)
 
     code = """
 content = read_file("test.txt")

@@ -8,7 +8,14 @@ from punie.agent.monty_runner import (
     run_code,
     run_code_async,
 )
-from punie.agent.typed_tools import TypeCheckError, TypeCheckResult
+from punie.agent.typed_tools import (
+    RuffResult,
+    RuffViolation,
+    TestCase,
+    TestResult,
+    TypeCheckError,
+    TypeCheckResult,
+)
 
 
 # Fake external functions for testing (fakes-over-mocks pattern)
@@ -70,6 +77,79 @@ def fake_typecheck(path: str) -> TypeCheckResult:
         return TypeCheckResult(success=True, error_count=0, warning_count=0, errors=[])
 
 
+def fake_ruff_check(path: str) -> RuffResult:
+    """Fake ruff linter for testing."""
+    # Simulate ruff checking with fake results
+    if "violation" in path:
+        # Simulate file with linting violations
+        return RuffResult(
+            success=False,
+            violation_count=2,
+            fixable_count=1,
+            violations=[
+                RuffViolation(
+                    file=path,
+                    line=10,
+                    column=5,
+                    code="E501",
+                    message="Line too long (89 > 88 characters)",
+                    fixable=False,
+                ),
+                RuffViolation(
+                    file=path,
+                    line=15,
+                    column=1,
+                    code="F401",
+                    message="`os` imported but unused",
+                    fixable=True,
+                ),
+            ],
+        )
+    else:
+        # Simulate clean file
+        return RuffResult(success=True, violation_count=0, fixable_count=0, violations=[])
+
+
+def fake_pytest_run(path: str) -> TestResult:
+    """Fake pytest runner for testing."""
+    # Simulate pytest running with fake results
+    if "failure" in path:
+        # Simulate tests with failures
+        return TestResult(
+            success=False,
+            passed=2,
+            failed=1,
+            errors=0,
+            skipped=0,
+            duration=0.15,
+            tests=[
+                TestCase(
+                    name=f"{path}::test_passing",
+                    outcome="passed",
+                    duration=0.05,
+                    message=None,
+                ),
+                TestCase(
+                    name=f"{path}::test_failing",
+                    outcome="failed",
+                    duration=0.10,
+                    message="AssertionError: expected 2 but got 3",
+                ),
+            ],
+        )
+    else:
+        # Simulate all tests passing
+        return TestResult(
+            success=True,
+            passed=3,
+            failed=0,
+            errors=0,
+            skipped=0,
+            duration=0.12,
+            tests=[],
+        )
+
+
 @pytest.fixture
 def external_functions():
     """Fixture providing external functions registry."""
@@ -78,6 +158,8 @@ def external_functions():
         write_file=fake_write_file,
         run_command=fake_run_command,
         typecheck=fake_typecheck,
+        ruff_check=fake_ruff_check,
+        pytest_run=fake_pytest_run,
     )
 
 

@@ -112,7 +112,7 @@ def generate_stubs() -> str:
         stubs.append(_generate_stub(func, name))
         stubs.append("")  # Blank line between functions
 
-    # Add typecheck stub manually (not in toolset, but available in sandbox)
+    # Add typed tool stubs manually (not in toolset, but available in sandbox)
     stubs.append("""def typecheck(path: str) -> TypeCheckResult:
     \"\"\"Run ty type checker on a file or directory and return structured results.
 
@@ -127,6 +127,44 @@ def generate_stubs() -> str:
         if not result.success:
             for error in result.errors:
                 print(f"{error.file}:{error.line} - {error.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def ruff_check(path: str) -> RuffResult:
+    \"\"\"Run ruff linter on a file or directory and return structured results.
+
+    Returns RuffResult with:
+    - success: True if no violations found
+    - violation_count: Total number of violations
+    - fixable_count: Number of auto-fixable violations
+    - violations: List of RuffViolation objects with file, line, column, code, message, fixable
+
+    Example:
+        result = ruff_check("src/")
+        if not result.success:
+            fixable = [v for v in result.violations if v.fixable]
+            print(f"Found {len(fixable)} fixable violations")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def pytest_run(path: str) -> TestResult:
+    \"\"\"Run pytest on a file or directory and return structured results.
+
+    Returns TestResult with:
+    - success: True if all tests passed
+    - passed: Number of tests that passed
+    - failed: Number of tests that failed
+    - errors: Number of tests with errors
+    - skipped: Number of skipped tests
+    - duration: Total test execution time in seconds
+    - tests: List of TestCase objects with name, outcome, duration, message
+
+    Example:
+        result = pytest_run("tests/")
+        if not result.success:
+            for test in result.tests:
+                if test.outcome == "failed":
+                    print(f"{test.name} failed: {test.message}")
     \"\"\"
     ...""")
 
