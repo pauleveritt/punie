@@ -57,8 +57,8 @@ def format_prompt(query: str) -> str:
 
 
 def is_tool_response(response: str) -> bool:
-    """Check if response contains a tool call."""
-    return "```json" in response and '"name":' in response
+    """Check if response contains a tool call (XML format)."""
+    return "<tool_call>" in response and "<function=" in response
 
 
 def get_disk_size(path: Path) -> float:
@@ -91,7 +91,8 @@ def main():
     # Load model
     print("Loading model...")
     start = time.time()
-    model, tokenizer = load(model_path)
+    result = load(model_path)
+    model, tokenizer = result[0], result[1]
     load_time = time.time() - start
     print(f"✓ Loaded in {load_time:.2f}s")
 

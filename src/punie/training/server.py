@@ -48,6 +48,12 @@ def build_server_command(config: ServerConfig) -> list[str]:
     if config.chat_template_args is not None:
         cmd.extend(["--chat-template-args", config.chat_template_args])
 
+    if config.draft_model is not None:
+        cmd.extend(["--draft-model", config.draft_model])
+
+    if config.num_draft_tokens is not None:
+        cmd.extend(["--num-draft-tokens", str(config.num_draft_tokens)])
+
     return cmd
 
 

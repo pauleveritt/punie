@@ -1075,50 +1075,91 @@ punie serve --model local:http://localhost:8080/v1/default
 
 ---
 
-## 21. Inference Speed Optimization (Revisited)
+## 21. Inference Speed Optimization
 
-**Status:** 🚧 TODO (Next Phase)
+**Status:** ✅ Infrastructure Complete (2026-02-14) | Benchmarking Pending
 
 **Goal:** Reduce end-to-end latency from ~25s (tool-calling queries with 2 generation turns) to <10s while maintaining 100% discrimination accuracy.
 
-**Context:** Phase 20 achieved breakthrough quantization results (5-bit preserves LoRA signal). Now focus on inference speed improvements with higher ROI than vocabulary pruning.
+**Context:** Phase 20 achieved Qwen3-30B-A3B migration with 5-bit quantization (20GB, 100% accuracy, 2.61s avg per query in direct MLX mode). End-to-end latency through full PydanticAI → mlx_lm.server pipeline is ~25s for multi-turn tool-calling queries. Priority: **Profile first** → **speculative decoding** → **conciseness training** (conditional).
 
-**Priority Tasks:**
+**Completed Tasks:**
 
-- [ ] 21.1 **Fuse Phase 8 adapter to 5-bit** (Highest Priority)
-  - **Effort:** <1 day (proven technique from Phase 18)
-  - **Expected gain:** 8-10x speedup vs adapter loading
-  - **Benchmark:** Phase 5c showed fused-8bit was 8.5x faster than adapter
-  - **Target:** Single 20GB model file, eliminate adapter overhead
+- [x] 21.1 **Save spec documentation**
+  - Created `agent-os/specs/2026-02-14-inference-speed-optimization/`
+  - Documented plan, scope, standards, and reference implementations
+  - Defined success criteria: <10s latency, 100% accuracy, <32GB memory
 
-- [ ] 21.2 **Test speculative decoding with 1.5B draft model**
-  - **Effort:** 1 week (implementation + tuning)
-  - **Expected gain:** 2-3x speedup on generation
-  - **Approach:** Use Qwen2.5-Coder-1.5B as draft, Qwen3-30B as verifier
-  - **Risk:** Medium - requires careful acceptance threshold tuning
+- [x] 21.2 **Create end-to-end latency profiler**
+  - Implemented `scripts/profile_latency.py` for latency breakdown measurement
+  - Measures: total time, generation time, tool time, framework overhead
+  - Runs 5-query discrimination test through real PydanticAI → mlx_lm.server pipeline
+  - Outputs JSON results + human-readable summary
+  - Passes ty ✅, ruff ✅
 
-- [ ] 21.3 **Train for conciseness**
-  - **Effort:** 3-5 days (data curation + training)
-  - **Expected gain:** 1.5-2x fewer tokens → 1.5-2x faster generation
-  - **Approach:** Add examples emphasizing concise tool usage and responses
-  - **Benefit:** Improves speed AND user experience (shorter responses)
+- [x] 21.3 **Wire speculative decoding into ServerConfig**
+  - Added `draft_model` and `num_draft_tokens` fields to ServerConfig
+  - Updated `build_server_command()` to pass `--draft-model` and `--num-draft-tokens` flags
+  - Added comprehensive tests following existing patterns
+  - **Test Suite:** 29 tests passing (21 existing + 2 new config + 2 new command + 4 updated)
+  - Passes ty ✅, ruff ✅
 
-**Deferred/Lower Priority:**
+- [x] 21.4 **Benchmark speculative decoding**
+  - Implemented `scripts/benchmark_speculative.py` for systematic comparison
+  - Tests 4 configurations: baseline, num_draft_tokens=[2, 3, 5]
+  - Draft model: `mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit` (~1GB)
+  - Compares: speed, accuracy, memory usage
+  - Outputs comparison table + findings + JSON results
+  - Passes ty ✅, ruff ✅
 
-- [ ] 21.4 **Profile latency breakdown**
-  - Measure: generation time, tool execution time, overhead
-  - Identify actual bottlenecks before further optimization
+**Executed:**
 
-- [ ] 21.5 **Test max_tokens reduction**
-  - Cap response length at inference time
-  - Quick experiment, may help but less reliable than training
+- [x] **Ran profiler** (`uv run python scripts/profile_latency.py`)
+  - ✅ Latency: 4.0s average (excellent, much better than expected)
+  - ❌ **CRITICAL ISSUE FOUND:** Tool-calling broken (40% accuracy, 2/5 queries)
+  - Model gives direct answers instead of calling tools
+  - See `FINDINGS.md` for detailed analysis
 
-- [ ] 21.6 **Vocabulary pruning** (Analyzed, not recommended)
-  - **Effort:** 2-3 weeks
-  - **Expected gain:** 3.6% size reduction (23GB → 22.2GB), ~2% speedup
-  - **ROI:** Low - significant effort for minimal speed improvement
-  - **Decision:** Skip unless shipping to resource-constrained devices
-  - **Alternative:** Non-uniform quantization (Python tokens 8-bit, rare tokens 3-bit) - similar savings, lower risk
+**Blocked by Critical Issue:**
+
+- [ ] **BLOCKER: Fix tool-calling behavior in fused models**
+  - 5-bit fused model does NOT call tools (40% accuracy vs expected 100%)
+  - Hypothesis: 5-bit quantization too aggressive for tool-calling instructions
+  - Investigation needed: Test adapters, test 6-bit/8-bit, compare formats
+  - **Cannot proceed with Phase 21 until resolved**
+
+- [ ] **Run speculative decoding benchmark** (Blocked until tool-calling fixed)
+  - Requires working tool calls to measure true end-to-end latency
+  - Will run after tool-calling issue resolved
+
+**Conditional Tasks:**
+
+- [ ] 21.5 **Train for conciseness** (Conditional)
+  - **Trigger:** Only if profiling shows generation time >70% of total latency
+  - Create 20-30 concise tool-calling examples
+  - Create 10-15 concise direct-answer examples
+  - Retrain with emphasis on brevity
+  - Benchmark token count + latency reduction
+  - Verify 100% accuracy maintained
+
+**Infrastructure Validated:**
+- ✅ ServerConfig supports speculative decoding parameters
+- ✅ build_server_command() passes correct flags to mlx_lm.server
+- ✅ Profiler ready to measure real-world latency breakdown
+- ✅ Benchmark script ready to compare configurations
+- ✅ All code passes type checking (ty) and linting (ruff)
+- ✅ Test suite: 29 passing tests for server config/command
+
+**Documentation:**
+- Spec: `agent-os/specs/2026-02-14-inference-speed-optimization/`
+- Files: plan.md, shape.md, standards.md, references.md
+- Updated roadmap with Phase 21 completion status
+
+**Next Steps:**
+1. Run profiler to identify bottleneck (generation vs tool vs overhead)
+2. Run speculative decoding benchmark to measure speedup
+3. Conditionally train for conciseness if needed
+4. Update roadmap with benchmark results
 
 **Success Criteria:**
 - End-to-end latency <10s for tool-calling queries
@@ -1126,9 +1167,104 @@ punie serve --model local:http://localhost:8080/v1/default
 - Model fits in 32GB unified memory
 - No quality regression on Phase 8 test suite
 
-**Expected Timeline:**
-- Week 1: Task 21.1 (fusion) - immediate deployment
-- Week 2-3: Task 21.2 (speculative decoding) - major speedup
-- Week 3-4: Task 21.3 (conciseness training) - quality + speed win
+**Key Insight:** Infrastructure complete, benchmarking required to determine which optimization path (speculative decoding vs conciseness training) provides best ROI.
 
-**Target:** Sub-10s latency achieved through fusion + one major optimization (speculative decoding OR conciseness training)
+---
+
+## 22. Code Mode: Python Tool Calls
+
+**Status:** Planned (2026-02-14)
+
+**Research:** `docs/research/code-tools-convergence.md`
+
+**Context:** Industry convergence (Anthropic, Cloudflare, Pydantic) on code-based tool calling. Instead of sequential JSON tool calls, models write Python code that calls tools as functions. This solves Punie's documented architectural incompatibility where mlx_lm.server returns raw text but PydanticAI expects structured `tool_calls` objects.
+
+**Key Benefits:**
+- **Solves production tool-calling gap:** No structured API needed (text-based output becomes a feature)
+- **Eliminates multi-turn overhead:** One code block = N tool calls (vs N+2 model turns in JSON format)
+- **Adds type safety:** Monty embeds ty type checker to validate LLM-generated code before execution
+- **Plays to model strength:** Qwen3-Coder trained on Python generation
+- **Eliminates format fragility:** No more JSON/XML parsing chains that break between versions
+
+**Problem Solved:**
+Phase 21 profiling revealed **40% tool-calling accuracy** (2/5 queries) due to format mismatch:
+- Training data used ```json code fences
+- mlx_lm.server expects XML `<tool_call>` format
+- Model gives direct answers instead of calling tools
+
+**Architecture:**
+- Training data: Model outputs Python code in code fences (not JSON)
+- System prompt: Shows typed function stubs (not prose descriptions)
+- Execution: Monty sandbox executes code with ty validation
+- Multi-step: One code block loops/conditionals for N tool calls (1 model turn instead of N+2)
+
+**Relationship to Phase 21:**
+- Phase 21 XML format fix: Short-term solution (align JSON→XML for current architecture)
+- Phase 22 Code Mode: Long-term solution (eliminate format issues + gain multi-step efficiency)
+
+**Implementation Tasks:**
+
+- [ ] 22.1 **Generate Python stubs from toolset**
+  - Use `inspect.signature()` on `src/punie/agent/toolset.py` (7 tools)
+  - Auto-generate typed stubs: `async def read_file(*, path: str) -> str: ...`
+  - Single source of truth for both model prompt and ty validation
+
+- [ ] 22.2 **Convert training data to code format**
+  - Mechanically convert 683 existing examples:
+    - `{"name": "read_file", "arguments": {"path": "X"}}` → `await read_file(path="X")`
+    - "Tool result: ..." → "Code output: ..."
+  - Keep direct-answer examples unchanged (~30%)
+  - Save to `data/code-mode/converted/`
+
+- [ ] 22.3 **Author multi-step workflow examples**
+  - Create 150-200 new examples showing Python loops/conditionals
+  - Example: "Find test files, count functions in each" → one Python block with loop
+  - Demonstrates unique value: N tool calls in 1 model turn
+  - Categories: file operations, search+filter, analysis pipelines
+  - Save to `data/code-mode/multi-step/`
+
+- [ ] 22.4 **Train Phase 22 model**
+  - Dataset: ~850 examples (683 converted + 150-200 multi-step)
+  - Training: Same LoRA pipeline as Phase 8/21
+  - Model: Qwen3-Coder-30B-A3B-Instruct (Python generation strength)
+  - Target: 300 iters, batch_size 2, 5e-5 learning rate
+
+- [ ] 22.5 **Integrate Monty execution**
+  - **Option A (preferred):** Wait for Pydantic AI `CodeModeToolset` PR merge → drop-in replacement
+  - **Option B (immediate):** Use Monty directly with custom tool registration
+  - Implement `run_code_with_tools()` function
+  - Register 7 tools as external functions in Monty sandbox
+  - Enable ty type checking with generated stubs
+
+- [ ] 22.6 **Update eval suite for code format**
+  - Modify scoring: Expect Python code output (not JSON tool calls)
+  - Add code-specific checks: Valid syntax, correct function calls, proper await
+  - Add multi-step tests: Verify loops/conditionals for N-tool workflows
+  - Baseline: ≥90% accuracy on single-tool discrimination
+
+- [ ] 22.7 **Benchmark vs Phase 21**
+  - Latency comparison: JSON (N+2 turns) vs Code (1 turn) for multi-step tasks
+  - Accuracy: Tool-calling discrimination (expect 100% like Phase 5)
+  - Memory: Same as Phase 21 (no model change)
+  - Generate comparison report: code-mode vs XML format
+
+**Success Criteria:**
+- **Accuracy:** ≥90% on single-tool discrimination (Phase 5 baseline)
+- **Multi-step latency:** 1 model turn for N-tool workflows (vs N+2 in JSON)
+- **Type safety:** ty catches malformed tool calls before execution
+- **Production compatibility:** Works with mlx_lm.server raw text output
+- **No format fragility:** Robust to server/API version changes
+
+**Maturity Assessment:**
+- Monty interpreter: v0.0.3 (limited stdlib but sufficient for tool code)
+- ty type checking: Embedded in Monty ✅
+- CodeModeToolset: PR #4153 (WIP) - Can use Monty directly if not merged
+- Training pipeline: Established (Phase 8) ✅
+- Qwen3-Coder: Production (30B MoE) ✅
+
+**References:**
+- [Anthropic Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
+- [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode/)
+- [Pydantic Monty GitHub](https://github.com/pydantic/monty)
+- [Pydantic AI CodeModeToolset PR #4153](https://github.com/pydantic/pydantic-ai/pull/4153)
+- [Simon Willison on Monty](https://simonwillison.net/2026/Feb/6/pydantic-monty/)

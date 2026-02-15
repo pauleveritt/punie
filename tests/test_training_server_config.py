@@ -25,6 +25,8 @@ def test_server_config_defaults():
     assert config.max_tokens is None
     assert config.chat_template_args is None
     assert config.stop_sequences is None
+    assert config.draft_model is None
+    assert config.num_draft_tokens is None
 
 
 def test_server_config_base_url():
@@ -93,6 +95,24 @@ def test_server_config_stop_sequences():
     assert config.stop_sequences == QWEN_STOP_SEQUENCES
 
 
+def test_server_config_with_draft_model():
+    """ServerConfig can specify draft_model for speculative decoding."""
+    config = ServerConfig(
+        model_path="test-model",
+        draft_model="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+    )
+    assert config.draft_model == "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit"
+
+
+def test_server_config_with_num_draft_tokens():
+    """ServerConfig can specify num_draft_tokens for speculative decoding."""
+    config = ServerConfig(
+        model_path="test-model",
+        num_draft_tokens=5,
+    )
+    assert config.num_draft_tokens == 5
+
+
 def test_server_config_all_parameters():
     """ServerConfig with all parameters specified."""
     config = ServerConfig(
@@ -105,6 +125,8 @@ def test_server_config_all_parameters():
         max_tokens=1024,
         chat_template_args='{"enable_thinking":false}',
         stop_sequences=QWEN_STOP_SEQUENCES,
+        draft_model="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        num_draft_tokens=5,
     )
     assert config.model_path == "mlx-community/Qwen3-Coder-30B"
     assert config.port == 9000
@@ -115,4 +137,6 @@ def test_server_config_all_parameters():
     assert config.max_tokens == 1024
     assert config.chat_template_args == '{"enable_thinking":false}'
     assert config.stop_sequences == QWEN_STOP_SEQUENCES
+    assert config.draft_model == "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit"
+    assert config.num_draft_tokens == 5
     assert config.base_url == "http://192.168.1.1:9000/v1"

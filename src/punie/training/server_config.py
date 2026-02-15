@@ -23,6 +23,8 @@ class ServerConfig:
     max_tokens: int | None = None  # Maximum generation length (--max-tokens)
     chat_template_args: str | None = None  # Chat template args JSON (--chat-template-args)
     stop_sequences: tuple[str, ...] | None = None  # Stop tokens (per-request, not CLI flag)
+    draft_model: str | None = None  # Draft model for speculative decoding (--draft-model)
+    num_draft_tokens: int | None = None  # Tokens per draft step (--num-draft-tokens)
 
     @property
     def base_url(self) -> str:

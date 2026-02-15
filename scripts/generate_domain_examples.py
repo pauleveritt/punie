@@ -28,22 +28,29 @@ class Example:
 
 
 def create_messages(example: Example) -> dict[str, list[dict[str, str]]]:
-    """Convert an Example to the messages format."""
+    """Convert an Example to the messages format (Qwen3-Coder XML format)."""
     messages = [
         {"role": "system", "content": SYSTEM_MSG},
         {"role": "user", "content": example.user_query},
     ]
 
     if example.tool_name:
+        # Build XML tool call
+        params = []
+        for key, value in (example.tool_args or {}).items():
+            params.append(f"<parameter={key}>\n{value}\n</parameter>")
+        params_xml = "\n".join(params)
+        xml_call = f"<tool_call>\n<function={example.tool_name}>\n{params_xml}\n</function>\n</tool_call>"
+
         # Assistant calls tool
         tool_call = {
             "role": "assistant",
-            "content": f"I'll use the {example.tool_name} tool.\n\n```json\n{json.dumps({'name': example.tool_name, 'arguments': example.tool_args}, indent=2)}\n```",
+            "content": f"I'll use the {example.tool_name} tool.\n\n{xml_call}",
         }
         messages.append(tool_call)
 
-        # Tool result
-        messages.append({"role": "user", "content": f"Tool result: {example.tool_result}"})
+        # Tool result (wrapped in XML)
+        messages.append({"role": "user", "content": f"<tool_response>\n{example.tool_result}\n</tool_response>"})
 
     # Final response
     messages.append({"role": "assistant", "content": example.final_response})

@@ -85,6 +85,30 @@ def test_build_server_command_with_chat_template_args():
     assert '{"enable_thinking":false}' in cmd
 
 
+def test_build_server_command_with_draft_model():
+    """build_server_command includes draft_model for speculative decoding."""
+    config = ServerConfig(
+        model_path="test-model",
+        draft_model="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+    )
+    cmd = build_server_command(config)
+
+    assert "--draft-model" in cmd
+    assert "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit" in cmd
+
+
+def test_build_server_command_with_num_draft_tokens():
+    """build_server_command includes num_draft_tokens for speculative decoding."""
+    config = ServerConfig(
+        model_path="test-model",
+        num_draft_tokens=5,
+    )
+    cmd = build_server_command(config)
+
+    assert "--num-draft-tokens" in cmd
+    assert "5" in cmd
+
+
 def test_build_server_command_all_parameters():
     """build_server_command with all parameters."""
     config = ServerConfig(
@@ -96,6 +120,8 @@ def test_build_server_command_all_parameters():
         top_p=0.95,
         max_tokens=1024,
         chat_template_args='{"enable_thinking":false}',
+        draft_model="mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        num_draft_tokens=5,
     )
     cmd = build_server_command(config)
 
@@ -120,6 +146,10 @@ def test_build_server_command_all_parameters():
         "1024",
         "--chat-template-args",
         '{"enable_thinking":false}',
+        "--draft-model",
+        "mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit",
+        "--num-draft-tokens",
+        "5",
     ]
     assert cmd == expected
 

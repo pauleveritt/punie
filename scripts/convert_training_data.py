@@ -20,14 +20,14 @@ from pathlib import Path
 
 
 def format_tool_call(tool_name: str, tool_args: str | dict) -> str:
-    """Format a tool call in markdown code fence format.
+    """Format a tool call in Qwen3-Coder XML format.
 
     Args:
         tool_name: Name of the tool (e.g., "read_file", "run_command")
         tool_args: Tool arguments (string or dict)
 
     Returns:
-        Formatted tool call string
+        Formatted XML tool call string
     """
     # Parse args if string
     if isinstance(tool_args, str):
@@ -38,9 +38,14 @@ def format_tool_call(tool_name: str, tool_args: str | dict) -> str:
     else:
         args_dict = tool_args or {}
 
-    # Format as markdown code fence
-    tool_json = json.dumps({"name": tool_name, "arguments": args_dict}, indent=2)
-    return f"I'll use the {tool_name} tool.\n\n```json\n{tool_json}\n```"
+    # Format as Qwen3-Coder XML
+    params = []
+    for key, value in args_dict.items():
+        params.append(f"<parameter={key}>\n{value}\n</parameter>")
+    params_xml = "\n".join(params)
+    xml_call = f"<tool_call>\n<function={tool_name}>\n{params_xml}\n</function>\n</tool_call>"
+
+    return f"I'll use the {tool_name} tool.\n\n{xml_call}"
 
 
 def convert_to_qwen_format(example: dict) -> str | None:
@@ -84,11 +89,13 @@ You are Punie, an AI coding assistant that helps with Python development via PyC
 <|im_start|>assistant
 {tool_call_text}<|im_end|>"""
 
-        # Add real tool result (not placeholder!)
+        # Add real tool result (wrapped in XML)
         if tool_result is not None:
             conversation += f"""
 <|im_start|>user
-Tool result: {tool_result}<|im_end|>"""
+<tool_response>
+{tool_result}
+</tool_response><|im_end|>"""
         else:
             # Skip examples with missing results
             return None
