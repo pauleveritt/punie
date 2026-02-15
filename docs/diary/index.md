@@ -2,6 +2,9 @@
 
 Reverse-chronological notes from ongoing work. Each entry is summarized and dated.
 
+## 2026-02-14 - [Phase 21: XML Format Fix Achieves 100% Tool-Calling Accuracy](2026-02-14-phase21-xml-format-fix.md)
+Fixed critical tool-calling regression (40% → 100% accuracy) by converting training data from JSON to XML format to match mlx_lm.server expectations. Model now production-ready: 20GB, 6.6s tool queries, 1.8s direct answers. Speculative decoding infrastructure implemented but benchmarking deferred in favor of Phase 22 (Code Mode).
+
 ## 2026-02-14 - [Quantization Breakthrough: 5-bit Preserves LoRA Fine-tuning](2026-02-14-quantization-breakthrough.md)
 Discovered that 5-bit quantization (32 levels) is the minimum threshold for preserving LoRA fine-tuning quality. Reduced Phase 8 model from 30GB (8-bit) to 20GB (5-bit) with 100% accuracy maintained. Scientific finding: LoRA signal preservation threshold is between 16 and 32 quantization levels.
 
