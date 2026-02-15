@@ -41,12 +41,14 @@ class TypeCheckResult(BaseModel):
         error_count: Number of errors found
         warning_count: Number of warnings found
         errors: List of errors and warnings
+        parse_error: Error message if output parsing failed, None otherwise
     """
 
     success: bool
     error_count: int
     warning_count: int
     errors: list[TypeCheckError]
+    parse_error: str | None = None
 
 
 def parse_ty_output(output: str) -> TypeCheckResult:
@@ -99,9 +101,15 @@ def parse_ty_output(output: str) -> TypeCheckResult:
             warning_count=warning_count,
             errors=errors,
         )
-    except (json.JSONDecodeError, KeyError, TypeError):
-        # If parsing fails, return success (ty might not support JSON format yet)
-        return TypeCheckResult(success=True, error_count=0, warning_count=0, errors=[])
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        # If parsing fails, return failure with parse error
+        return TypeCheckResult(
+            success=False,
+            error_count=0,
+            warning_count=0,
+            errors=[],
+            parse_error=f"Failed to parse ty output: {e}",
+        )
 
 
 # Ruff models
@@ -135,12 +143,14 @@ class RuffResult(BaseModel):
         violation_count: Total number of violations found
         fixable_count: Number of violations that can be auto-fixed
         violations: List of all violations
+        parse_error: Error message if output parsing failed, None otherwise
     """
 
     success: bool
     violation_count: int
     fixable_count: int
     violations: list[RuffViolation]
+    parse_error: str | None = None
 
 
 def parse_ruff_output(output: str) -> RuffResult:
@@ -196,11 +206,20 @@ def parse_ruff_output(output: str) -> RuffResult:
                 fixable_count += 1
 
     success = len(violations) == 0
+    parse_error = None
+
+    # If we have non-empty output but found no violations, warn about possible format change
+    if output.strip() and not violations:
+        # Check if output looks like actual violations (has colons and line numbers)
+        if ":" in output and any(char.isdigit() for char in output):
+            parse_error = "Non-empty output with no violations parsed - possible format change"
+
     return RuffResult(
         success=success,
         violation_count=len(violations),
         fixable_count=fixable_count,
         violations=violations,
+        parse_error=parse_error,
     )
 
 
@@ -234,6 +253,7 @@ class TestResult(BaseModel):
         skipped: Number of tests that were skipped
         duration: Total test execution time in seconds
         tests: List of individual test results
+        parse_error: Error message if output parsing failed, None otherwise
     """
 
     success: bool
@@ -243,6 +263,7 @@ class TestResult(BaseModel):
     skipped: int
     duration: float
     tests: list[TestCase]
+    parse_error: str | None = None
 
 
 def parse_pytest_output(output: str) -> TestResult:
@@ -328,6 +349,14 @@ def parse_pytest_output(output: str) -> TestResult:
             break
 
     success = failed == 0 and errors == 0
+    parse_error = None
+
+    # If we have non-empty output but found no tests or summary, warn about parsing failure
+    if output.strip() and not tests and duration == 0.0:
+        # Check if output looks like pytest output (contains test-related keywords)
+        if any(keyword in output.lower() for keyword in ["test", "passed", "failed", "error"]):
+            parse_error = "Non-empty pytest output could not be parsed - possible format change"
+
     return TestResult(
         success=success,
         passed=passed,
@@ -336,4 +365,5 @@ def parse_pytest_output(output: str) -> TestResult:
         skipped=skipped,
         duration=duration,
         tests=tests,
+        parse_error=parse_error,
     )

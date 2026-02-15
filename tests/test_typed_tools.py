@@ -234,11 +234,13 @@ def test_parse_ty_output_warnings_only():
 
 
 def test_parse_ty_output_malformed_json():
-    """parse_ty_output handles malformed JSON gracefully."""
+    """parse_ty_output handles malformed JSON as failure."""
     result = parse_ty_output("not valid json")
-    assert result.success is True  # Fallback to success
+    assert result.success is False  # Parse failure = failure
     assert result.error_count == 0
     assert len(result.errors) == 0
+    assert result.parse_error is not None
+    assert "failed to parse" in result.parse_error.lower()
 
 
 # Ruff model tests
@@ -463,3 +465,44 @@ tests/test_foo.py::test_qux SKIPPED
     assert result.errors == 1
     assert result.skipped == 1
     assert len(result.tests) == 3
+
+
+# Parser error field tests
+
+
+def test_parse_ty_output_success_has_no_parse_error():
+    """parse_ty_output sets parse_error to None on success."""
+    result = parse_ty_output("")
+    assert result.parse_error is None
+
+
+def test_parse_ruff_output_warns_on_unparseable_output():
+    """parse_ruff_output sets parse_error when output looks like violations but none parsed."""
+    # Output that looks like it should contain violations (has colons and numbers)
+    # but doesn't match the expected pattern
+    output = "some_file.py:10:5 Something went wrong"
+    result = parse_ruff_output(output)
+    # This will trigger the parse_error warning
+    assert result.parse_error is not None
+    assert "format change" in result.parse_error.lower()
+
+
+def test_parse_ruff_output_no_error_on_valid_empty():
+    """parse_ruff_output doesn't set parse_error on legitimately empty output."""
+    result = parse_ruff_output("")
+    assert result.parse_error is None
+
+
+def test_parse_pytest_output_warns_on_unparseable_output():
+    """parse_pytest_output sets parse_error when output looks like pytest but can't be parsed."""
+    # Output that mentions "test" but doesn't match expected format
+    output = "Something about tests went wrong but no parseable format"
+    result = parse_pytest_output(output)
+    assert result.parse_error is not None
+    assert "could not be parsed" in result.parse_error.lower()
+
+
+def test_parse_pytest_output_no_error_on_valid_empty():
+    """parse_pytest_output doesn't set parse_error on legitimately empty output."""
+    result = parse_pytest_output("")
+    assert result.parse_error is None

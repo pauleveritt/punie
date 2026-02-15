@@ -15,6 +15,10 @@ from pathlib import Path
 import mlx.core as mx
 from mlx_lm import generate, load
 
+# Import shared prompt formatting utility
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from punie.agent.prompt_utils import format_prompt as format_prompt_util
+
 
 # 20-query test suite (13 tool + 7 direct)
 TEST_QUERIES = [
@@ -148,8 +152,11 @@ TEST_QUERIES = [
 ]
 
 
-def format_prompt(query: str) -> str:
-    """Format query in Qwen2.5 chat template with tool definitions."""
+def format_prompt(query: str, model_path: str) -> str:
+    """Format query in chat template with tool definitions.
+
+    Uses shared utility to guarantee consistency with training format.
+    """
     system_prompt = """You are Punie, an AI coding assistant that helps with Python development via PyCharm.
 
 # Tools
@@ -166,13 +173,8 @@ For each function call, return a json object with function name and arguments wi
 {"name": <function-name>, "arguments": <args-json-object>}
 </tool_call>"""
 
-    return (
-        "<|im_start|>system\n"
-        f"{system_prompt}<|im_end|>\n"
-        "<|im_start|>user\n"
-        f"{query}<|im_end|>\n"
-        "<|im_start|>assistant\n"
-    )
+    # Use shared utility with custom system message
+    return format_prompt_util(query, model_path, system_message=system_prompt)
 
 
 def is_code_mode_response(response: str) -> bool:
@@ -240,7 +242,8 @@ def test_model(model_path: str, verbose: bool = True) -> dict:
             print(f"\n[{i}/20] {test['description']}")
             print(f"  Query: {test['query']}")
 
-        prompt = format_prompt(test["query"])
+        # Use shared utility to guarantee consistency with training format
+        prompt = format_prompt(test["query"], model_path)
 
         # Generate response
         start = time.time()

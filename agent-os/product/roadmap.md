@@ -109,7 +109,8 @@ coverage/quality improvements which provide more immediate value.
     - Updated PunieAgent to store client_capabilities and wire discovery into prompt()
     - Extended FakeClient with discover_tools() support for testing
     - Cleaned up dead code: removed unused _sessions set from adapter
-    - Full test coverage: 16 new discovery tests (frozen dataclass verification, catalog queries, toolset factories, adapter integration, fallback chain)
+    - Full test coverage: 16 new discovery tests (frozen dataclass verification, catalog queries, toolset factories,
+      adapter integration, fallback chain)
     - Updated example 09 from aspirational Tier 3 to working Tier 1 demonstration
     - Type checking passes (ty), linting passes (ruff), all 143 tests pass
     - Created spec documentation in agent-os/specs/2026-02-08-1030-dynamic-tool-discovery/
@@ -123,7 +124,8 @@ coverage/quality improvements which provide more immediate value.
     - Implemented lazy fallback for unknown session IDs (backward compatibility)
     - Extended FakeClient with discover_tools_calls tracking for tests
     - Legacy agent mode skips registration (preserves existing behavior)
-    - Full test coverage: 16 new session registration tests (frozen dataclass, registration in new_session, cached state usage, lazy fallback, legacy compatibility)
+    - Full test coverage: 16 new session registration tests (frozen dataclass, registration in new_session, cached state
+      usage, lazy fallback, legacy compatibility)
     - Created working example: examples/10_session_registration.py
     - Type checking passes (ty), linting passes (ruff), all 123 tests pass
     - Created spec documentation in agent-os/specs/2026-02-08-1400-session-registration/
@@ -135,6 +137,7 @@ coverage/quality improvements which provide more immediate value.
 **Status:** Phase 5.1, 5.2, 5.4 Completed (2026-02-08) | Phase 5.3 Deferred
 
 **References:**
+
 - [JetBrains acp.json documentation](https://www.jetbrains.com/help/ai-assistant/acp.html#add-custom-agent)
 
 - [x] 5.1 Implement Typer-based CLI with uvx support - Completed 2026-02-08
@@ -181,11 +184,14 @@ coverage/quality improvements which provide more immediate value.
 
 **Status:** Phase 6.1 Completed (2026-02-08)
 
-**Context:** Enable fully local, offline AI-assisted development using Apple Silicon (M1/M2/M3) without external API calls. Ported pydantic-ai-mlx architecture to current Pydantic AI v1.56.0 API with complete tool calling support. Agent can execute tools locally without API calls.
+**Context:** Enable fully local, offline AI-assisted development using Apple Silicon (M1/M2/M3) without external API
+calls. Ported pydantic-ai-mlx architecture to current Pydantic AI v1.56.0 API with complete tool calling support. Agent
+can execute tools locally without API calls.
 
 **Dependencies:** Optional mlx-lm>=0.22.0 (macOS arm64 only)
 
 **References:**
+
 - [pydantic-ai-mlx by dorukgezici](https://github.com/dorukgezici/pydantic-ai-mlx)
 - [MLX on Apple Silicon](https://github.com/ml-explore/mlx)
 - [Qwen2.5-Coder models](https://huggingface.co/mlx-community)
@@ -220,7 +226,8 @@ coverage/quality improvements which provide more immediate value.
     - Created spec documentation in agent-os/specs/2026-02-08-local-tools/
     - All 24 tests pass with real tmp_path filesystem operations
 - [x] 6.4 Agent Configuration ✅ 2026-02-08
-    - Created AgentConfig frozen dataclass with instructions, temperature, max_tokens, retries, output_retries, validate_python_syntax
+    - Created AgentConfig frozen dataclass with instructions, temperature, max_tokens, retries, output_retries,
+      validate_python_syntax
     - Two instruction sets: PUNIE_INSTRUCTIONS (PyCharm/ACP default) and PUNIE_LOCAL_INSTRUCTIONS (standalone local)
     - Added resolve_mode() function following resolve_model() pattern (CLI flag > PUNIE_MODE env var > "acp" default)
     - Updated create_pydantic_agent() to accept optional AgentConfig parameter (backward compatible)
@@ -250,7 +257,8 @@ coverage/quality improvements which provide more immediate value.
 
 **Status:** Phase 7.1-7.3 Completed (2026-02-09) | Phase 7.4-7.5 In Progress
 
-**Context:** Punie supports both IDE tools (via ACP) and local tools (via LocalClient). Understanding the performance characteristics of each approach is critical for optimization and architecture decisions.
+**Context:** Punie supports both IDE tools (via ACP) and local tools (via LocalClient). Understanding the performance
+characteristics of each approach is critical for optimization and architecture decisions.
 
 - [x] 7.1 Create instrumentation infrastructure for tool timing - Completed 2026-02-09
     - Created PerformanceCollector with ToolTiming and PromptTiming frozen dataclasses
@@ -270,7 +278,8 @@ coverage/quality improvements which provide more immediate value.
     - Reports saved as punie-perf-YYYYMMDD-HHMMSS.html
 - [ ] 7.4 Fix ACP mode performance reporting (collector lifecycle) - **TODO**
     - **Issue:** Infinite loop when reusing PerformanceCollector across multiple prompts in ACP mode
-    - **Root cause:** TimedToolset wraps toolset at agent creation, capturing collector reference. When agent handles multiple prompts, collector accumulates stale state causing repeated tool calls
+    - **Root cause:** TimedToolset wraps toolset at agent creation, capturing collector reference. When agent handles
+      multiple prompts, collector accumulates stale state causing repeated tool calls
     - **Current workaround:** Disabled in ACP mode (self._perf_enabled = False)
     - **Proposed solutions:**
         1. Create fresh PerformanceCollector per prompt (requires agent recreation or toolset rewrapping)
@@ -307,7 +316,9 @@ coverage/quality improvements which provide more immediate value.
 
 - [ ] 10.1 Create domain-specific skills and policies framework
 - [ ] 10.2 Implement custom deterministic policies for project-specific rules
-- [ ] 10.3 Add support for free-threaded Python (PEP 703) — **Deferred: mlx-lm lacks cp314t wheels (as of 2026-02-08). Project switched to Python 3.14 (regular) to unblock local model installation. May revisit when free-threaded ecosystem matures.**
+- [ ] 10.3 Add support for free-threaded Python (PEP 703) — **Deferred: mlx-lm lacks cp314t wheels (as of 2026-02-08).
+  Project switched to Python 3.14 (regular) to unblock local model installation. May revisit when free-threaded
+  ecosystem matures.**
 - [ ] 10.4 Optimize for parallel agent operations across multiple cores
 
 ## Research
@@ -368,9 +379,12 @@ features:
 
 **Status:** ✅ Completed (2026-02-10)
 
-**Context:** Simplified local model integration by replacing direct MLX model loading with OpenAI-compatible API calls. LM Studio and mlx-lm.server both expose OpenAI-compatible endpoints, allowing Punie to use Pydantic AI's built-in OpenAIChatModel with a custom base_url instead of maintaining custom MLX integration code.
+**Context:** Simplified local model integration by replacing direct MLX model loading with OpenAI-compatible API calls.
+LM Studio and mlx-lm.server both expose OpenAI-compatible endpoints, allowing Punie to use Pydantic AI's built-in
+OpenAIChatModel with a custom base_url instead of maintaining custom MLX integration code.
 
 **Benefits:**
+
 - Removed ~2,400 lines of code (MLXModel, chat template handling, tool call parsing, tests)
 - Leverages Pydantic AI's first-class OpenAI support (no custom Model implementation needed)
 - Unified interface for both cloud (OpenAI) and local (LM Studio, mlx-lm.server) models
@@ -378,6 +392,7 @@ features:
 - Separates model serving from agent logic (better separation of concerns)
 
 **Architecture:**
+
 ```python
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -392,6 +407,7 @@ model = OpenAIChatModel("model-name", provider=provider)
 ```
 
 **Accomplished:**
+
 - [x] 11.1 Add LM Studio connection support
     - Uses Pydantic AI's OpenAIChatModel with OpenAIProvider(base_url=...)
     - Supports three spec formats: "", "model-name", "http://host:port/v1/model"
@@ -413,13 +429,16 @@ model = OpenAIChatModel("model-name", provider=provider)
     - Simplified factory.py: _create_local_model() now ~5 lines (was ~20)
     - Added _parse_local_spec() pure function with 7 tests
 
-**Note:** Phase 6 (Local Model Integration with MLX) was superseded by this implementation. Direct MLX model loading proved fragile (chat template issues, quantization failures, XML/JSON format parsing). Delegating to LM Studio or mlx-lm.server provides better reliability and maintainability.
+**Note:** Phase 6 (Local Model Integration with MLX) was superseded by this implementation. Direct MLX model loading
+proved fragile (chat template issues, quantization failures, XML/JSON format parsing). Delegating to LM Studio or
+mlx-lm.server provides better reliability and maintainability.
 
 ## 11.5 Provider String Cleanup
 
 **Status:** Not Started
 
-**Goal:** Remove OpenAI provider string references (`openai:*`) from CLI help, docs, examples, and tests, and align all model selection messaging with provider-agnostic language.
+**Goal:** Remove OpenAI provider string references (`openai:*`) from CLI help, docs, examples, and tests, and align all
+model selection messaging with provider-agnostic language.
 
 - [ ] 11.5.1 Audit code and documentation for `openai:*` references
 - [ ] 11.5.2 Update user-facing guidance to remove OpenAI-specific model strings
@@ -429,9 +448,11 @@ model = OpenAIChatModel("model-name", provider=provider)
 
 **Status:** ✅ Completed (2026-02-11)
 
-**Context:** Automate starting/stopping `mlx_lm.server` from Python so evaluation and training can be fully scripted. All code launches mlx-lm as a subprocess — no import-time dependency on mlx-lm. All tests work without it installed.
+**Context:** Automate starting/stopping `mlx_lm.server` from Python so evaluation and training can be fully scripted.
+All code launches mlx-lm as a subprocess — no import-time dependency on mlx-lm. All tests work without it installed.
 
 **Architecture:**
+
 ```python
 from punie.training.server_config import ServerConfig
 from punie.training.server import ServerProcess
@@ -452,6 +473,7 @@ async with ServerProcess(config=config) as server:
 ```
 
 **Accomplished:**
+
 - [x] 12.1 Server configuration dataclass
     - Created ServerConfig (frozen) with model_path, port, host, adapter_path, max_kv_size, repetition_penalty
     - Added base_url property for OpenAI-compatible API endpoint
@@ -493,6 +515,7 @@ async with ServerProcess(config=config) as server:
 **Goal:** Run standardized prompts against models, score results, produce baseline reports.
 
 **Key Components:**
+
 - Evaluation prompts and suites with categories
 - Scoring functions (tool calling + keyword presence)
 - Evaluation runner with server lifecycle management
@@ -500,6 +523,7 @@ async with ServerProcess(config=config) as server:
 - CLI command: `punie eval`
 
 **Example Usage:**
+
 ```python
 from punie.training.eval_suites import create_baseline_suite
 from punie.training.eval_runner import run_evaluation, EvalRunConfig
@@ -534,6 +558,7 @@ print(f"Score: {report.overall_score:.1%}")
 **Goal:** Framework for managing, validating, filtering, and writing training datasets in MLX LoRA format.
 
 **Key Components:**
+
 - Dataset dataclasses (ChatMessage, TrainingExample, TrainingDataset)
 - Validation functions (message count, roles, content)
 - Filtering functions (language, Python version, content quality)
@@ -542,6 +567,7 @@ print(f"Score: {report.overall_score:.1%}")
 - CLI commands: `punie train`, `punie dataset validate`, `punie dataset stats`, `punie dataset download`
 
 **Example Usage:**
+
 ```python
 from punie.training.lora_config import LoRAConfig
 from punie.training.train_runner import run_training
@@ -557,9 +583,11 @@ config = LoRAConfig(
 adapter_path = await run_training(config)
 ```
 
-**Critical Fix:** Training command format changed from `mlx_lm.lora` to `python -m mlx_lm lora --train` (discovered during pipeline testing).
+**Critical Fix:** Training command format changed from `mlx_lm.lora` to `python -m mlx_lm lora --train` (discovered
+during pipeline testing).
 
-**Validation:** Full end-to-end pipeline test (`test_full_training_pipeline.py`) runs successfully: data generation → validation → baseline eval → training → adapted eval → comparison.
+**Validation:** Full end-to-end pipeline test (`test_full_training_pipeline.py`) runs successfully: data generation →
+validation → baseline eval → training → adapted eval → comparison.
 
 **Test Suite:** 130 training tests passing
 **Quality:** Ruff ✅, Ty ✅, All tests ✅
@@ -576,25 +604,28 @@ adapter_path = await run_training(config)
 **Completed:**
 
 **15.1: Dataset Downloads**
+
 - `download_sample_dataset()`: Synthetic examples for testing
 - `download_python_code_dataset()`: CodeSearchNet Python code (MIT licensed)
 - Both support streaming (never download full corpus)
 - Convert to chat-completion format compatible with mlx_lm.lora
 
 **15.3+: Progressive Pruning Infrastructure**
+
 - CLI filter command: `punie dataset filter`
-  - Language filtering (remove non-English)
-  - Python version filtering (remove Python 2, old versions)
-  - Content quality filtering (remove short/malformed examples)
+    - Language filtering (remove non-English)
+    - Python version filtering (remove Python 2, old versions)
+    - Content quality filtering (remove short/malformed examples)
 - CLI merge command: `punie dataset merge`
-  - Combine multiple datasets
-  - Useful for adding hand-authored examples
+    - Combine multiple datasets
+    - Useful for adding hand-authored examples
 - Evaluation comparison: `compare_reports()`
-  - Side-by-side HTML comparison of multiple evaluation runs
-  - Shows score deltas, category breakdowns
-  - Highlights improvements/regressions
+    - Side-by-side HTML comparison of multiple evaluation runs
+    - Shows score deltas, category breakdowns
+    - Highlights improvements/regressions
 
 **Example Workflow:**
+
 ```bash
 # Download dataset
 punie dataset download sample --max 100 --output data/raw/
@@ -615,12 +646,14 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 ```
 
 **Validation:** Full progressive pruning test (`test_progressive_pruning.py`) demonstrates:
+
 - Creating test dataset with known quality issues
 - Filtering step-by-step (language → Python version → content quality)
 - Retention rate tracking (started 7 examples → 5 retained)
 - Comparison report generation
 
 **15.4: Hyperparameter Tuning** (Complete 2026-02-11)
+
 - `HyperparamGrid` for defining search space (learning rates, LoRA ranks, iterations, batch sizes)
 - `run_hyperparam_search()` runs grid search: train + evaluate each combination
 - `TrainingLog` and `parse_training_log()` extract train/val loss curves from mlx_lm output
@@ -631,6 +664,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - **Test Suite:** 143 training tests passing (+13 new)
 
 **15.5: Inference Parameter Tuning** (Complete 2026-02-11)
+
 - `InferenceGrid` for server-side parameter search (temperature, top-p, repetition penalty, max KV cache)
 - `run_inference_search()` tests each parameter combination via evaluation
 - `InferenceResult` stores server config + eval results
@@ -639,12 +673,14 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - **Test Suite:** 149 training tests passing (+6 new)
 
 **Pending:**
+
 - 15.2: Download real datasets (Dolma Wiki, RedPajama, KodCode) — requires user action
 
 **Test Suite:** 149 training tests passing
 **Quality:** Ruff ✅, Ty ✅, All tests ✅
 
 **Phase 15 Summary:**
+
 - ✅ Complete progressive pruning workflow (download → filter → merge → train → evaluate → compare)
 - ✅ Hyperparameter tuning (grid search finds optimal training params)
 - ✅ Inference tuning (optimize server-side generation parameters)
@@ -660,12 +696,14 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Goal:** Create tool-calling training infrastructure for Punie's 7 PyCharm integration tools.
 
 **Key Components:**
+
 - Tool-calling templates for creating multi-turn examples
 - Hand-authored high-quality tool-calling examples
 - Tool-calling evaluation suite
 - Complete training and evaluation workflow
 
 **16.1: Tool-Calling Templates**
+
 - `ToolCallExample` helper for multi-turn tool-call sequences
 - Tool-specific templates: `create_read_file_example()`, `create_write_file_example()`, `create_run_command_example()`
 - `create_multi_tool_example()` for complex workflows
@@ -673,23 +711,26 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - Multi-turn conversation format (user → assistant tool call → tool result → assistant response)
 
 **16.2: Hand-Authored Examples**
+
 - Generated 10 high-quality examples covering Punie's tools
 - Examples demonstrate realistic workflows:
-  - read_file: Reading and analyzing file contents
-  - write_file: Creating and modifying files
-  - run_command: Running commands and interpreting results
-  - Multi-tool: Complex sequences (read → modify → verify)
+    - read_file: Reading and analyzing file contents
+    - write_file: Creating and modifying files
+    - run_command: Running commands and interpreting results
+    - Multi-tool: Complex sequences (read → modify → verify)
 - Dataset split: 8 train, 1 valid, 1 test
 - Saved to: `data/hand-authored/tool-calling/`
 - All examples validated ✅
 
 **16.3: Tool-Calling Evaluation Suite**
+
 - Custom evaluation prompts for tool-calling tasks
 - Expected tool calls validation
 - Expected keywords in responses
 - Categories: single-tool, multi-tool workflows
 
 **16.4: Complete Training Workflow**
+
 - Demo script: `test_tool_calling_training.py`
 - End-to-end workflow: baseline eval → train → adapted eval → compare
 - Training config: 20 iterations, 5e-5 learning rate, batch size 2
@@ -697,6 +738,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - Comparison report showing improvements
 
 **Validation:**
+
 - Tool-calling templates tested with 7 comprehensive tests
 - All examples pass dataset validation
 - Complete workflow demonstrates training feasibility
@@ -705,6 +747,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Quality:** Ruff ✅, Ty ✅, All tests ✅
 
 **Phase 16 Summary:**
+
 - ✅ Tool-calling training infrastructure complete
 - ✅ Hand-authored examples for all Punie tools
 - ✅ Evaluation framework for measuring tool-calling accuracy
@@ -719,9 +762,11 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Status:** ✅ Complete
 **Date:** 2026-02-11
 
-**Goal:** Critical analysis revealed 4 gaps in training infrastructure. Fixed all gaps and validated end-to-end functionality.
+**Goal:** Critical analysis revealed 4 gaps in training infrastructure. Fixed all gaps and validated end-to-end
+functionality.
 
 **Gap 1: LoRA Rank Parameter Not Used**
+
 - **Issue:** Config accepted `lora_rank` but never passed to training command
 - **Discovery:** mlx-lm doesn't support `--rank` as CLI parameter
 - **Fix:** Changed `--lora-layers` → `--num-layers`, removed invalid `--rank` flag
@@ -730,6 +775,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - **Commits:** aba0502, efbee21
 
 **Gap 2: 30B Model Benchmark**
+
 - **Issue:** Never verified if Qwen3-Coder-30B-A3B-Instruct-4bit is trainable on M1 32GB
 - **Created:** `benchmark_30b_model.py`, `check_30b_model.py`
 - **Result:** ✅ **3.52 seconds per iteration** - EXCELLENT!
@@ -739,32 +785,35 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - **Commits:** b313ea9, f82155f
 
 **Gap 3: Successful Training Run**
+
 - **Issue:** Never demonstrated training with realistic parameters (100 iters, 68+ examples)
 - **Created:** `create_realistic_training_dataset.py` (85 examples), `run_successful_training_demo.py`
 - **Dataset:** 68 train / 8 valid / 9 test (Python code, debugging, best practices)
 - **Results:**
-  - ✅ Training completed: 100 iterations (~2 min on 1.5B model)
-  - ✅ Training loss: 3.1150 → 0.1190 (96.2% improvement)
-  - ✅ Adapter created: 20MB at `adapters/successful-demo/`
-  - ✅ Evaluation harness runs on both baseline and adapted
-  - ⚠️  Evaluation: 0% improvement (data alignment issue, not infrastructure failure)
+    - ✅ Training completed: 100 iterations (~2 min on 1.5B model)
+    - ✅ Training loss: 3.1150 → 0.1190 (96.2% improvement)
+    - ✅ Adapter created: 20MB at `adapters/successful-demo/`
+    - ✅ Evaluation harness runs on both baseline and adapted
+    - ⚠️ Evaluation: 0% improvement (data alignment issue, not infrastructure failure)
 - **Validation:** Infrastructure works end-to-end, training dramatically reduces loss
 - **Learning:** Training data must align with evaluation prompts
 - **Files:** `data/realistic-training/`, HTML reports generated
 - **Commits:** 7c2ddab
 
 **Gap 4: Agent Integration Documentation**
+
 - **Issue:** No documentation on using trained adapters with Punie agent
 - **Created:** `docs/research/using-adapters-with-punie.md`
 - **Documented 3 patterns:**
-  1. Standalone evaluation (working now)
-  2. Manual `mlx_lm.server` (working now, recommended workaround)
-  3. Integrated `punie serve --adapter` (documented, not yet implemented)
+    1. Standalone evaluation (working now)
+    2. Manual `mlx_lm.server` (working now, recommended workaround)
+    3. Integrated `punie serve --adapter` (documented, not yet implemented)
 - **Workflow:** Train → Start server with adapter → Run Punie
 - **Technical details:** Adapter file structure, testing, common issues
 - **Commits:** f82155f
 
 **Infrastructure Validation:**
+
 - ✅ Server management works (start/stop mlx_lm.server)
 - ✅ Training execution works (correct mlx-lm parameters)
 - ✅ Training monitoring works (parse loss from logs)
@@ -773,6 +822,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - ✅ Comparison reports work (HTML generation)
 
 **Key Findings:**
+
 - 30B MoE model is excellent for M1 32GB (fast training)
 - Training command format matters (`python -m mlx_lm lora --train`)
 - LoRA rank must use config file, not CLI (future enhancement)
@@ -784,6 +834,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Documentation:** Gap fixes summary, adapter integration guide
 
 **Gap Fixes Summary:**
+
 - ✅ All 4 critical gaps resolved
 - ✅ End-to-end infrastructure validated
 - ✅ Training infrastructure production-ready
@@ -801,24 +852,29 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Goal:** Establish training baseline with substantial dataset to prove infrastructure works at scale.
 
 **Dataset Created:**
+
 - 5,000 diverse Python examples (not toy data)
-- Categories: code generation (1,000), explanations (1,000), debugging (1,000), best practices (1,000), advanced topics (1,000)
+- Categories: code generation (1,000), explanations (1,000), debugging (1,000), best practices (1,000), advanced
+  topics (1,000)
 - Split: 4,000 train / 500 valid / 500 test
 - Saved to: `data/downloaded/diverse-python-5k/`
 
 **Complete Training Workflow:**
+
 - Baseline evaluation (4 prompts: code generation, documentation)
 - Training: 100 iterations on 4,000 examples
 - Adapted evaluation with trained adapter
 - Comparison report with delta analysis
 
 **Results:**
+
 - ✅ **Training loss:** 3.0460 → 0.1500 (95.1% improvement)
 - ✅ **Adapter created:** 20MB at `adapters/baseline-diverse-python-5k/`
 - ✅ **Infrastructure validated:** Works with 4,000 examples (10x larger than Gap 3)
 - ⚠️ **Evaluation improvement:** 0% (data alignment issue, not infrastructure failure)
 
 **Key Findings:**
+
 - Infrastructure is production-ready ✅
 - Training works at scale (4,000 examples)
 - Loss reduction proves model is learning
@@ -827,6 +883,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - This is a data curation issue, not infrastructure issue
 
 **What This Validates:**
+
 - ✅ Server management scales to large datasets
 - ✅ Training execution handles 4,000 examples
 - ✅ LoRA adapter creation works at scale
@@ -835,6 +892,7 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 - ✅ Ready for production workflows
 
 **Files Generated:**
+
 - Dataset: `data/downloaded/diverse-python-5k/` (5,000 examples)
 - Scripts: `create_diverse_python_dataset.py`, `download_and_train_baseline.py`
 - Adapter: `adapters/baseline-diverse-python-5k/` (20MB)
@@ -843,7 +901,9 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Commits:** 74ce2b2 (setup), 0162a33 (results)
 
 **Next Steps:**
-1. **For better evaluation results:** Align training data with evaluation prompts (remove variation markers, use clean examples)
+
+1. **For better evaluation results:** Align training data with evaluation prompts (remove variation markers, use clean
+   examples)
 2. **For production:** Train on domain-specific data that matches use case
 3. **Optional:** Implement integrated `punie serve --adapter` command
 4. **Ready:** Production training workflows validated
@@ -858,12 +918,14 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Goal:** Train on tool-calling data to improve Punie's tool usage.
 
 **Dataset Created:**
+
 - 107 synthetic tool-calling examples
 - Tools: read_file (40), write_file (24), run_command (40), multi-step (3)
 - Split: 85 train / 11 valid / 11 test
 - Saved to: `data/synthetic/tool-calling/`
 
 **Training Results:**
+
 - ✅ **Training loss:** 2.7760 → 0.1330 (95.2% improvement)
 - ✅ **Adapter created:** 20MB at `adapters/tool-calling-synthetic/`
 - ⚠️ **Eval improvement:** 0% (same format mismatch issue)
@@ -871,15 +933,18 @@ punie dataset merge data/step-c/ data/hand-authored/ --output data/merged/
 **Critical Finding - Root Cause Identified:**
 
 All three training runs (Gap 3, Phase 15.2, Tool-calling) showed:
+
 - ✅ Training works: 95%+ loss reduction
 - ⚠️ Evaluation: 0% improvement
 
 **Root cause:** Training data format ≠ Agent tool format
+
 - Training data: Text responses mentioning tools
 - Evaluation: Actual tool calls in agent message format
 - Result: Model learns text patterns, not tool execution
 
 **Evidence training works:**
+
 1. Consistent 95%+ loss reduction across all runs
 2. Valid adapters created (20MB safetensors)
 3. Infrastructure scales (85 to 4,000 examples)
@@ -899,6 +964,7 @@ All three training runs (Gap 3, Phase 15.2, Tool-calling) showed:
 ### What's Complete
 
 **Core Infrastructure:**
+
 - ✅ Server management (start/stop mlx_lm.server)
 - ✅ Training execution (100+ iters, 1,000+ examples)
 - ✅ LoRA adapter creation (20MB safetensors)
@@ -908,6 +974,7 @@ All three training runs (Gap 3, Phase 15.2, Tool-calling) showed:
 - ✅ 30B model benchmarked (3.52 sec/iter)
 
 **Training Runs Completed:**
+
 1. Gap 3: 85 examples, -96.2% loss
 2. Phase 15.2: 4,000 examples, -95.1% loss
 3. Tool-calling: 85 examples, -95.2% loss
@@ -915,6 +982,7 @@ All three training runs (Gap 3, Phase 15.2, Tool-calling) showed:
 **All training runs successful** - infrastructure validated at scale.
 
 **Documentation:**
+
 - Lessons learned: `docs/research/training-infrastructure-lessons-learned.md`
 - Gap fixes: `docs/research/gap-fixes-summary.md`
 - Adapter usage: `docs/research/using-adapters-with-punie.md`
@@ -923,11 +991,13 @@ All three training runs (Gap 3, Phase 15.2, Tool-calling) showed:
 ### Outstanding: Data Quality (Not Infrastructure)
 
 The 0% evaluation improvement across all runs is due to:
+
 - Training on text responses (mentions tools)
 - Evaluating on agent tool execution (actual calls)
 - **This is a data format issue, not infrastructure failure**
 
 **To get >0% improvement:**
+
 - Train on real agent tool execution traces (not text)
 - Or evaluate on text quality (not tool execution)
 - Infrastructure is ready for either approach
@@ -935,12 +1005,14 @@ The 0% evaluation improvement across all runs is due to:
 ### Ready for Production
 
 **CLI Commands Work:**
+
 ```bash
 uv run punie train <data-dir> --iters 100 --output <adapter-dir>
 uv run punie eval --adapter <adapter-dir> --port 8080
 ```
 
 **Adapter Usage Works:**
+
 ```bash
 mlx_lm.server --model <base> --adapter-path <adapter> --port 8080
 punie serve --model local:http://localhost:8080/v1/default
@@ -957,6 +1029,7 @@ punie serve --model local:http://localhost:8080/v1/default
 **Goal:** Build training pipeline to teach 7B model proper tool usage, fixing memorization and infinite loop issues.
 
 **Completed Tasks:**
+
 - [x] 17.1 Establish baselines (30B model, 7B base, Claude Code)
 - [x] 17.2 Fix tool-call format (from `"tool"` key to `"name"` key)
 - [x] 17.3 Fix stop sequences (`"stop"` → `"stop_sequences"` key mismatch in factory.py)
@@ -964,6 +1037,7 @@ punie serve --model local:http://localhost:8080/v1/default
 - [x] 17.5 Balance tool vs direct-answer examples (5 → 50 direct answers)
 
 **Results:**
+
 - ✅ Fixed memorization: Model now calls tools instead of giving memorized answers
 - ✅ Fixed infinite loop: Stop sequences now working correctly
 - ✅ 100% discrimination accuracy (5/5 queries)
@@ -971,7 +1045,8 @@ punie serve --model local:http://localhost:8080/v1/default
 - ✅ Loss: Initial 2.140 → Final 0.815 (62% improvement)
 - ✅ Speed: ~12s avg inference time
 
-**Key Learning:** Training data composition matters. 32.8% direct-answer examples enabled proper tool/direct-answer discrimination.
+**Key Learning:** Training data composition matters. 32.8% direct-answer examples enabled proper tool/direct-answer
+discrimination.
 
 ---
 
@@ -982,12 +1057,14 @@ punie serve --model local:http://localhost:8080/v1/default
 **Goal:** Resolve fused model regression where 4-bit fusion destroyed fine-tuning signal.
 
 **Completed Tasks:**
+
 - [x] 18.1 Identify root cause: 4-bit re-quantization destroys LoRA deltas
 - [x] 18.2 Implement dequantized fusion (float16 without re-quantization)
 - [x] 18.3 Test 8-bit re-quantization (256 levels vs 16 preserves signal)
 - [x] 18.4 Benchmark 4 configurations (base, adapter, fused-f16, fused-8bit)
 
 **Results:**
+
 - ✅ **8-bit fused model is the winner:** 100% accuracy, 14.27s avg, 7.55 GB
 - ✅ Speed improvements: 2.7x faster than base, 8.5x faster than adapter
 - ✅ Root cause confirmed: 4-bit quantization (16 levels) rounds away LoRA perturbations
@@ -1001,10 +1078,13 @@ punie serve --model local:http://localhost:8080/v1/default
 
 **Status:** ✅ Completed (2026-02-14)
 
-**Goal:** Scale from domain-specific (244 examples) to diverse Python frameworks (794 examples), then add HTML support (824 examples).
+**Goal:** Scale from domain-specific (244 examples) to diverse Python frameworks (794 examples), then add HTML support (
+824 examples).
 
 **Completed Tasks:**
-- [x] 19.1 Clone 10 popular Python repos (fastapi, flask, pytest, typer, click, httpx, starlette, pydantic, attrs, structlog)
+
+- [x] 19.1 Clone 10 popular Python repos (fastapi, flask, pytest, typer, click, httpx, starlette, pydantic, attrs,
+  structlog)
 - [x] 19.2 Generate 550 examples via AST parsing (grep/read/direct patterns)
 - [x] 19.3 Add 30 HTML examples (semantic HTML, forms, tables, accessibility)
 - [x] 19.4 Train Phase 6 (794 examples: Python only)
@@ -1012,19 +1092,22 @@ punie serve --model local:http://localhost:8080/v1/default
 - [x] 19.6 Benchmark all phases (5-model comparison)
 
 **Results - Phase 6:**
+
 - ✅ 100% accuracy maintained
 - ✅ 1.3% faster than Phase 5 (11.97s vs 12.13s)
 - ✅ 67% smaller adapter (0.13 GB vs 0.39 GB)
 - ✅ 3.3x more training data (794 vs 244 examples)
 
 **Results - Phase 7:**
+
 - ✅ **100% accuracy maintained**
 - ✅ **Fastest inference: 11.96s avg** (0.08% faster than Phase 6)
 - ✅ **Fastest load time: 0.68s** (45% faster than Phase 6)
 - ✅ **Multi-domain: Python + HTML with zero performance penalty**
 - ✅ **0.13 GB adapter size** (same as Phase 6)
 
-**Key Learning:** More diverse training data improves generalization and speed. Multi-domain training (Python + HTML) doesn't hurt performance.
+**Key Learning:** More diverse training data improves generalization and speed. Multi-domain training (Python + HTML)
+doesn't hurt performance.
 
 ---
 
@@ -1034,9 +1117,11 @@ punie serve --model local:http://localhost:8080/v1/default
 
 **Goal:** Improve model quality and reduce memory footprint through MoE architecture and quantization optimization.
 
-**Actual Approach:** Pivoted from Phase 7 speed optimization to Qwen3-30B-A3B migration with breakthrough quantization research.
+**Actual Approach:** Pivoted from Phase 7 speed optimization to Qwen3-30B-A3B migration with breakthrough quantization
+research.
 
 **Completed Tasks:**
+
 - [x] 20.1 Migrate to Qwen3-Coder-30B-A3B (MoE: 30B total, 3.3B active per token)
 - [x] 20.2 Train Phase 8 adapter with domain-pruned data (683 examples: Python + HTML + CSS + JS)
 - [x] 20.3 Fuse adapter to float16 (57GB intermediate)
@@ -1047,12 +1132,14 @@ punie serve --model local:http://localhost:8080/v1/default
 **Key Achievement:** Discovered LoRA signal preservation threshold is between 16 and 32 quantization levels.
 
 **Results:**
+
 - Model size: 30GB (8-bit) → 20GB (5-bit) = 33% reduction
 - Quality: 100% accuracy maintained (5/5 discrimination test)
 - Speed: 2.61s average per query (5-bit model)
 - Memory: Fits in 32GB unified memory (20GB model + inference overhead)
 
 **Scientific Discovery:**
+
 - 4-bit (16 levels): ❌ Destroys LoRA signal → 60% accuracy
 - 5-bit (32 levels): ✅ Preserves LoRA signal → 100% accuracy (threshold)
 - 6-bit (64 levels): ✅ Preserves LoRA signal → 100% accuracy
@@ -1061,12 +1148,14 @@ punie serve --model local:http://localhost:8080/v1/default
 **Production:** Use `fused_model_qwen3_phase8_5bit` (20GB) for all Phase 8+ deployments.
 
 **Documentation:**
+
 - Phase 8 spec: `agent-os/specs/2026-02-14-qwen3-migration/`
 - 6-bit experiment: `agent-os/specs/2026-02-14-6bit-quantization-experiment/`
 - Diary entry: `docs/diary/2026-02-14-quantization-breakthrough.md`
 - Updated: README.md, MEMORY.md
 
 **Original Phase 20 Tasks (Deferred):**
+
 - [ ] Profile end-to-end latency breakdown (generation vs tool vs overhead)
 - [ ] Test speculative decoding with 1.5B draft model
 - [ ] Train for conciseness (shorter responses = fewer tokens)
@@ -1079,70 +1168,74 @@ punie serve --model local:http://localhost:8080/v1/default
 
 **Status:** ✅ Infrastructure Complete (2026-02-14) | Benchmarking Pending
 
-**Goal:** Reduce end-to-end latency from ~25s (tool-calling queries with 2 generation turns) to <10s while maintaining 100% discrimination accuracy.
+**Goal:** Reduce end-to-end latency from ~25s (tool-calling queries with 2 generation turns) to <10s while maintaining
+100% discrimination accuracy.
 
-**Context:** Phase 20 achieved Qwen3-30B-A3B migration with 5-bit quantization (20GB, 100% accuracy, 2.61s avg per query in direct MLX mode). End-to-end latency through full PydanticAI → mlx_lm.server pipeline is ~25s for multi-turn tool-calling queries. Priority: **Profile first** → **speculative decoding** → **conciseness training** (conditional).
+**Context:** Phase 20 achieved Qwen3-30B-A3B migration with 5-bit quantization (20GB, 100% accuracy, 2.61s avg per query
+in direct MLX mode). End-to-end latency through full PydanticAI → mlx_lm.server pipeline is ~25s for multi-turn
+tool-calling queries. Priority: **Profile first** → **speculative decoding** → **conciseness training** (conditional).
 
 **Completed Tasks:**
 
 - [x] 21.1 **Save spec documentation**
-  - Created `agent-os/specs/2026-02-14-inference-speed-optimization/`
-  - Documented plan, scope, standards, and reference implementations
-  - Defined success criteria: <10s latency, 100% accuracy, <32GB memory
+    - Created `agent-os/specs/2026-02-14-inference-speed-optimization/`
+    - Documented plan, scope, standards, and reference implementations
+    - Defined success criteria: <10s latency, 100% accuracy, <32GB memory
 
 - [x] 21.2 **Create end-to-end latency profiler**
-  - Implemented `scripts/profile_latency.py` for latency breakdown measurement
-  - Measures: total time, generation time, tool time, framework overhead
-  - Runs 5-query discrimination test through real PydanticAI → mlx_lm.server pipeline
-  - Outputs JSON results + human-readable summary
-  - Passes ty ✅, ruff ✅
+    - Implemented `scripts/profile_latency.py` for latency breakdown measurement
+    - Measures: total time, generation time, tool time, framework overhead
+    - Runs 5-query discrimination test through real PydanticAI → mlx_lm.server pipeline
+    - Outputs JSON results + human-readable summary
+    - Passes ty ✅, ruff ✅
 
 - [x] 21.3 **Wire speculative decoding into ServerConfig**
-  - Added `draft_model` and `num_draft_tokens` fields to ServerConfig
-  - Updated `build_server_command()` to pass `--draft-model` and `--num-draft-tokens` flags
-  - Added comprehensive tests following existing patterns
-  - **Test Suite:** 29 tests passing (21 existing + 2 new config + 2 new command + 4 updated)
-  - Passes ty ✅, ruff ✅
+    - Added `draft_model` and `num_draft_tokens` fields to ServerConfig
+    - Updated `build_server_command()` to pass `--draft-model` and `--num-draft-tokens` flags
+    - Added comprehensive tests following existing patterns
+    - **Test Suite:** 29 tests passing (21 existing + 2 new config + 2 new command + 4 updated)
+    - Passes ty ✅, ruff ✅
 
 - [x] 21.4 **Benchmark speculative decoding**
-  - Implemented `scripts/benchmark_speculative.py` for systematic comparison
-  - Tests 4 configurations: baseline, num_draft_tokens=[2, 3, 5]
-  - Draft model: `mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit` (~1GB)
-  - Compares: speed, accuracy, memory usage
-  - Outputs comparison table + findings + JSON results
-  - Passes ty ✅, ruff ✅
+    - Implemented `scripts/benchmark_speculative.py` for systematic comparison
+    - Tests 4 configurations: baseline, num_draft_tokens=[2, 3, 5]
+    - Draft model: `mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit` (~1GB)
+    - Compares: speed, accuracy, memory usage
+    - Outputs comparison table + findings + JSON results
+    - Passes ty ✅, ruff ✅
 
 **Executed:**
 
 - [x] **Ran profiler** (`uv run python scripts/profile_latency.py`)
-  - ✅ Latency: 4.0s average (excellent, much better than expected)
-  - ❌ **CRITICAL ISSUE FOUND:** Tool-calling broken (40% accuracy, 2/5 queries)
-  - Model gives direct answers instead of calling tools
-  - See `FINDINGS.md` for detailed analysis
+    - ✅ Latency: 4.0s average (excellent, much better than expected)
+    - ❌ **CRITICAL ISSUE FOUND:** Tool-calling broken (40% accuracy, 2/5 queries)
+    - Model gives direct answers instead of calling tools
+    - See `FINDINGS.md` for detailed analysis
 
 **Blocked by Critical Issue:**
 
 - [ ] **BLOCKER: Fix tool-calling behavior in fused models**
-  - 5-bit fused model does NOT call tools (40% accuracy vs expected 100%)
-  - Hypothesis: 5-bit quantization too aggressive for tool-calling instructions
-  - Investigation needed: Test adapters, test 6-bit/8-bit, compare formats
-  - **Cannot proceed with Phase 21 until resolved**
+    - 5-bit fused model does NOT call tools (40% accuracy vs expected 100%)
+    - Hypothesis: 5-bit quantization too aggressive for tool-calling instructions
+    - Investigation needed: Test adapters, test 6-bit/8-bit, compare formats
+    - **Cannot proceed with Phase 21 until resolved**
 
 - [ ] **Run speculative decoding benchmark** (Blocked until tool-calling fixed)
-  - Requires working tool calls to measure true end-to-end latency
-  - Will run after tool-calling issue resolved
+    - Requires working tool calls to measure true end-to-end latency
+    - Will run after tool-calling issue resolved
 
 **Conditional Tasks:**
 
 - [ ] 21.5 **Train for conciseness** (Conditional)
-  - **Trigger:** Only if profiling shows generation time >70% of total latency
-  - Create 20-30 concise tool-calling examples
-  - Create 10-15 concise direct-answer examples
-  - Retrain with emphasis on brevity
-  - Benchmark token count + latency reduction
-  - Verify 100% accuracy maintained
+    - **Trigger:** Only if profiling shows generation time >70% of total latency
+    - Create 20-30 concise tool-calling examples
+    - Create 10-15 concise direct-answer examples
+    - Retrain with emphasis on brevity
+    - Benchmark token count + latency reduction
+    - Verify 100% accuracy maintained
 
 **Infrastructure Validated:**
+
 - ✅ ServerConfig supports speculative decoding parameters
 - ✅ build_server_command() passes correct flags to mlx_lm.server
 - ✅ Profiler ready to measure real-world latency breakdown
@@ -1151,23 +1244,27 @@ punie serve --model local:http://localhost:8080/v1/default
 - ✅ Test suite: 29 passing tests for server config/command
 
 **Documentation:**
+
 - Spec: `agent-os/specs/2026-02-14-inference-speed-optimization/`
 - Files: plan.md, shape.md, standards.md, references.md
 - Updated roadmap with Phase 21 completion status
 
 **Next Steps:**
+
 1. Run profiler to identify bottleneck (generation vs tool vs overhead)
 2. Run speculative decoding benchmark to measure speedup
 3. Conditionally train for conciseness if needed
 4. Update roadmap with benchmark results
 
 **Success Criteria:**
+
 - End-to-end latency <10s for tool-calling queries
 - Maintain 100% discrimination accuracy (5/5 queries)
 - Model fits in 32GB unified memory
 - No quality regression on Phase 8 test suite
 
-**Key Insight:** Infrastructure complete, benchmarking required to determine which optimization path (speculative decoding vs conciseness training) provides best ROI.
+**Key Insight:** Infrastructure complete, benchmarking required to determine which optimization path (speculative
+decoding vs conciseness training) provides best ROI.
 
 ---
 
@@ -1179,9 +1276,12 @@ punie serve --model local:http://localhost:8080/v1/default
 **Spec:** `agent-os/specs/2026-02-14-phase22-code-mode/`
 **Completion Doc:** `docs/phase22-completion-summary.md`
 
-**Context:** Industry convergence (Anthropic, Cloudflare, Pydantic) on code-based tool calling. Instead of sequential JSON tool calls, models write Python code that calls tools as functions. This solves Punie's documented architectural incompatibility where mlx_lm.server returns raw text but PydanticAI expects structured `tool_calls` objects.
+**Context:** Industry convergence (Anthropic, Cloudflare, Pydantic) on code-based tool calling. Instead of sequential
+JSON tool calls, models write Python code that calls tools as functions. This solves Punie's documented architectural
+incompatibility where mlx_lm.server returns raw text but PydanticAI expects structured `tool_calls` objects.
 
 **Key Benefits:**
+
 - **Solves production tool-calling gap:** No structured API needed (text-based output becomes a feature)
 - **Eliminates multi-turn overhead:** One code block = N tool calls (vs N+2 model turns in JSON format)
 - **Adds type safety:** Pragmatic sandbox validates Python code before execution
@@ -1191,44 +1291,45 @@ punie serve --model local:http://localhost:8080/v1/default
 **Accomplished:**
 
 - [x] 22.1 **Generate Python stubs from toolset**
-  - Created `src/punie/agent/stubs.py` with `generate_stubs()` and `get_stub_instructions()`
-  - Uses `inspect.signature()` to auto-generate typed stubs from `toolset.py`
-  - Single source of truth for both model prompt and execution
+    - Created `src/punie/agent/stubs.py` with `generate_stubs()` and `get_stub_instructions()`
+    - Uses `inspect.signature()` to auto-generate typed stubs from `toolset.py`
+    - Single source of truth for both model prompt and execution
 
 - [x] 22.2 **Convert training data to code format**
-  - Created `scripts/convert_to_code_format.py` - converts Phase 8 examples to Python
-  - Converted 683 examples to code format (saved to `data/phase8_code_format/`)
-  - Kept direct-answer examples unchanged (~30%)
+    - Created `scripts/convert_to_code_format.py` - converts Phase 8 examples to Python
+    - Converted 683 examples to code format (saved to `data/phase8_code_format/`)
+    - Kept direct-answer examples unchanged (~30%)
 
 - [x] 22.3 **Author multi-step workflow examples**
-  - Created `scripts/generate_code_workflows.py`
-  - Generated 24 multi-step examples (file ops, search+filter, analysis pipelines)
-  - Demonstrates N tool calls in 1 model turn with loops/conditionals
+    - Created `scripts/generate_code_workflows.py`
+    - Generated 24 multi-step examples (file ops, search+filter, analysis pipelines)
+    - Demonstrates N tool calls in 1 model turn with loops/conditionals
 
 - [x] 22.4 **Train Phase 22 model**
-  - Dataset: 707 examples (683 converted + 24 multi-step)
-  - Training: 500 iters, batch_size 1, lr 1e-4, 8 layers
-  - Model: Qwen3-Coder-30B-A3B-Instruct
-  - **Results:** Perplexity 1.826, 14GB fused model (5-bit)
+    - Dataset: 707 examples (683 converted + 24 multi-step)
+    - Training: 500 iters, batch_size 1, lr 1e-4, 8 layers
+    - Model: Qwen3-Coder-30B-A3B-Instruct
+    - **Results:** Perplexity 1.826, 14GB fused model (5-bit)
 
 - [x] 22.5 **Implement pragmatic sandbox (not Monty)**
-  - Created `src/punie/agent/monty_runner.py` with `run_code()` and `run_code_async()`
-  - Uses restricted `exec()` with safe builtins (no file I/O, no imports, no system access)
-  - Registers external functions: `read_file`, `write_file`, `run_command`
-  - Added `execute_code` tool in `toolset.py` (line 219-340)
-  - **Decision:** Monty v0.0.3 too immature, custom sandbox sufficient for v1
+    - Created `src/punie/agent/monty_runner.py` with `run_code()` and `run_code_async()`
+    - Uses restricted `exec()` with safe builtins (no file I/O, no imports, no system access)
+    - Registers external functions: `read_file`, `write_file`, `run_command`
+    - Added `execute_code` tool in `toolset.py` (line 219-340)
+    - **Decision:** Monty v0.0.3 too immature, custom sandbox sufficient for v1
 
 - [x] 22.6 **Update eval suite for code format**
-  - Modified scoring to expect Python code output (not JSON tool calls)
-  - Added code-specific checks in test scripts
-  - Created `scripts/test_phase22_model.py` for end-to-end validation
+    - Modified scoring to expect Python code output (not JSON tool calls)
+    - Added code-specific checks in test scripts
+    - Created `scripts/test_phase22_model.py` for end-to-end validation
 
 - [x] 22.7 **Benchmark Phase 22**
-  - Excellent training metrics (perplexity 1.826)
-  - 14GB model size (5-bit quantized)
-  - Integration tests pass ✅
+    - Excellent training metrics (perplexity 1.826)
+    - 14GB model size (5-bit quantized)
+    - Integration tests pass ✅
 
 **Known Gaps (to be addressed in Phase 23):**
+
 1. Async bridge in `execute_code` has `NotImplementedError` stubs (lines 273-283)
 2. `stubs.py` not connected to system prompt (hand-written Code Mode section in config.py)
 3. `json` module not available in sandbox (blocks structured parsing of tool output)
@@ -1237,18 +1338,21 @@ punie serve --model local:http://localhost:8080/v1/default
 6. Training data flywheel vision not documented
 
 **Training Results:**
+
 - Perplexity: 1.826 (excellent)
 - Model size: 14GB (5-bit quantized)
 - Dataset: 707 examples (683 converted + 24 multi-step)
 - Training time: ~6 minutes (500 iters on M1 32GB)
 
 **Success Criteria Met:**
+
 - ✅ Code-based tool calling working in training
 - ✅ Multi-step workflows in single code block
 - ✅ Excellent training metrics
 - ⚠️ Production integration has gaps (see Phase 23)
 
 **References:**
+
 - [Anthropic Programmatic Tool Calling](https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling)
 - [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode/)
 - [Pydantic Monty GitHub](https://github.com/pydantic/monty)
@@ -1261,78 +1365,83 @@ punie serve --model local:http://localhost:8080/v1/default
 
 **Goal:** Fix Phase 22 gaps, then add `ty` type checker as the first typed tool to demonstrate domain tool integration.
 
-**Context:** Phase 22 implemented Code Mode with excellent training metrics but has 6 identified gaps. This phase takes a conservative approach: solidify what we have, write the broader vision to the roadmap, then add `ty` as the first typed tool and retrain.
+**Context:** Phase 22 implemented Code Mode with excellent training metrics but has 6 identified gaps. This phase takes
+a conservative approach: solidify what we have, write the broader vision to the roadmap, then add `ty` as the first
+typed tool and retrain.
 
 **Part 1: Solidify Phase 22**
 
 - [x] 23.1 **Fix async bridge in execute_code**
-  - Replaced `NotImplementedError` stubs in `toolset.py:273-283`
-  - Implemented async-to-sync bridge using `asyncio.run_coroutine_threadsafe()`
-  - External functions now call async ACP methods from sync sandbox
-  - Added integration test `test_execute_code_async_bridge_integration()`
+    - Replaced `NotImplementedError` stubs in `toolset.py:273-283`
+    - Implemented async-to-sync bridge using `asyncio.run_coroutine_threadsafe()`
+    - External functions now call async ACP methods from sync sandbox
+    - Added integration test `test_execute_code_async_bridge_integration()`
 
 - [x] 23.2 **Connect stubs.py to system prompt**
-  - Replaced hand-written Code Mode section in `config.py:PUNIE_INSTRUCTIONS`
-  - Now uses dynamic `get_stub_instructions()` from `stubs.py`
-  - System prompt automatically updates when tools change
+    - Replaced hand-written Code Mode section in `config.py:PUNIE_INSTRUCTIONS`
+    - Now uses dynamic `get_stub_instructions()` from `stubs.py`
+    - System prompt automatically updates when tools change
 
 - [x] 23.3 **Add json module to sandbox**
-  - Added `json` module to sandbox namespace (available without import)
-  - Enables structured parsing of tool output (e.g., `ty --output-format json`)
-  - Safe (no I/O, no system access)
+    - Added `json` module to sandbox namespace (available without import)
+    - Enables structured parsing of tool output (e.g., `ty --output-format json`)
+    - Safe (no I/O, no system access)
 
 - [ ] 23.4 **Update roadmap with Phase 22 completion**
-  - Mark Phase 22 tasks as complete
-  - Add Phase 23 entry (this section)
-  - Add Phase 24+ placeholder for Domain Tools vision
-  - Document training data flywheel concept
+    - Mark Phase 22 tasks as complete
+    - Add Phase 23 entry (this section)
+    - Add Phase 24+ placeholder for Domain Tools vision
+    - Document training data flywheel concept
 
 - [ ] 23.5 **Validate Phase 22 model end-to-end**
-  - Start mlx_lm.server with Phase 22 model
-  - Run 5 single-tool discrimination queries
-  - Run 5 multi-step queries
-  - Record results in diary
+    - Start mlx_lm.server with Phase 22 model
+    - Run 5 single-tool discrimination queries
+    - Run 5 multi-step queries
+    - Record results in diary
 
 **Part 2: Add ty Type Checking as Typed Tool**
 
 - [ ] 23.6 **Create TypeCheckResult Pydantic model**
-  - New file: `src/punie/agent/typed_tools.py`
-  - Define `TypeCheckError` and `TypeCheckResult` models
-  - Structured output for type checking results
+    - New file: `src/punie/agent/typed_tools.py`
+    - Define `TypeCheckError` and `TypeCheckResult` models
+    - Structured output for type checking results
 
 - [ ] 23.7 **Implement typecheck() external function**
-  - Add `typecheck` to `ExternalFunctions` dataclass in `monty_runner.py`
-  - Wire through ACP in `toolset.py` (calls `ty check` + parses output)
-  - Add to `stubs.py` stub generation
-  - Model calls `typecheck("src/")` and gets back structured `TypeCheckResult`
+    - Add `typecheck` to `ExternalFunctions` dataclass in `monty_runner.py`
+    - Wire through ACP in `toolset.py` (calls `ty check` + parses output)
+    - Add to `stubs.py` stub generation
+    - Model calls `typecheck("src/")` and gets back structured `TypeCheckResult`
 
 - [ ] 23.8 **Update system prompt for typecheck**
-  - Add `typecheck` to core_functions list in `stubs.py`
-  - Add typecheck documentation to `config.py` instructions
-  - Document when to use `typecheck()` vs `run_command("ty", ...)`
+    - Add `typecheck` to core_functions list in `stubs.py`
+    - Add typecheck documentation to `config.py` instructions
+    - Document when to use `typecheck()` vs `run_command("ty", ...)`
 
 - [ ] 23.9 **Generate ty training data**
-  - Create `scripts/generate_ty_training_data.py`
-  - 50-100 examples: simple type check (15), check-and-fix (15), type-informed coding (10), direct answers (10)
-  - Show model using `typecheck()` correctly with structured results
+    - Create `scripts/generate_ty_training_data.py`
+    - 50-100 examples: simple type check (15), check-and-fix (15), type-informed coding (10), direct answers (10)
+    - Show model using `typecheck()` correctly with structured results
 
 - [ ] 23.10 **Merge ty examples and retrain Phase 23**
-  - Start with Phase 22's 707 examples
-  - Add 50-100 ty examples
-  - Maintain ~70/30 tool/direct ratio
-  - Split 80/10/10
-  - Train 500 iters, batch_size 1, lr 1e-4, 8 layers
-  - Fuse to float16 → quantize to 5-bit
-  - Target: ~800 examples total, comparable perplexity to Phase 22
+    - Start with Phase 22's 707 examples
+    - Add 50-100 ty examples
+    - Maintain ~70/30 tool/direct ratio
+    - Split 80/10/10
+    - Train 500 iters, batch_size 1, lr 1e-4, 8 layers
+    - Fuse to float16 → quantize to 5-bit
+    - Target: ~800 examples total, comparable perplexity to Phase 22
 
 - [ ] 23.11 **Validate ty integration end-to-end**
-  - Test 5 ty-specific queries
-  - Target: 100% single-tool, 80%+ multi-step ty workflows
+    - Test 5 ty-specific queries
+    - Target: 100% single-tool, 80%+ multi-step ty workflows
 
 **Key Insight:**
-Adding `ty` as a typed tool demonstrates the path forward for domain tools. Instead of returning raw CLI text, `typecheck()` returns structured Python objects (`TypeCheckResult`) that the model can use directly in the sandbox. This is the first step toward the "holy grail" vision of rich domain tools.
+Adding `ty` as a typed tool demonstrates the path forward for domain tools. Instead of returning raw CLI text,
+`typecheck()` returns structured Python objects (`TypeCheckResult`) that the model can use directly in the sandbox. This
+is the first step toward the "holy grail" vision of rich domain tools.
 
 **Success Criteria:**
+
 - ✅ All Phase 22 gaps resolved
 - ✅ End-to-end validation passes (single-tool + multi-step)
 - ✅ Model correctly invokes `typecheck()` for type-related queries
@@ -1349,11 +1458,13 @@ Adding `ty` as a typed tool demonstrates the path forward for domain tools. Inst
 **Vision:**
 
 As developers use Punie with typed tools (ty, ruff, pytest, etc.), the agent generates:
+
 1. Queries → code that calls typed tools
 2. Tool results → structured Python objects
 3. Actions taken → validated by tool output
 
 This creates a training data flywheel:
+
 - Real usage → real examples
 - Typed tools → structured data (not raw text)
 - Validation → correct tool usage confirmed
@@ -1361,6 +1472,7 @@ This creates a training data flywheel:
 - Retraining → model learns domain expertise
 
 **Example:**
+
 ```python
 # User asks: "Fix type errors in config.py"
 # Model generates:
@@ -1377,6 +1489,7 @@ if result.error_count > 0:
 ```
 
 **Typed Tools to Add:**
+
 - `ty` (type checking) ← Phase 23
 - `ruff` (linting/formatting)
 - `pytest` (test running)
@@ -1384,6 +1497,7 @@ if result.error_count > 0:
 - Domain-specific tools (svcs-di, tdom-svcs patterns)
 
 **Implementation Path:**
+
 1. Phase 23: Add `ty` as first typed tool ✅
 2. Phase 24: Add `ruff` and `pytest` (planned)
 3. Phase 25: 7B model experiment (in progress)
@@ -1391,7 +1505,8 @@ if result.error_count > 0:
 5. Phase 27: Training data collection infrastructure (planned)
 6. Phase 28: Automatic curation and retraining pipeline (planned)
 
-**Key Principle:** Start with standard Python tools (ty, ruff, pytest) to establish the pattern, then expand to domain-specific tools.
+**Key Principle:** Start with standard Python tools (ty, ruff, pytest) to establish the pattern, then expand to
+domain-specific tools.
 
 ---
 
@@ -1399,11 +1514,14 @@ if result.error_count > 0:
 
 **Status:** ⚠️ Inconclusive - Setup Flawed (2026-02-15)
 
-**Goal:** Test if Qwen2.5-Coder-7B (dense, 7B params) can match Qwen3-30B-A3B (MoE, 30B params, 3B active) when fine-tuned with Code Mode data.
+**Goal:** Test if Qwen2.5-Coder-7B (dense, 7B params) can match Qwen3-30B-A3B (MoE, 30B params, 3B active) when
+fine-tuned with Code Mode data.
 
-**Result:** ⚠️ **Experiment inconclusive due to 5 critical setup flaws.** Cannot conclude whether 7B architecture is viable.
+**Result:** ⚠️ **Experiment inconclusive due to 5 critical setup flaws.** Cannot conclude whether 7B architecture is
+viable.
 
 **Observed Performance:**
+
 - 7B accuracy: 35% (7/20 queries, 0/13 tool queries)
 - 30B accuracy: 100% (20/20 queries)
 - 7B speed: 19.15s avg (surprisingly 10x slower than 30B!)
@@ -1412,31 +1530,33 @@ if result.error_count > 0:
 **5 Critical Setup Flaws:**
 
 1. **`<tool_response>` token doesn't exist in Qwen2.5** (CRITICAL)
-   - 58% of training data uses `<tool_response>` / `</tool_response>`
-   - Qwen3 has as single tokens, Qwen2.5 tokenizes as ~5 subword pieces
-   - Multi-turn tool pattern corrupted during training
+    - 58% of training data uses `<tool_response>` / `</tool_response>`
+    - Qwen3 has as single tokens, Qwen2.5 tokenizes as ~5 subword pieces
+    - Multi-turn tool pattern corrupted during training
 
 2. **Tool call format mismatch** (CRITICAL)
-   - Training data uses Qwen3 XML: `<function=name><parameter=key>value`
-   - Qwen2.5 expects JSON: `{"name": "...", "arguments": {...}}`
-   - Fine-tuning fights base model priors
+    - Training data uses Qwen3 XML: `<function=name><parameter=key>value`
+    - Qwen2.5 expects JSON: `{"name": "...", "arguments": {...}}`
+    - Fine-tuning fights base model priors
 
 3. **Two conflicting formats in training data** (MODERATE)
-   - Format A (419 examples): Qwen3 XML wrapper
-   - Format B (62 examples): Bare Python code
-   - 7B model cannot resolve ambiguity
+    - Format A (419 examples): Qwen3 XML wrapper
+    - Format B (62 examples): Bare Python code
+    - 7B model cannot resolve ambiguity
 
 4. **Test script missing tool instructions** (MODERATE)
-   - No tool definitions or function signatures in system prompt
-   - 30B internalized from training, 7B needs runtime guidance
+    - No tool definitions or function signatures in system prompt
+    - 30B internalized from training, 7B needs runtime guidance
 
 5. **eos_token_id mismatch** (MINOR)
-   - Fused config uses wrong token (151643 vs 151645)
-   - Model generates until max_tokens → 19s uniform times
+    - Fused config uses wrong token (151643 vs 151645)
+    - Model generates until max_tokens → 19s uniform times
 
-**Verdict:** Cannot conclude 7B architecture is insufficient. Setup was so broken that we have no signal on 7B's actual capability.
+**Verdict:** Cannot conclude 7B architecture is insufficient. Setup was so broken that we have no signal on 7B's actual
+capability.
 
 **What Fair Retest Would Require:**
+
 1. Convert training data to Qwen2.5 JSON format
 2. Replace `<tool_response>` with Qwen2.5 convention
 3. Unify to single format (no XML/Python mix)
@@ -1447,44 +1567,58 @@ if result.error_count > 0:
 **Decision:** Stick with Qwen3-30B-A3B (`fused_model_qwen3_phase23_ty_5bit` - 20 GB, 100% accuracy, 1.94s avg)
 
 **Infrastructure Validated:**
+
 - ✅ Training pipeline works at any scale (7B to 30B)
 - ✅ 5-bit quantization preserved training signal
 - ✅ Comparison framework detected issues immediately
 - ✅ Learned what NOT to do in cross-model training
 
 **Files Cleaned Up:**
+
 - Removed `fused_model_qwen25_phase25_7b_f16/` (14 GB)
 - Removed `fused_model_qwen25_phase25_7b_5bit/` (4.9 GB)
 - Removed `adapters_phase25_7b/` (308 MB)
 - Total reclaimed: 19.2 GB
 
 **Documentation:**
+
 - Diary: `docs/diary/2026-02-15-phase25-7b-experiment-failed.md` (root cause analysis)
 - Spec: `agent-os/specs/2026-02-14-phase25-7b-experiment/`
 - MEMORY.md: Updated with 5 setup flaws
 
-**Key Learning:** Training data format, tokenization, and system prompt must match target model. Cross-model training requires careful adaptation.
+**Key Learning:** Training data format, tokenization, and system prompt must match target model. Cross-model training
+requires careful adaptation.
 
 ---
 
 ## 26. LSP-Based Tool Architecture
 
-**Status:** Planned (2026-02-15)
+**Status:** 🎯 Next Priority (starts after Phase 23 completion)
+**Date:** 2026-02-15
+**Prerequisites:** Phase 23 tasks 23.4-23.11 must be complete
 
-**Goal:** Replace text-based tools (grep, read_file, write_file) with LSP operations for precise, semantic code manipulation.
+**Goal:** Replace text-based tools (grep, read_file, write_file) with LSP operations for precise, semantic code
+manipulation.
+
+**Why Next:** LSP integration is lower risk than domain tools (Phase 27), faster to implement (~2 weeks), and establishes
+semantic tool patterns. It reuses existing ty infrastructure and provides immediate value for code navigation and
+refactoring.
 
 **Context:** Current tools are text-based:
+
 - `grep "class Foo"` → finds strings in comments, docstrings, etc.
 - `read_file` → returns full text (no context about symbols)
 - `write_file` → overwrites entire file (no semantic edits)
 
 LSP operations are semantic:
+
 - Go to definition → finds actual symbol declarations
 - Find references → traces usage across codebase
 - Rename → safe refactoring with awareness
 - Code actions → semantic fixes (add import, extract method, etc.)
 
 **Benefits:**
+
 - **Precision:** Symbol-based vs text-based search
 - **Safety:** Semantic edits vs text replacement
 - **Context:** Type information, hover docs, signature help
@@ -1493,21 +1627,25 @@ LSP operations are semantic:
 **LSP Operations to Implement:**
 
 **Navigation:**
+
 - `goto_definition(symbol)` → file path + line number
 - `find_references(symbol)` → list of usage locations
 - `find_implementations(interface)` → concrete classes
 
 **Search:**
+
 - `find_symbol(name)` → workspace symbol search
 - `document_symbols(file)` → outline (classes, functions, etc.)
 - `workspace_symbols(query)` → cross-file symbol search
 
 **Edits:**
+
 - `rename_symbol(old, new)` → safe refactoring
 - `apply_code_action(action)` → semantic fixes
 - `organize_imports(file)` → sort/remove unused imports
 
 **Information:**
+
 - `hover(file, position)` → type info, docstring
 - `signature_help(file, position)` → function parameters
 - `completion(file, position)` → autocomplete suggestions
@@ -1527,30 +1665,106 @@ result = lsp_query("goto_definition", symbol="AgentConfig", file="src/punie/agen
 ```
 
 **Integration with ty:**
+
 - `ty` LSP server already running for type checking
 - Reuse existing connection for navigation/refactoring
 - Unified interface for all LSP operations
 
 **Training Data Strategy:**
+
 1. Generate examples using real LSP queries on Punie codebase
 2. Show model using LSP for precise operations
 3. Contrast with text-based approaches (demonstrate when each is appropriate)
 4. Multi-step workflows (LSP query → read → edit → verify)
 
-**Implementation Path:**
-1. Add `lsp_query()` typed tool with LSPResult Pydantic model
-2. Implement LSP client (reuse ty connection + add Python LSP server)
-3. Generate 100+ LSP training examples
-4. Retrain with LSP examples
-5. Benchmark: LSP precision vs text-based tools
+**Implementation Tasks:**
+
+- [ ] 26.1 **Create LSPResult Pydantic models**
+    - New file: `src/punie/agent/lsp_tools.py`
+    - Define `LSPLocation`, `LSPSymbol`, `LSPResult` models
+    - Structured output for LSP operations (goto_definition, find_references, hover, etc.)
+    - Follow same pattern as `TypeCheckResult` from Phase 23
+
+- [ ] 26.2 **Implement lsp_query() external function**
+    - Add `lsp_query` to sandbox's external functions
+    - Wire through ACP in `toolset.py` (connects to ty LSP server)
+    - Support operations: goto_definition, find_references, hover
+    - Add to `stubs.py` stub generation
+    - Model calls `lsp_query("goto_definition", symbol="AgentConfig")` → structured `LSPResult`
+
+- [ ] 26.3 **Connect to ty LSP server**
+    - Implement JSON-RPC client for ty LSP (stdio or TCP)
+    - Handle LSP protocol: initialize, text document sync, requests
+    - Map LSP responses to Python `LSPResult` objects
+    - Handle errors gracefully (server not running, invalid queries)
+
+- [ ] 26.4 **Update system prompt for LSP**
+    - Add `lsp_query` to core_functions list in `stubs.py`
+    - Document when to use LSP vs text tools:
+        - LSP: Symbol navigation, type queries, refactoring
+        - Text: Content search, file operations, pattern matching
+    - Add examples showing LSP advantages
+
+- [ ] 26.5 **Generate LSP training data**
+    - Create `scripts/generate_lsp_training_data.py`
+    - 100-120 examples across categories:
+        - Navigation (30): goto_definition, find_references, find_implementations
+        - Information (30): hover, signature_help
+        - Search (20): workspace_symbols, document_symbols
+        - Multi-step workflows (20): LSP → read → edit → verify
+    - Show contrast with text-based approaches (when LSP is better)
+    - Real examples from Punie codebase
+
+- [ ] 26.6 **Merge LSP examples and retrain Phase 26**
+    - Start with Phase 23's ~800 examples (Phase 22 base + ty)
+    - Add 100-120 LSP examples
+    - Maintain ~70/30 tool/direct ratio
+    - Split 80/10/10 (train/valid/test)
+    - Train 500 iters, batch_size 1, lr 1e-4, 8 layers
+    - Fuse to float16 → quantize to 5-bit
+    - Target: ~920 examples total, comparable perplexity to Phase 23
+
+- [ ] 26.7 **Benchmark LSP vs text-based tools**
+    - Create evaluation suite: 20 queries (10 LSP-appropriate, 10 text-appropriate)
+    - Measure: precision (symbol matches), recall (false positives), speed
+    - Compare: LSP navigation vs grep, LSP refactoring vs text replacement
+    - Target: 90%+ correct tool selection, zero false positives on symbol queries
+
+- [ ] 26.8 **Validate LSP integration end-to-end**
+    - Test 10 LSP-specific queries (navigation, hover, references)
+    - Target: 100% single-tool discrimination, 80%+ multi-step LSP workflows
+    - Verify: Model prefers LSP for symbols, text tools for content
+    - Document: When each approach is appropriate
+
+**Estimated Time:** 1-2 weeks (per analysis document)
 
 **Success Criteria:**
-- Model chooses LSP for symbol operations, text tools for content search
-- Refactoring operations succeed (rename, extract, etc.)
-- No false positives (text matches in comments/strings)
-- Training data demonstrates clear LSP advantages
+
+- ✅ Model correctly discriminates: LSP for symbols, text tools for content
+- ✅ Zero false positives on symbol operations (no comment/string matches)
+- ✅ Refactoring operations work (rename symbols, organize imports)
+- ✅ 80%+ accuracy on multi-step LSP workflows
+- ✅ Training data shows clear LSP advantages over text-based approaches
+
+**Key Deliverables:**
+
+- `src/punie/agent/lsp_tools.py` - LSPResult models and parsers
+- `lsp_query()` external function in sandbox
+- ty LSP client integration (JSON-RPC over stdio/TCP)
+- 100-120 LSP training examples
+- Phase 26 trained model (~920 total examples)
+- Evaluation suite comparing LSP vs text tools
+- Documentation: when to use each approach
+
+**References:**
+
+- Analysis: `agent-os/specs/2026-02-15-lsp-and-domain-tools-strategy/analysis.md`
+- ty LSP findings: `agent-os/specs/2026-02-15-lsp-and-domain-tools-strategy/ty-lsp-integration-findings.md`
+- tdom LSP reference: `/Users/pauleveritt/projects/t-strings/tdom/tdom_lsp/` (working implementation)
 
 **Future:** Expand to other languages (TypeScript, Rust, Go) using same LSP architecture.
+
+**Next Phase:** Phase 27 (Domain Typed Tools) will build on LSP patterns to implement domain-specific validation tools.
 
 ---
 
@@ -1558,16 +1772,19 @@ result = lsp_query("goto_definition", symbol="AgentConfig", file="src/punie/agen
 
 **Status:** Planned (2026-02-15)
 
-**Goal:** Implement tools that think in domain vocabulary (components, services, middleware) instead of code syntax (classes, functions, decorators). This enables the model to reason about **design decisions**, not just code correctness.
+**Goal:** Implement tools that think in domain vocabulary (components, services, middleware) instead of code syntax (
+classes, functions, decorators). This enables the model to reason about **design decisions**, not just code correctness.
 
 **Context:**
 
 Current tools validate *existing* code:
+
 - `ty check` → finds type errors
 - `ruff check` → finds style violations
 - `pytest` → runs tests
 
 Domain tools guide *future* code design:
+
 - `validate_component(spec)` → checks if component design follows tdom rules
 - `check_dependency_graph(registry)` → validates service architecture
 - `validate_middleware_chain(chain)` → ensures correct middleware ordering
@@ -1577,6 +1794,7 @@ Domain tools guide *future* code design:
 The model stops thinking in "code" and starts thinking in **domain concepts that happen to be implemented as code**.
 
 Example workflow:
+
 ```python
 # User asks: "Add authentication to this tdom-svcs app"
 
@@ -1606,29 +1824,32 @@ result = validate_middleware_chain([
 **Domain Tools to Implement:**
 
 **tdom domain:**
+
 - `validate_component(spec)` → Component structure, props, children, escaping
 - `check_render_tree(template)` → Node hierarchy, no dangling refs
 - `validate_escape_context(node)` → XSS prevention rules
 
 **svcs + svcs-di domain:**
+
 - `validate_service_registration(reg)` → Factory type, lifecycle, protocol conformance
 - `check_dependency_graph(registry)` → No circular deps, layer violations
 - `validate_injection_site(location)` → Service is registered before injection
 
 **tdom-svcs domain:**
+
 - `validate_middleware_chain(chain)` → Priority ordering, no conflicts
 - `check_di_template_binding(template)` → All injected services are registered
 - `validate_route_pattern(pattern)` → Route syntax, parameter types
 
 **Domain Vocabulary vs Code Vocabulary:**
 
-| Domain Concept | Code Implementation | Domain Tool Checks |
-|---------------|--------------------|--------------------|
-| Component | Python function with t-string return | Props are JSON-serializable, children are valid |
-| Service | Class/function registered with svcs | Lifecycle is valid, protocol is implemented |
-| Middleware | Function with priority decorator | Priority ordering, no conflicts |
-| Route | URL pattern with parameter types | Syntax is valid, types are supported |
-| DI Binding | Template variable injection | Service is registered |
+| Domain Concept | Code Implementation                  | Domain Tool Checks                              |
+|----------------|--------------------------------------|-------------------------------------------------|
+| Component      | Python function with t-string return | Props are JSON-serializable, children are valid |
+| Service        | Class/function registered with svcs  | Lifecycle is valid, protocol is implemented     |
+| Middleware     | Function with priority decorator     | Priority ordering, no conflicts                 |
+| Route          | URL pattern with parameter types     | Syntax is valid, types are supported            |
+| DI Binding     | Template variable injection          | Service is registered                           |
 
 **Architecture:**
 
@@ -1640,11 +1861,13 @@ class ComponentSpec(BaseModel):
     children: list[str]
     escaping: str  # "auto" | "manual" | "none"
 
+
 class ServiceRegistration(BaseModel):
     factory: str
     lifecycle: str  # "request" | "session" | "app"
     protocol: str
     dependencies: list[str]
+
 
 # Domain validation functions (verbs)
 def validate_component(spec: ComponentSpec) -> ValidationResult:
@@ -1654,6 +1877,7 @@ def validate_component(spec: ComponentSpec) -> ValidationResult:
     # Rule 2: Children must be valid component names
     # Rule 3: Escaping must be correct for context
     return ValidationResult(valid=len(errors) == 0, errors=errors)
+
 
 # Sandbox integration (same pattern as LSP/ty/ruff)
 def sync_validate_component(spec_dict: dict) -> str:
@@ -1666,10 +1890,10 @@ def sync_validate_component(spec_dict: dict) -> str:
 
 1. Mine domain repos (tdom, svcs, svcs-di, tdom-svcs) for patterns
 2. Create 150 examples showing domain reasoning workflows:
-   - Component design with validation (30 examples)
-   - Service architecture with dependency checking (40 examples)
-   - Middleware ordering and conflicts (30 examples)
-   - Full app design (50 examples showing multi-tool workflows)
+    - Component design with validation (30 examples)
+    - Service architecture with dependency checking (40 examples)
+    - Middleware ordering and conflicts (30 examples)
+    - Full app design (50 examples showing multi-tool workflows)
 3. Contrast with code-first approaches (show why domain tools catch design errors)
 4. Multi-step workflows: validate design → write code → validate code → test
 
@@ -1685,20 +1909,21 @@ def sync_validate_component(spec_dict: dict) -> str:
 
 **Success Criteria:**
 
-- Model reasons in domain vocabulary (components, services, middleware) not code vocabulary (classes, functions, decorators)
+- Model reasons in domain vocabulary (components, services, middleware) not code vocabulary (classes, functions,
+  decorators)
 - Domain tools catch design errors before code is written
 - Training data demonstrates domain-driven design workflows
 - Model uses domain tools for architectural decisions, validation tools for code correctness
 
 **Why This is Higher Impact Than LSP:**
 
-| Dimension | LSP | Domain Tools |
-|-----------|-----|--------------|
-| Navigation | ✅ Precise symbol lookup | ✅ Semantic understanding |
-| Refactoring | ✅ Safe renames | ✅ Domain-aware refactoring |
-| Design decisions | ❌ Still thinks in code | ✅ Thinks in domain concepts |
-| Architectural guardrails | ❌ No constraints | ✅ Validates invariants |
-| Learning curve | Modest | Transformative |
+| Dimension                | LSP                     | Domain Tools                |
+|--------------------------|-------------------------|-----------------------------|
+| Navigation               | ✅ Precise symbol lookup | ✅ Semantic understanding    |
+| Refactoring              | ✅ Safe renames          | ✅ Domain-aware refactoring  |
+| Design decisions         | ❌ Still thinks in code  | ✅ Thinks in domain concepts |
+| Architectural guardrails | ❌ No constraints        | ✅ Validates invariants      |
+| Learning curve           | Modest                  | Transformative              |
 
 **Key Difference from Validation Tools:**
 
@@ -1707,7 +1932,8 @@ def sync_validate_component(spec_dict: dict) -> str:
 
 Domain tools shift reasoning from **"How do I write this code?"** to **"What design should I implement?"**
 
-This is the difference between a junior developer (writes code that compiles) and a senior architect (designs systems that scale).
+This is the difference between a junior developer (writes code that compiles) and a senior architect (designs systems
+that scale).
 
 **Future:** Expand to other domains as Punie's scope grows (API design, database schema, deployment configs, etc.).
 
@@ -1717,11 +1943,13 @@ This is the difference between a junior developer (writes code that compiles) an
 
 **Status:** Planned (2026-02-15)
 
-**Goal:** Retrain on complete dataset (~1265 examples) with all tool categories, then establish automatic training data collection from real Punie usage.
+**Goal:** Retrain on complete dataset (~1265 examples) with all tool categories, then establish automatic training data
+collection from real Punie usage.
 
 **Context:**
 
 After Phases 26 (LSP) and 27 (Domain Tools), Punie will have:
+
 - Text-based tools (grep, read, write, run_command)
 - Validation tools (ty, ruff, pytest)
 - Semantic tools (LSP navigation, type queries, refactoring)
@@ -1731,14 +1959,14 @@ This phase completes the training data and establishes the self-improvement loop
 
 **Dataset Composition (~1265 examples):**
 
-| Category | Count | Purpose |
-|----------|-------|---------|
-| Phase 22 base | 707 | Text tools, direct answers, multi-step workflows |
-| Phase 24 (ruff, pytest, ty) | 100 | Validation tool calling |
-| Domain examples (agent-os) | 158 | Domain knowledge Q&A |
-| Phase 26 (LSP) | 100 | Semantic navigation and refactoring |
-| Phase 27 (Domain Tools) | 150 | Domain reasoning and design validation |
-| **Total** | **1215** | Complete tool ecosystem |
+| Category                    | Count    | Purpose                                          |
+|-----------------------------|----------|--------------------------------------------------|
+| Phase 22 base               | 707      | Text tools, direct answers, multi-step workflows |
+| Phase 24 (ruff, pytest, ty) | 100      | Validation tool calling                          |
+| Domain examples (agent-os)  | 158      | Domain knowledge Q&A                             |
+| Phase 26 (LSP)              | 100      | Semantic navigation and refactoring              |
+| Phase 27 (Domain Tools)     | 150      | Domain reasoning and design validation           |
+| **Total**                   | **1215** | Complete tool ecosystem                          |
 
 **Training Configuration:**
 
@@ -1751,16 +1979,18 @@ This phase completes the training data and establishes the self-improvement loop
 **Retrain Goals:**
 
 1. **Tool selection mastery** — Model chooses the right tool for each task:
-   - Text tools for content search
-   - LSP for symbol navigation
-   - Validation tools for code correctness
-   - Domain tools for design decisions
+    - Text tools for content search
+    - LSP for symbol navigation
+    - Validation tools for code correctness
+    - Domain tools for design decisions
 
 2. **Multi-tool workflows** — Complex tasks require tool sequencing:
-   - LSP to explore → read to understand → domain tool to validate → write to implement → validation tool to verify → test
+    - LSP to explore → read to understand → domain tool to validate → write to implement → validation tool to verify →
+      test
 
 3. **Domain reasoning** — Model thinks in domain vocabulary:
-   - "Add auth service" → validate_service_registration → validate_middleware_chain → validate_di_template_binding → write code
+    - "Add auth service" → validate_service_registration → validate_middleware_chain → validate_di_template_binding →
+      write code
 
 **Training Data Flywheel:**
 
@@ -1786,6 +2016,7 @@ The holy grail vision: **automatic training data collection from real usage**.
 **Phase 2: Filter**
 
 Automatic quality checks:
+
 - ✅ Successful outcome (no errors, tools used correctly)
 - ✅ Novel pattern (not duplicate of existing examples)
 - ✅ No sensitive data (no API keys, personal info)
@@ -1795,6 +2026,7 @@ Automatic quality checks:
 **Phase 3: Curate**
 
 Manual review for edge cases:
+
 - Complex multi-tool workflows
 - Novel domain patterns
 - Error handling examples
@@ -1803,6 +2035,7 @@ Manual review for edge cases:
 **Phase 4: Retrain**
 
 Scheduled retraining on growing dataset:
+
 - Monthly retrain with new examples
 - Track perplexity and benchmark scores over time
 - A/B test new models before deployment
@@ -1818,30 +2051,30 @@ Scheduled retraining on growing dataset:
 **Infrastructure Requirements:**
 
 1. **Logging system**
-   - Capture all Punie interactions (query, code, results)
-   - Store in structured format (JSONL)
-   - Respect privacy (opt-in, no sensitive data)
+    - Capture all Punie interactions (query, code, results)
+    - Store in structured format (JSONL)
+    - Respect privacy (opt-in, no sensitive data)
 
 2. **Filtering pipeline**
-   - Automatic quality checks
-   - Deduplication
-   - Diversity balancing (don't over-represent common patterns)
+    - Automatic quality checks
+    - Deduplication
+    - Diversity balancing (don't over-represent common patterns)
 
 3. **Curation tools**
-   - UI for manual review
-   - Tagging and categorization
-   - Example editing and annotation
+    - UI for manual review
+    - Tagging and categorization
+    - Example editing and annotation
 
 4. **Retraining pipeline**
-   - Automatic dataset merging
-   - Training script generation
-   - Benchmark evaluation
-   - Model versioning
+    - Automatic dataset merging
+    - Training script generation
+    - Benchmark evaluation
+    - Model versioning
 
 5. **Deployment system**
-   - A/B testing infrastructure
-   - Rollback capability
-   - Performance monitoring
+    - A/B testing infrastructure
+    - Rollback capability
+    - Performance monitoring
 
 **Success Criteria:**
 
@@ -1860,11 +2093,13 @@ Real usage → Capture → Filter → Curate → Retrain → Deploy → Better m
                                                         More usage ← ← ←
 ```
 
-This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes training data. The model gets smarter with use.
+This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes
+training data. The model gets smarter with use.
 
 **Key Insight:**
 
 The flywheel only works if the tools are *rich enough* to be worth learning from:
+
 - Text tools: Limited learning (everyone knows grep)
 - Validation tools: Some learning (how to fix specific errors)
 - LSP: Good learning (semantic navigation patterns)
@@ -1885,11 +2120,13 @@ Domain tools are the key to the flywheel — they capture **design knowledge**, 
 
 **Status:** Planned (after Phase 28)
 
-**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the self-improvement loop.
+**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the
+self-improvement loop.
 
 **Context:**
 
-Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the architecture described in flywheel.md and holy-grail-architecture.md. This is when the self-improving loop becomes reality.
+Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the architecture described in flywheel.md and
+holy-grail-architecture.md. This is when the self-improving loop becomes reality.
 
 **Key Components:**
 
@@ -1903,12 +2140,14 @@ Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the archi
 **Implementation Path:**
 
 **Milestone 1: Skills Framework (1 week)**
+
 - `punie/skills/` directory structure
 - Skill loader implementing list/load/execute pattern
 - SKILL.md parser with YAML frontmatter
 - Initial skills: tdom-components, svcs-services, middleware
 
 **Milestone 2: Monty Tool + Validation (1 week)**
+
 - `generate_artifact` tool implementation
 - Schema registry (tdom, svcs, middleware)
 - Pydantic validators for each artifact type
@@ -1916,6 +2155,7 @@ Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the archi
 - Layered validation: ast → libcst matchers → libcst transformers → ty
 
 **Milestone 3: Training Data Collector (3 days)**
+
 - `TrainingCollector` class in `punie.training`
 - Automatic trace recording on every generation
 - JSONL output format with full context
@@ -1923,6 +2163,7 @@ Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the archi
 - Filtering for `validation_passed=True` only
 
 **Milestone 4: Bootstrap Dataset (1 week)**
+
 - 30 reference tdom components (varied complexity)
 - 20 reference svcs services (lifecycle patterns)
 - 15 reference middleware implementations
@@ -1930,6 +2171,7 @@ Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the archi
 - Fine-tune initial adapter with bootstrap data
 
 **Milestone 5: Self-Improvement Loop (ongoing)**
+
 - Automated data collection during daily work
 - Weekly fine-tuning jobs (continuous improvement)
 - Metrics dashboard (validation rates, retry counts, velocity)

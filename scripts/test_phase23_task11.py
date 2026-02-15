@@ -5,11 +5,16 @@ Automated 15-query test suite for typed tools validation.
 """
 
 import json
+import sys
 import time
 from pathlib import Path
 
 import mlx.core as mx
 from mlx_lm import generate, load
+
+# Import shared prompt formatting utility
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from punie.agent.prompt_utils import format_prompt
 
 
 # Test queries organized by category
@@ -113,17 +118,6 @@ TEST_QUERIES = {
 }
 
 
-def format_prompt(query: str) -> str:
-    """Format query in Qwen3 chat template."""
-    return (
-        "<|im_start|>system\n"
-        "You are Punie, an AI coding assistant that helps with Python development via PyCharm.<|im_end|>\n"
-        "<|im_start|>user\n"
-        f"{query}<|im_end|>\n"
-        "<|im_start|>assistant\n"
-    )
-
-
 def is_tool_call(response: str) -> bool:
     """Check if response contains a tool call."""
     return "<tool_call>" in response or "execute_code" in response
@@ -141,7 +135,7 @@ def accesses_structured_fields(response: str) -> bool:
     return any(pattern in response for pattern in field_patterns)
 
 
-def run_test_suite(model, tokenizer):
+def run_test_suite(model, tokenizer, model_path: str):
     """Run all 15 test queries and collect results."""
     results = {}
     query_num = 0
@@ -158,7 +152,8 @@ def run_test_suite(model, tokenizer):
             print(f"\n[{query_num}/15] {test['description']}")
             print(f"  Query: {test['query']}")
 
-            prompt = format_prompt(test["query"])
+            # Use shared utility to guarantee consistency with training format
+            prompt = format_prompt(test["query"], model_path)
 
             # Generate response
             start = time.time()
@@ -316,7 +311,7 @@ def main():
     print(f"  Memory: {memory_gb:.2f} GB")
 
     # Run tests
-    results = run_test_suite(model, tokenizer)
+    results = run_test_suite(model, tokenizer, model_path)
 
     # Calculate metrics
     metrics = calculate_metrics(results)

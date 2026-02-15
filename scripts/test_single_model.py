@@ -14,6 +14,10 @@ from pathlib import Path
 import mlx.core as mx
 from mlx_lm import generate, load
 
+# Import shared prompt formatting utility
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from punie.agent.prompt_utils import format_prompt
+
 
 # Test queries (3 tool, 2 direct)
 TEST_QUERIES = [
@@ -43,17 +47,6 @@ TEST_QUERIES = [
         "description": "Comparison question - should answer directly",
     },
 ]
-
-
-def format_prompt(query: str) -> str:
-    """Format query in Qwen chat template."""
-    return (
-        "<|im_start|>system\n"
-        "You are Punie, an AI coding assistant that helps with Python development via PyCharm.<|im_end|>\n"
-        "<|im_start|>user\n"
-        f"{query}<|im_end|>\n"
-        "<|im_start|>assistant\n"
-    )
 
 
 def is_tool_response(response: str) -> bool:
@@ -109,7 +102,8 @@ def main():
         print(f"\n[{i}/5] {test['description']}")
         print(f"  Query: {test['query']}")
 
-        prompt = format_prompt(test["query"])
+        # Use shared utility to guarantee consistency with training format
+        prompt = format_prompt(test["query"], model_path)
 
         # Generate response
         start = time.time()
