@@ -220,6 +220,161 @@ async def run_command(
         ctx.deps.tracker.forget(tool_call_id)
 
 
+async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
+    """Execute Python code with multiple tool calls (Code Mode).
+
+    Runs model-generated Python code in a restricted sandbox. The code can call
+    read_file, write_file, and run_command to perform multi-step operations in
+    a single turn.
+
+    Reports tool call lifecycle to IDE via session_update.
+
+    NOTE: Current implementation is for training validation with fake external
+    functions. Production integration requires proper async bridge pattern
+    (either Monty's external call pattern or thread pool executor).
+
+    Args:
+        ctx: Run context with ACPDeps
+        code: Python source code to execute
+
+    Returns:
+        Captured stdout from code execution
+
+    Example:
+        code = '''
+        files = run_command("find", args=["-name", "*.py"]).splitlines()
+        total = sum(read_file(f).count("import ") for f in files)
+        print(f"Found {total} imports")
+        '''
+    """
+    from punie.agent.monty_runner import (
+        CodeExecutionError,
+        ExternalFunctions,
+        run_code,
+    )
+
+    logger.info(f"🔧 TOOL: execute_code({len(code)} chars)")
+    tool_call_id = "execute_code"
+
+    # Start tracking
+    start = ctx.deps.tracker.start(
+        tool_call_id, title="Executing Python code", kind="execute"
+    )
+    await ctx.deps.client_conn.session_update(ctx.deps.session_id, start)
+
+    try:
+        # Create async-to-sync bridge for external functions
+        # The sandbox runs synchronously (exec is inherently sync), but external
+        # functions need to call async ACP tools. We use run_coroutine_threadsafe
+        # to bridge from the sync sandbox back to the async event loop.
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+
+        def sync_read_file(path: str) -> str:
+            """Bridge from sync sandbox to async read_text_file ACP tool."""
+            future = asyncio.run_coroutine_threadsafe(
+                ctx.deps.client_conn.read_text_file(
+                    session_id=ctx.deps.session_id, path=path
+                ),
+                loop,
+            )
+            response = future.result(timeout=30)
+            return response.content
+
+        def sync_write_file(path: str, content: str) -> str:
+            """Bridge from sync sandbox to async write_text_file ACP tool."""
+            future = asyncio.run_coroutine_threadsafe(
+                ctx.deps.client_conn.write_text_file(
+                    session_id=ctx.deps.session_id, path=path, content=content
+                ),
+                loop,
+            )
+            response = future.result(timeout=30)
+            return "success"  # write_text_file returns None, return success marker
+
+        def sync_run_command(
+            command: str, args: list[str] | None = None, cwd: str | None = None
+        ) -> str:
+            """Bridge from sync sandbox to async terminal workflow (create/wait/output/release)."""
+            # Use terminal workflow: create -> wait -> get output -> release
+            async def _run_terminal():
+                term = await ctx.deps.client_conn.create_terminal(
+                    command=command,
+                    args=args or [],
+                    cwd=cwd,
+                    session_id=ctx.deps.session_id,
+                )
+                await ctx.deps.client_conn.wait_for_terminal_exit(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                output_resp = await ctx.deps.client_conn.terminal_output(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                await ctx.deps.client_conn.release_terminal(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                return output_resp.output
+
+            future = asyncio.run_coroutine_threadsafe(_run_terminal(), loop)
+            return future.result(timeout=30)
+
+        def sync_typecheck(path: str):  # type: ignore[no-untyped-def]
+            """Bridge from sync sandbox to async ty type checker via terminal."""
+            from punie.agent.typed_tools import TypeCheckResult, parse_ty_output
+
+            # Use terminal workflow to run ty check with JSON output
+            async def _run_typecheck() -> TypeCheckResult:
+                term = await ctx.deps.client_conn.create_terminal(
+                    command="ty",
+                    args=["check", path, "--output-format", "json"],
+                    cwd=None,
+                    session_id=ctx.deps.session_id,
+                )
+                await ctx.deps.client_conn.wait_for_terminal_exit(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                output_resp = await ctx.deps.client_conn.terminal_output(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                await ctx.deps.client_conn.release_terminal(
+                    session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+                )
+                # Parse JSON output into TypeCheckResult
+                return parse_ty_output(output_resp.output)
+
+            future = asyncio.run_coroutine_threadsafe(_run_typecheck(), loop)
+            return future.result(timeout=30)
+
+        # Execute code in sandbox (runs in thread pool to not block event loop)
+        external_functions = ExternalFunctions(
+            read_file=sync_read_file,
+            write_file=sync_write_file,
+            run_command=sync_run_command,
+            typecheck=sync_typecheck,
+        )
+        output = await loop.run_in_executor(None, run_code, code, external_functions)
+
+        # Report completion
+        progress = ctx.deps.tracker.progress(
+            tool_call_id,
+            status="completed",
+            content=[tool_content(text_block(output))],
+        )
+        await ctx.deps.client_conn.session_update(ctx.deps.session_id, progress)
+
+        return output
+    except CodeExecutionError as exc:
+        logger.error(f"✗ Code execution failed: {exc}")
+        raise ModelRetry(f"Code execution failed: {exc}") from exc
+    except Exception as exc:
+        logger.error(f"✗ Unexpected error: {exc}")
+        raise ModelRetry(f"Failed to execute code: {exc}") from exc
+    finally:
+        # Clean up tracker
+        ctx.deps.tracker.forget(tool_call_id)
+
+
 async def get_terminal_output(ctx: RunContext[ACPDeps], terminal_id: str) -> str:
     """Get output from a terminal by ID.
 
@@ -306,6 +461,7 @@ def create_toolset() -> FunctionToolset[ACPDeps]:
     - read_file
     - write_file (with permission)
     - run_command (with permission)
+    - execute_code (Code Mode for multi-step operations)
     - get_terminal_output
     - release_terminal
     - wait_for_terminal_exit
@@ -320,6 +476,7 @@ def create_toolset() -> FunctionToolset[ACPDeps]:
             read_file,
             write_file,
             run_command,
+            execute_code,
             get_terminal_output,
             release_terminal,
             wait_for_terminal_exit,

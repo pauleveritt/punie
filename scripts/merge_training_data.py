@@ -1,133 +1,93 @@
 #!/usr/bin/env python3
-"""Merge all training data sources for Phase 6 training.
-
-Combines:
-1. Existing Phase 5 examples (244 examples: POC + domain + public)
-2. New Stack v2 examples (550+ examples: diverse Python codebases)
-
-Total: ~800 examples with good tool/direct balance.
-"""
+"""Merge converted Phase 21 data with new Code Mode workflows and split into train/valid/test."""
 
 import json
 import random
 from pathlib import Path
 
 
+def load_jsonl(file_path):
+    """Load examples from a JSONL file."""
+    examples = []
+    with open(file_path) as f:
+        for line in f:
+            examples.append(json.loads(line))
+    return examples
+
+
+def save_jsonl(examples, file_path):
+    """Save examples to a JSONL file."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_path, "w") as f:
+        for example in examples:
+            f.write(json.dumps(example) + "\n")
+
+
+def count_tool_vs_direct(examples):
+    """Count tool-calling vs direct-answer examples."""
+    tool_count = sum(1 for ex in examples if "<tool_call>" in ex["text"])
+    direct_count = len(examples) - tool_count
+    return tool_count, direct_count
+
+
 def main():
-    print("=" * 80)
-    print("TRAINING DATA MERGER - Phase 6")
-    print("=" * 80)
-    print("\nCombining all training data sources:")
-    print("  1. Phase 5 examples (domain + POC + public)")
-    print("  2. Popular repo examples (FastAPI, pytest, etc.)")
+    """Merge and split Phase 22 training data."""
+    converted_dir = Path("data/phase22_code_format")
+    workflows_file = Path("data/phase22_code_workflows.jsonl")
+    output_dir = Path("data/phase22_merged")
+
+    print("Merging Phase 22 training data...")
     print()
 
     all_examples = []
 
-    # Load existing Phase 5 training data
-    phase5_train = Path("data/mlx_format/train.jsonl")
-    phase5_valid = Path("data/mlx_format/valid.jsonl")
+    # Load converted Phase 21 examples
+    for split in ["train", "valid", "test"]:
+        converted_file = converted_dir / f"{split}.jsonl"
+        if converted_file.exists():
+            examples = load_jsonl(converted_file)
+            all_examples.extend(examples)
+            print(f"✓ Loaded {len(examples)} converted examples from {split}")
 
-    if phase5_train.exists():
-        print(f"Loading Phase 5 training data from {phase5_train}...")
-        with phase5_train.open() as f:
-            for line in f:
-                item = json.loads(line)
-                all_examples.append({
-                    "text": item["text"],
-                    "source": "phase5_train",
-                })
-
-        print(f"  Loaded {len([ex for ex in all_examples if ex['source'] == 'phase5_train'])} examples")
-
-    if phase5_valid.exists():
-        print(f"Loading Phase 5 validation data from {phase5_valid}...")
-        with phase5_valid.open() as f:
-            for line in f:
-                item = json.loads(line)
-                all_examples.append({
-                    "text": item["text"],
-                    "source": "phase5_valid",
-                })
-
-        print(f"  Loaded {len([ex for ex in all_examples if ex['source'] == 'phase5_valid'])} examples")
-
-    phase5_count = len(all_examples)
-
-    # Load repo examples (from popular Python projects)
-    repos_file = Path("data/repos_examples/training_examples.jsonl")
-    if repos_file.exists():
-        print(f"\nLoading repo examples from {repos_file}...")
-        with repos_file.open() as f:
-            for line in f:
-                item = json.loads(line)
-                all_examples.append(item)
-
-        repos_count = len(all_examples) - phase5_count
-        print(f"  Loaded {repos_count} examples")
-    else:
-        print(f"\n⚠️  Warning: {repos_file} not found")
-        print("   Run scripts/generate_repo_examples.py first")
-        repos_count = 0
+    # Load new workflow examples
+    if workflows_file.exists():
+        workflow_examples = load_jsonl(workflows_file)
+        all_examples.extend(workflow_examples)
+        print(f"✓ Loaded {len(workflow_examples)} new workflow examples")
 
     total = len(all_examples)
-    print(f"\n✓ Total examples: {total}")
-    print(f"  Phase 5: {phase5_count} ({phase5_count/total*100:.1f}%)")
-    print(f"  Repos: {repos_count} ({repos_count/total*100:.1f}%)")
+    print()
+    print(f"Total examples: {total}")
 
-    # Analyze tool vs direct distribution
-    tool_examples = sum(1 for ex in all_examples if '"name":' in ex["text"])
-    direct_examples = total - tool_examples
+    # Analyze distribution
+    tool_count, direct_count = count_tool_vs_direct(all_examples)
+    print(f"Tool-calling: {tool_count} ({int(tool_count/total*100)}%)")
+    print(f"Direct answers: {direct_count} ({int(direct_count/total*100)}%)")
+    print()
 
-    print("\nTool vs Direct distribution:")
-    print(f"  Tool-calling: {tool_examples} ({tool_examples/total*100:.1f}%)")
-    print(f"  Direct answers: {direct_examples} ({direct_examples/total*100:.1f}%)")
-
-    # Shuffle
-    print("\nShuffling examples...")
+    # Shuffle and split
+    random.seed(42)
     random.shuffle(all_examples)
 
-    # Split 90/10 for train/valid
-    split_idx = int(len(all_examples) * 0.9)
-    train_examples = all_examples[:split_idx]
-    valid_examples = all_examples[split_idx:]
+    train_size = int(total * 0.8)
+    valid_size = int(total * 0.1)
 
-    print(f"  Train: {len(train_examples)}")
-    print(f"  Valid: {len(valid_examples)}")
+    train = all_examples[:train_size]
+    valid = all_examples[train_size:train_size + valid_size]
+    test = all_examples[train_size + valid_size:]
 
-    # Save to Phase 6 directory
-    output_dir = Path("data/phase6_format")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Save
+    save_jsonl(train, output_dir / "train.jsonl")
+    save_jsonl(valid, output_dir / "valid.jsonl")
+    save_jsonl(test, output_dir / "test.jsonl")
 
-    train_file = output_dir / "train.jsonl"
-    valid_file = output_dir / "valid.jsonl"
-
-    print(f"\nSaving to {output_dir}/...")
-    with train_file.open('w') as f:
-        for ex in train_examples:
-            f.write(json.dumps({"text": ex["text"]}) + '\n')
-
-    with valid_file.open('w') as f:
-        for ex in valid_examples:
-            f.write(json.dumps({"text": ex["text"]}) + '\n')
-
-    print(f"✓ Saved {len(train_examples)} training examples to {train_file}")
-    print(f"✓ Saved {len(valid_examples)} validation examples to {valid_file}")
-
-    print("\n✅ Phase 6 training data ready!")
-    print(f"   Total: {total} examples ({tool_examples} tool, {direct_examples} direct)")
-    print("   Train/Valid split: 90/10")
+    print("Split into:")
+    print(f"  Train: {len(train)} ({int(len(train)/total*100)}%)")
+    print(f"  Valid: {len(valid)} ({int(len(valid)/total*100)}%)")
+    print(f"  Test:  {len(test)} ({int(len(test)/total*100)}%)")
     print()
-    print("Next step: Train Phase 6 model with:")
-    print("  uv run python -m mlx_lm.lora \\")
-    print("    --model mlx-community/Qwen2.5-Coder-7B-Instruct-4bit \\")
-    print("    --train --data data/phase6_format \\")
-    print("    --iters 500 --batch-size 2 --learning-rate 1e-4 \\")
-    print("    --num-layers 16 --adapter-path adapters_phase6 \\")
-    print("    --save-every 250 --val-batches 10 --test")
-    print("=" * 80)
+    print(f"Output: {output_dir}")
 
 
 if __name__ == "__main__":
-    random.seed(42)
     main()
