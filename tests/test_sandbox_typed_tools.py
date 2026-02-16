@@ -3,7 +3,19 @@
 import pytest
 
 from punie.agent.monty_runner import ExternalFunctions, run_code
-from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
+from punie.agent.typed_tools import (
+    DocumentSymbolsResult,
+    FindReferencesResult,
+    GitDiffResult,
+    GitLogResult,
+    GitStatusResult,
+    GotoDefinitionResult,
+    HoverResult,
+    RuffResult,
+    TestResult,
+    TypeCheckResult,
+    WorkspaceSymbolsResult,
+)
 
 
 # Fake functions for testing
@@ -80,6 +92,54 @@ def fake_pytest_run(path: str) -> TestResult:
     )
 
 
+def fake_goto_definition(
+    file_path: str, line: int, column: int, symbol: str  # noqa: ARG001
+) -> GotoDefinitionResult:
+    """Fake goto_definition that returns no locations."""
+    return GotoDefinitionResult(success=False, symbol=symbol, locations=[])
+
+
+def fake_find_references(
+    file_path: str, line: int, column: int, symbol: str  # noqa: ARG001
+) -> FindReferencesResult:
+    """Fake find_references that returns no references."""
+    return FindReferencesResult(
+        success=False, symbol=symbol, reference_count=0, references=[]
+    )
+
+
+def fake_hover(
+    file_path: str, line: int, column: int, symbol: str  # noqa: ARG001
+) -> HoverResult:
+    """Fake hover that returns no info."""
+    return HoverResult(success=False, symbol=symbol)
+
+
+def fake_document_symbols(file_path: str) -> DocumentSymbolsResult:  # noqa: ARG001
+    """Fake document_symbols that returns no symbols."""
+    return DocumentSymbolsResult(success=False, file_path=file_path, symbols=[])
+
+
+def fake_workspace_symbols(query: str) -> WorkspaceSymbolsResult:  # noqa: ARG001
+    """Fake workspace_symbols that returns no symbols."""
+    return WorkspaceSymbolsResult(success=False, query=query, symbols=[])
+
+
+def fake_git_status(path: str) -> GitStatusResult:  # noqa: ARG001
+    """Fake git_status that returns clean tree."""
+    return GitStatusResult(success=True, clean=True, file_count=0, files=[])
+
+
+def fake_git_diff(path: str, staged: bool = False) -> GitDiffResult:  # noqa: ARG001
+    """Fake git_diff that returns no changes."""
+    return GitDiffResult(success=True, file_count=0, additions=0, deletions=0, files=[])
+
+
+def fake_git_log(path: str, count: int = 10) -> GitLogResult:  # noqa: ARG001
+    """Fake git_log that returns no commits."""
+    return GitLogResult(success=True, commits=[], commit_count=0)
+
+
 @pytest.fixture
 def external_functions():
     """Fixture with all external functions including typed tools."""
@@ -90,6 +150,14 @@ def external_functions():
         typecheck=fake_typecheck,
         ruff_check=fake_ruff_check,
         pytest_run=fake_pytest_run,
+        goto_definition=fake_goto_definition,
+        find_references=fake_find_references,
+        hover=fake_hover,
+        document_symbols=fake_document_symbols,
+        workspace_symbols=fake_workspace_symbols,
+        git_status=fake_git_status,
+        git_diff=fake_git_diff,
+        git_log=fake_git_log,
     )
 
 

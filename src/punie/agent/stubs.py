@@ -168,6 +168,155 @@ def generate_stubs() -> str:
     \"\"\"
     ...""")
 
+    stubs.append("""def goto_definition(file_path: str, line: int, column: int, symbol: str) -> GotoDefinitionResult:
+    \"\"\"Find the definition location of a symbol using LSP.
+
+    Returns GotoDefinitionResult with:
+    - success: True if definition found
+    - symbol: Symbol name being searched
+    - locations: List of DefinitionLocation objects with file, line, column, end_line, end_column, preview
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = goto_definition("src/app.py", 15, 10, "UserService")
+        if result.success:
+            loc = result.locations[0]
+            print(f"Defined at {loc.file}:{loc.line}:{loc.column}")
+            content = read_file(loc.file)  # Can read the definition file
+    \"\"\"
+    ...""")
+
+    stubs.append("""def find_references(file_path: str, line: int, column: int, symbol: str) -> FindReferencesResult:
+    \"\"\"Find all references to a symbol using LSP.
+
+    Returns FindReferencesResult with:
+    - success: True if references found
+    - symbol: Symbol name being searched
+    - reference_count: Total number of references found
+    - references: List of ReferenceLocation objects with file, line, column, preview
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = find_references("src/services/user.py", 20, 7, "UserService")
+        if result.success:
+            print(f"Found {result.reference_count} references")
+            for ref in result.references:
+                print(f"  {ref.file}:{ref.line}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def hover(file_path: str, line: int, column: int, symbol: str) -> HoverResult:
+    \"\"\"Get hover information (type info, docstring) for a symbol using LSP.
+
+    Returns HoverResult with:
+    - success: True if hover info found
+    - symbol: Symbol name being searched
+    - content: Hover content (markdown or plaintext)
+    - language: Language identifier (e.g., "python", "markdown")
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = hover("src/app.py", 15, 10, "UserService")
+        if result.success:
+            print(f"Type info: {result.content}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def document_symbols(file_path: str) -> DocumentSymbolsResult:
+    \"\"\"Get all symbols (classes, functions, variables) in a file using LSP.
+
+    Returns DocumentSymbolsResult with:
+    - success: True if symbols found
+    - file_path: File path being queried
+    - symbols: List of SymbolInfo objects with name, kind, line, end_line, children
+    - symbol_count: Total number of symbols (including nested)
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = document_symbols("src/services/user.py")
+        if result.success:
+            print(f"Found {result.symbol_count} symbols")
+            for symbol in result.symbols:
+                print(f"  {symbol.name} (kind={symbol.kind}) at line {symbol.line}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def workspace_symbols(query: str) -> WorkspaceSymbolsResult:
+    \"\"\"Search for symbols across the entire workspace using LSP.
+
+    Returns WorkspaceSymbolsResult with:
+    - success: True if symbols found
+    - query: Search query string
+    - symbols: List of WorkspaceSymbol objects with name, kind, file, line, container_name
+    - symbol_count: Total number of symbols found
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = workspace_symbols("UserService")
+        if result.success:
+            print(f"Found {result.symbol_count} matches")
+            for match in result.symbols:
+                print(f"  {match.name} in {match.file}:{match.line}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def git_status(path: str) -> GitStatusResult:
+    \"\"\"Get git working tree status with structured file information.
+
+    Returns GitStatusResult with:
+    - success: True if command executed successfully
+    - clean: True if working tree is clean (no changes)
+    - file_count: Total number of files with changes
+    - files: List of GitFileStatus objects with file, status, staged
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = git_status(".")
+        if not result.clean:
+            staged = [f for f in result.files if f.staged]
+            print(f"Found {len(staged)} staged files")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def git_diff(path: str, staged: bool = False) -> GitDiffResult:
+    \"\"\"Get git diff with structured change information.
+
+    Returns GitDiffResult with:
+    - success: True if command executed successfully
+    - file_count: Number of files changed
+    - additions: Total lines added across all files
+    - deletions: Total lines deleted across all files
+    - files: List of DiffFile objects with file, additions, deletions, hunks
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = git_diff(".", staged=True)
+        if result.file_count > 0:
+            print(f"Staged changes: +{result.additions} -{result.deletions}")
+            for file in result.files:
+                print(f"  {file.file}: +{file.additions} -{file.deletions}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def git_log(path: str, count: int = 10) -> GitLogResult:
+    \"\"\"Get git commit history with structured commit information.
+
+    Returns GitLogResult with:
+    - success: True if command executed successfully
+    - commits: List of GitCommit objects with hash, author, date, message
+    - commit_count: Total number of commits returned
+    - parse_error: Error message if operation failed, None otherwise
+
+    Example:
+        result = git_log(".", count=5)
+        if result.commit_count > 0:
+            print(f"Recent {result.commit_count} commits:")
+            for commit in result.commits:
+                print(f"  {commit.hash} by {commit.author} on {commit.date}")
+                print(f"    {commit.message}")
+    \"\"\"
+    ...""")
+
     return "\n".join(stubs)
 
 

@@ -11,13 +11,24 @@ from __future__ import annotations
 
 import ast
 import io
-import sys
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
+    from punie.agent.typed_tools import (
+        DocumentSymbolsResult,
+        FindReferencesResult,
+        GitDiffResult,
+        GitLogResult,
+        GitStatusResult,
+        GotoDefinitionResult,
+        HoverResult,
+        RuffResult,
+        TestResult,
+        TypeCheckResult,
+        WorkspaceSymbolsResult,
+    )
 
 
 @dataclass(frozen=True)
@@ -33,6 +44,14 @@ class ExternalFunctions:
     typecheck: Callable[[str], TypeCheckResult]
     ruff_check: Callable[[str], RuffResult]
     pytest_run: Callable[[str], TestResult]
+    goto_definition: Callable[[str, int, int, str], GotoDefinitionResult]
+    find_references: Callable[[str, int, int, str], FindReferencesResult]
+    hover: Callable[[str, int, int, str], HoverResult]
+    document_symbols: Callable[[str], DocumentSymbolsResult]
+    workspace_symbols: Callable[[str], WorkspaceSymbolsResult]
+    git_status: Callable[[str], GitStatusResult]
+    git_diff: Callable[[str, bool], GitDiffResult]
+    git_log: Callable[[str, int], GitLogResult]
 
 
 class CodeExecutionError(Exception):
@@ -132,7 +151,31 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         ...     return RuffResult(success=True, violation_count=0, fixable_count=0, violations=[])
         >>> def fake_pytest(path: str) -> TestResult:
         ...     return TestResult(success=True, passed=0, failed=0, errors=0, skipped=0, duration=0.0, tests=[])
-        >>> funcs = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest)
+        >>> def fake_goto_definition(file_path: str, line: int, col: int, symbol: str) -> GotoDefinitionResult:
+        ...     from punie.agent.typed_tools import GotoDefinitionResult
+        ...     return GotoDefinitionResult(success=False, symbol=symbol, locations=[])
+        >>> def fake_find_references(file_path: str, line: int, col: int, symbol: str) -> FindReferencesResult:
+        ...     from punie.agent.typed_tools import FindReferencesResult
+        ...     return FindReferencesResult(success=False, symbol=symbol, reference_count=0, references=[])
+        >>> def fake_hover(file_path: str, line: int, col: int, symbol: str) -> HoverResult:
+        ...     from punie.agent.typed_tools import HoverResult
+        ...     return HoverResult(success=False, symbol=symbol)
+        >>> def fake_document_symbols(file_path: str) -> DocumentSymbolsResult:
+        ...     from punie.agent.typed_tools import DocumentSymbolsResult
+        ...     return DocumentSymbolsResult(success=False, file_path=file_path, symbols=[])
+        >>> def fake_workspace_symbols(query: str) -> WorkspaceSymbolsResult:
+        ...     from punie.agent.typed_tools import WorkspaceSymbolsResult
+        ...     return WorkspaceSymbolsResult(success=False, query=query, symbols=[])
+        >>> def fake_git_status(path: str) -> GitStatusResult:
+        ...     from punie.agent.typed_tools import GitStatusResult
+        ...     return GitStatusResult(success=True, clean=True, file_count=0, files=[])
+        >>> def fake_git_diff(path: str, staged: bool) -> GitDiffResult:
+        ...     from punie.agent.typed_tools import GitDiffResult
+        ...     return GitDiffResult(success=True, file_count=0, additions=0, deletions=0, files=[])
+        >>> def fake_git_log(path: str, count: int) -> GitLogResult:
+        ...     from punie.agent.typed_tools import GitLogResult
+        ...     return GitLogResult(success=True, commits=[], commit_count=0)
+        >>> funcs = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest, fake_goto_definition, fake_find_references, fake_hover, fake_document_symbols, fake_workspace_symbols, fake_git_status, fake_git_diff, fake_git_log)
         >>> result = run_code('content = read_file("test.txt"); print(content)', funcs)
         >>> result.strip()
         'test content'
@@ -151,6 +194,14 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         "typecheck": external_functions.typecheck,
         "ruff_check": external_functions.ruff_check,
         "pytest_run": external_functions.pytest_run,
+        "goto_definition": external_functions.goto_definition,
+        "find_references": external_functions.find_references,
+        "hover": external_functions.hover,
+        "document_symbols": external_functions.document_symbols,
+        "workspace_symbols": external_functions.workspace_symbols,
+        "git_status": external_functions.git_status,
+        "git_diff": external_functions.git_diff,
+        "git_log": external_functions.git_log,
         "json": json,  # Available directly, no import needed
     }
 

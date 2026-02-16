@@ -1,0 +1,12 @@
+{
+  "total_examples": 800,
+  "train_examples": 720,
+  "valid_examples": 80,
+  "lsp_examples": 400,
+  "non_lsp_examples": 400,
+  "balance": "50% LSP, 50% non-LSP",
+  "sources": [
+    "data/phase26_lsp_expanded/examples.jsonl",
+    "data/phase26_curated_non_lsp/examples.jsonl"
+  ]
+}

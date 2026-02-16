@@ -5,7 +5,19 @@ from pydantic_ai import RunContext
 
 from punie.agent.deps import ACPDeps
 from punie.agent.monty_runner import ExternalFunctions, run_code
-from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
+from punie.agent.typed_tools import (
+    DocumentSymbolsResult,
+    FindReferencesResult,
+    GitDiffResult,
+    GitLogResult,
+    GitStatusResult,
+    GotoDefinitionResult,
+    HoverResult,
+    RuffResult,
+    TestResult,
+    TypeCheckResult,
+    WorkspaceSymbolsResult,
+)
 
 
 def test_execute_code_tool_exists():
@@ -61,7 +73,35 @@ def test_execute_code_runs_simple_python():
     def fake_pytest(path: str) -> TestResult:
         return TestResult(success=True, passed=0, failed=0, errors=0, skipped=0, duration=0.0, tests=[])
 
-    external_functions = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest)
+    def fake_goto_definition(file_path: str, line: int, col: int, symbol: str) -> GotoDefinitionResult:
+        return GotoDefinitionResult(success=False, symbol=symbol, locations=[])
+
+    def fake_find_references(file_path: str, line: int, col: int, symbol: str) -> FindReferencesResult:
+        return FindReferencesResult(success=False, symbol=symbol, reference_count=0, references=[])
+
+    def fake_hover(file_path: str, line: int, col: int, symbol: str) -> HoverResult:
+        return HoverResult(success=False, symbol=symbol)
+
+    def fake_document_symbols(file_path: str) -> DocumentSymbolsResult:
+        return DocumentSymbolsResult(success=False, file_path=file_path, symbols=[])
+
+    def fake_workspace_symbols(query: str) -> WorkspaceSymbolsResult:
+        return WorkspaceSymbolsResult(success=False, query=query, symbols=[])
+
+    def fake_git_status(path: str) -> GitStatusResult:
+        return GitStatusResult(success=True, clean=True, file_count=0, files=[])
+
+    def fake_git_diff(path: str, staged: bool = False) -> GitDiffResult:
+        return GitDiffResult(success=True, file_count=0, additions=0, deletions=0, files=[])
+
+    def fake_git_log(path: str, count: int = 10) -> GitLogResult:
+        return GitLogResult(success=True, commits=[], commit_count=0)
+
+    external_functions = ExternalFunctions(
+        fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest,
+        fake_goto_definition, fake_find_references, fake_hover, fake_document_symbols,
+        fake_workspace_symbols, fake_git_status, fake_git_diff, fake_git_log
+    )
 
     code = """
 content = read_file("test.txt")

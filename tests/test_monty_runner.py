@@ -9,12 +9,20 @@ from punie.agent.monty_runner import (
     run_code_async,
 )
 from punie.agent.typed_tools import (
+    DocumentSymbolsResult,
+    FindReferencesResult,
+    GitDiffResult,
+    GitLogResult,
+    GitStatusResult,
+    GotoDefinitionResult,
+    HoverResult,
     RuffResult,
     RuffViolation,
     TestCase,
     TestResult,
     TypeCheckError,
     TypeCheckResult,
+    WorkspaceSymbolsResult,
 )
 
 
@@ -150,6 +158,46 @@ def fake_pytest_run(path: str) -> TestResult:
         )
 
 
+def fake_goto_definition(file_path: str, line: int, col: int, symbol: str) -> GotoDefinitionResult:
+    """Fake goto_definition for testing."""
+    return GotoDefinitionResult(success=False, symbol=symbol, locations=[])
+
+
+def fake_find_references(file_path: str, line: int, col: int, symbol: str) -> FindReferencesResult:
+    """Fake find_references for testing."""
+    return FindReferencesResult(success=False, symbol=symbol, reference_count=0, references=[])
+
+
+def fake_hover(file_path: str, line: int, col: int, symbol: str) -> HoverResult:
+    """Fake hover for testing."""
+    return HoverResult(success=False, symbol=symbol)
+
+
+def fake_document_symbols(file_path: str) -> DocumentSymbolsResult:
+    """Fake document_symbols for testing."""
+    return DocumentSymbolsResult(success=False, file_path=file_path, symbols=[])
+
+
+def fake_workspace_symbols(query: str) -> WorkspaceSymbolsResult:
+    """Fake workspace_symbols for testing."""
+    return WorkspaceSymbolsResult(success=False, query=query, symbols=[])
+
+
+def fake_git_status(path: str) -> GitStatusResult:
+    """Fake git_status for testing."""
+    return GitStatusResult(success=True, clean=True, file_count=0, files=[])
+
+
+def fake_git_diff(path: str, staged: bool = False) -> GitDiffResult:
+    """Fake git_diff for testing."""
+    return GitDiffResult(success=True, file_count=0, additions=0, deletions=0, files=[])
+
+
+def fake_git_log(path: str, count: int = 10) -> GitLogResult:
+    """Fake git_log for testing."""
+    return GitLogResult(success=True, commits=[], commit_count=0)
+
+
 @pytest.fixture
 def external_functions():
     """Fixture providing external functions registry."""
@@ -160,6 +208,14 @@ def external_functions():
         typecheck=fake_typecheck,
         ruff_check=fake_ruff_check,
         pytest_run=fake_pytest_run,
+        goto_definition=fake_goto_definition,
+        find_references=fake_find_references,
+        hover=fake_hover,
+        document_symbols=fake_document_symbols,
+        workspace_symbols=fake_workspace_symbols,
+        git_status=fake_git_status,
+        git_diff=fake_git_diff,
+        git_log=fake_git_log,
     )
 
 

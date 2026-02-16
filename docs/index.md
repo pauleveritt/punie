@@ -4,7 +4,8 @@ AI coding agent that delegates tool execution to PyCharm via the Agent Communica
 
 ## About
 
-Punie is an experimental agent that enables AI-assisted development with IDE-native tooling by delegating tool execution to PyCharm through ACP.
+Punie is an experimental agent that enables AI-assisted development with IDE-native tooling by delegating tool execution
+to PyCharm through ACP.
 
 ## Features
 
@@ -15,6 +16,7 @@ Punie bridges complementary technologies:
 - **MLX** — Local model support for offline development on Apple Silicon
 
 The bridge enables:
+
 - **IDE Integration:** Native file operations, terminal execution, permission controls
 - **Local Models:** Fully offline AI using MLX on Apple Silicon (zero API costs)
 - **Tool Calling:** Complete tool execution support for both cloud and local models
@@ -47,13 +49,14 @@ punie serve --model local
 :maxdepth: 2
 :caption: Research
 
+flywheel
+
 research/evolution
 research/architecture
 research/acp-sdk
 research/pydantic-ai
 diary/index
 ```
-
 
 ## Indices and tables
 

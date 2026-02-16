@@ -35,9 +35,9 @@ def get_tokenizer(model_path: str | Path) -> Any:
         Note: Returns various tokenizer types depending on model
 
     Example:
-        >>> tokenizer = get_tokenizer("fused_model_qwen3_phase26_6bit")
+        >>> tokenizer = get_tokenizer("fused_model_qwen3_phase27_augmented_5bit")
         >>> tokenizer.name_or_path
-        'fused_model_qwen3_phase26_6bit'
+        'fused_model_qwen3_phase27_augmented_5bit'
     """
     path_str = str(model_path)
 
@@ -83,7 +83,7 @@ def format_prompt(
 
     Example:
         >>> # CORRECT: Always use this utility
-        >>> prompt = format_prompt("Check types in src/", "fused_model_qwen3_phase26_6bit")
+        >>> prompt = format_prompt("Check types in src/", "fused_model_qwen3_phase27_augmented_5bit")
         >>> prompt.startswith("<|im_start|>system")
         True
 
@@ -141,7 +141,7 @@ def format_prompt_with_history(
         ... ]
         >>> prompt = format_prompt_with_history(
         ...     "Show me an example",
-        ...     "fused_model_qwen3_phase26_6bit",
+        ...     "fused_model_qwen3_phase27_augmented_5bit",
         ...     history=history,
         ... )
     """
@@ -211,8 +211,11 @@ def validate_python_code(code: str) -> tuple[bool, str | None]:
     Example:
         >>> validate_python_code("x = 1 + 2")
         (True, None)
-        >>> validate_python_code("x = 1 +")
-        (False, 'SyntaxError: ...')
+        >>> is_valid, error = validate_python_code("x = 1 +")
+        >>> is_valid
+        False
+        >>> error.startswith("SyntaxError:")
+        True
     """
     import ast
 
@@ -258,6 +261,39 @@ def extract_tool_calls_from_response(response: str) -> list[str]:
     return code_blocks
 
 
+def extract_python_from_code_mode(raw_block: str) -> str | None:
+    """Extract Python code from Code Mode XML wrapper.
+
+    Args:
+        raw_block: Raw tool call block (may contain <parameter=code> wrapper)
+
+    Returns:
+        Pure Python code string, or None if extraction fails
+
+    Example:
+        >>> raw = '<function=execute_code><parameter=code>result = typecheck("src/")</parameter></function>'
+        >>> extract_python_from_code_mode(raw)
+        'result = typecheck("src/")'
+
+        >>> raw = 'result = typecheck("src/")'  # Already clean
+        >>> extract_python_from_code_mode(raw)
+        'result = typecheck("src/")'
+    """
+    import re
+
+    # Try to extract from <parameter=code>...</parameter> wrapper
+    match = re.search(r'<parameter=code>\s*(.*?)\s*</parameter>', raw_block, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # If no wrapper found, check if it's already clean Python
+    cleaned = raw_block.strip()
+    if cleaned and not cleaned.startswith('<'):
+        return cleaned
+
+    return None
+
+
 # Export public API
 __all__ = [
     "format_prompt",
@@ -267,4 +303,5 @@ __all__ = [
     "is_tool_response",
     "validate_python_code",
     "extract_tool_calls_from_response",
+    "extract_python_from_code_mode",
 ]

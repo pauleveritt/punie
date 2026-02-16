@@ -31,6 +31,16 @@ Guidelines:
 - Use typecheck() for type checking → returns structured TypeCheckResult with errors, warnings, and details
 - Use ruff_check() for linting → returns structured RuffResult with violations, fixable count, and details
 - Use pytest_run() for testing → returns structured TestResult with passed/failed/errors counts and test details
+- Use goto_definition() to find where a symbol is defined → returns GotoDefinitionResult with file, line, column
+- Use find_references() to find all usages of a symbol → returns FindReferencesResult with list of locations
+- Use hover() to get type info and docstrings for a symbol → returns HoverResult with content and language
+- Use document_symbols() to get all symbols in a file → returns DocumentSymbolsResult with hierarchical symbols
+- Use workspace_symbols() to search for symbols across the workspace → returns WorkspaceSymbolsResult with matching symbols
+- Prefer LSP navigation (goto_definition, find_references, hover, document_symbols, workspace_symbols) over text search for finding symbols
+- Use git_status() for git working tree status → returns GitStatusResult with file changes, staged/unstaged info
+- Use git_diff() for git diff output → returns GitDiffResult with additions/deletions per file
+- Use git_log() for git commit history → returns GitLogResult with commits, hashes, and messages
+- Prefer structured git tools (git_status, git_diff, git_log) over raw run_command for git operations
 - Read files before modifying them to understand context.
 - Explain what you plan to do before making changes.
 - When writing files, provide complete file contents.

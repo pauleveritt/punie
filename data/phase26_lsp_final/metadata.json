@@ -1,0 +1,11 @@
+{
+  "total_examples": 1023,
+  "train_examples": 920,
+  "valid_examples": 103,
+  "sources": {
+    "phase26_base_field_access": 953,
+    "phase26_lsp_navigation": 70
+  },
+  "description": "Phase 26 LSP + field access merged dataset",
+  "note": "phase26_base includes Phase 22 (683), Phase 23 ty (50), Phase 24 ruff/pytest (100), Phase 26 field access (120)"
+}

@@ -11,9 +11,13 @@ import pytest
 
 from punie.agent.prompt_utils import (
     clear_tokenizer_cache,
+    extract_python_from_code_mode,
+    extract_tool_calls_from_response,
     format_prompt,
     format_prompt_with_history,
     get_tokenizer,
+    is_tool_response,
+    validate_python_code,
 )
 
 
@@ -219,7 +223,7 @@ def test_format_prompt_with_real_model(tmp_path):
     """
     # This test requires a real model directory
     # Skip if model doesn't exist
-    model_path = Path("fused_model_qwen3_phase26_6bit")
+    model_path = Path("fused_model_qwen3_phase27_augmented_5bit")
     if not model_path.exists():
         pytest.skip("Model not found - skipping integration test")
 
@@ -230,3 +234,90 @@ def test_format_prompt_with_real_model(tmp_path):
     assert "<|im_start|>" in prompt
     assert "<|im_end|>" in prompt
     assert "Check types in src/" in prompt
+
+
+def test_extract_tool_calls_from_response():
+    """Test extracting tool calls from model response."""
+    # Test <tool_call> format
+    response = "<tool_call>result = typecheck('src/')</tool_call>"
+    calls = extract_tool_calls_from_response(response)
+    assert len(calls) == 1
+    assert calls[0] == "result = typecheck('src/')"
+
+    # Test multiple tool calls
+    response = """
+    <tool_call>result = typecheck('src/')</tool_call>
+    Some explanation
+    <tool_call>ruff_result = ruff_check('src/')</tool_call>
+    """
+    calls = extract_tool_calls_from_response(response)
+    assert len(calls) == 2
+    assert "typecheck" in calls[0]
+    assert "ruff_check" in calls[1]
+
+    # Test direct answer (no tool calls)
+    response = "Dependency injection is a design pattern..."
+    calls = extract_tool_calls_from_response(response)
+    assert len(calls) == 0
+
+
+def test_extract_python_from_code_mode():
+    """Test extracting Python from Code Mode XML wrapper."""
+    # Test with full XML wrapper
+    raw = '<function=execute_code><parameter=code>result = typecheck("src/")</parameter></function>'
+    python = extract_python_from_code_mode(raw)
+    assert python == 'result = typecheck("src/")'
+
+    # Test with already clean Python
+    raw = 'result = typecheck("src/")'
+    python = extract_python_from_code_mode(raw)
+    assert python == 'result = typecheck("src/")'
+
+    # Test with multiline Python
+    raw = """<parameter=code>
+result = typecheck("src/")
+if result.error_count > 0:
+    print(f"Found {result.error_count} errors")
+</parameter>"""
+    python = extract_python_from_code_mode(raw)
+    assert 'result = typecheck("src/")' in python
+    assert "if result.error_count > 0:" in python
+
+    # Test with no valid Python
+    raw = "<function=execute_code><parameter=data>invalid</parameter></function>"
+    python = extract_python_from_code_mode(raw)
+    assert python is None
+
+
+def test_is_tool_response():
+    """Test detecting tool call vs direct answer."""
+    # Tool call formats
+    assert is_tool_response("<tool_call>result = typecheck('src/')</tool_call>")
+    assert is_tool_response("```python\nexecute_code(...)\n```")
+    assert is_tool_response("```json\n{...}\n```")
+
+    # Direct answers
+    assert not is_tool_response("Dependency injection is a design pattern...")
+    assert not is_tool_response("You should use Protocol when...")
+    assert not is_tool_response("The difference between merge and rebase is...")
+
+
+def test_validate_python_code():
+    """Test Python code validation using AST."""
+    # Valid code
+    is_valid, error = validate_python_code("x = 1 + 2")
+    assert is_valid
+    assert error is None
+
+    is_valid, error = validate_python_code("result = typecheck('src/')")
+    assert is_valid
+    assert error is None
+
+    # Invalid code
+    is_valid, error = validate_python_code("x = 1 +")
+    assert not is_valid
+    assert "SyntaxError" in error
+
+    is_valid, error = validate_python_code("if True\n    print('hi')")
+    assert not is_valid
+    assert "SyntaxError" in error

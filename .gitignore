@@ -30,26 +30,12 @@ data/*_examples/
 data/phase*_format/
 data/*.jsonl
 data/*.log
-fused_model/
-fused_model_f16/
-fused_model_8bit/
-fused_model_qwen3_phase8_f16/
-fused_model_qwen3_phase8_8bit/
-fused_model_qwen3_phase8_6bit/
-fused_model_qwen3_phase8_5bit/
-fused_model_qwen3_phase21_xml_f16/
-fused_model_qwen3_phase21_xml_5bit/
-fused_model_qwen3_phase22_code_f16/
-fused_model_qwen3_phase22_code_5bit/
-fused_model_qwen3_phase23_ty_f16/
-fused_model_qwen3_phase23_ty_5bit/
-fused_model_qwen25_phase25_7b_f16/
-fused_model_qwen25_phase25_7b_5bit/
-fused_model_qwen25_phase25b_7b_f16/
-fused_model_qwen25_phase25b_7b_6bit/
+fused_model*/
 archived_models/
 
 # Logs and evaluation reports
 logs/
 *.log
 /*.html
+/validation_*.json
+scripts/data/

@@ -1517,8 +1517,9 @@ if result.error_count > 0:
 2. Phase 24: Add `ruff` and `pytest` (planned)
 3. Phase 25: 7B model experiment (in progress)
 4. Phase 26: LSP-based tool architecture (planned)
-5. Phase 27: Training data collection infrastructure (planned)
-6. Phase 28: Automatic curation and retraining pipeline (planned)
+5. Phase 32: Domain typed tools (planned)
+6. Phase 33: Full retrain + training data flywheel (planned)
+7. Phase 34: Flywheel architecture implementation (planned)
 
 **Key Principle:** Start with standard Python tools (ty, ruff, pytest) to establish the pattern, then expand to
 domain-specific tools.
@@ -1615,7 +1616,7 @@ requires careful adaptation.
 **Goal:** Replace text-based tools (grep, read_file, write_file) with LSP operations for precise, semantic code
 manipulation.
 
-**Why Next:** LSP integration is lower risk than domain tools (Phase 27), faster to implement (~2 weeks), and establishes
+**Why Next:** LSP integration is lower risk than domain tools (Phase 32), faster to implement (~2 weeks), and establishes
 semantic tool patterns. It reuses existing ty infrastructure and provides immediate value for code navigation and
 refactoring.
 
@@ -1779,11 +1780,80 @@ result = lsp_query("goto_definition", symbol="AgentConfig", file="src/punie/agen
 
 **Future:** Expand to other languages (TypeScript, Rust, Go) using same LSP architecture.
 
-**Next Phase:** Phase 27 (Domain Typed Tools) will build on LSP patterns to implement domain-specific validation tools.
+**Next Phase:** Phase 27 (Return to Punie) focuses on validating that the latest model and flywheel work still functions
+in core Punie workflows.
 
 ---
 
-## 27. Domain Typed Tools (Holy Grail Part B)
+## 27. Return to Punie (Server Buildout Step 0)
+
+**Status:** Planned
+
+**Goal:** Ensure recent model, tooling, and flywheel work still functions in Punie CLI, especially `punie ask`.
+
+**Focus Areas:**
+
+- Validate `punie ask` end-to-end with current AgentConfig, local model, and toolset
+- Confirm tool permissions, logging, and session behavior match ACP expectations
+- Identify gaps where flywheel or performance hooks are missing from CLI paths
+- Add targeted smoke tests or scripts for `punie ask` regression coverage
+
+## 28. Frontend/Backend (Single-Project Server)
+
+**Status:** Planned
+
+**Goal:** Add a centralized `punie server` with a WebSocket client for `punie ask`, still single-project and no
+subinterpreters.
+
+**Focus Areas:**
+
+- Implement `punie server` WebSocket endpoint for a single project root
+- Rework `punie ask` into a long-lived WS client that can send multiple prompts
+- Define a minimal session handshake and keep-alive behavior
+- Preserve current tool policies and logging in server mode
+
+## 29. Toad Frontend (ACP Over WebSocket)
+
+**Status:** Planned
+
+**Goal:** Update Toad to connect to Punie over WebSocket, following the punie-server sketch.
+
+**Focus Areas:**
+
+- Implement WebSocketAgent in Toad (`~/PycharmProjects/toad`)
+- Add transport fields (ws_url, headers/auth, client_id) and selection logic
+- Reuse ACP request/response flow while swapping transport
+- Validate Toad connects to `punie server` and runs a full prompt lifecycle
+
+## 30. Thin ACP Router
+
+**Status:** Planned
+
+**Goal:** Rewrite ACP support into a thin router that keeps a WebSocket connection open.
+
+**Focus Areas:**
+
+- Implement a minimal ACP shim that bridges stdio ACP to WS
+- Centralize reconnect/backoff and diagnostics in the shim
+- Keep ACP logic unchanged while swapping transport to WS
+- Document configuration and migration for IDE clients
+
+## 31. Multi-Project (Subinterpreters)
+
+**Status:** Planned
+
+**Goal:** Support multiple projects in a single server using subinterpreters or equivalent isolation.
+
+**Focus Areas:**
+
+- Project registry and per-project session routing
+- Per-project worker lifecycle management
+- Enforced workspace boundaries per session
+- Shared model backend strategy across workers
+
+---
+
+## 32. Domain Typed Tools (Holy Grail Part B)
 
 **Status:** Planned (2026-02-15)
 
@@ -1954,7 +2024,7 @@ that scale).
 
 ---
 
-## 28. Full Retrain + Training Data Flywheel
+## 33. Full Retrain + Training Data Flywheel
 
 **Status:** Planned (2026-02-15)
 
@@ -1963,7 +2033,7 @@ collection from real Punie usage.
 
 **Context:**
 
-After Phases 26 (LSP) and 27 (Domain Tools), Punie will have:
+After Phases 26 (LSP) and 32 (Domain Tools), Punie will have:
 
 - Text-based tools (grep, read, write, run_command)
 - Validation tools (ty, ruff, pytest)
@@ -1980,7 +2050,7 @@ This phase completes the training data and establishes the self-improvement loop
 | Phase 24 (ruff, pytest, ty) | 100      | Validation tool calling                          |
 | Domain examples (agent-os)  | 158      | Domain knowledge Q&A                             |
 | Phase 26 (LSP)              | 100      | Semantic navigation and refactoring              |
-| Phase 27 (Domain Tools)     | 150      | Domain reasoning and design validation           |
+| Phase 32 (Domain Tools)     | 150      | Domain reasoning and design validation           |
 | **Total**                   | **1215** | Complete tool ecosystem                          |
 
 **Training Configuration:**
@@ -2131,16 +2201,16 @@ Domain tools are the key to the flywheel — they capture **design knowledge**, 
 
 ---
 
-## 29. Flywheel Architecture Implementation
+## 34. Flywheel Architecture Implementation
 
-**Status:** Planned (after Phase 28)
+**Status:** Planned (after Phase 33)
 
 **Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the
 self-improvement loop.
 
 **Context:**
 
-Phase 28 completes the full retrain on ~1265 examples. Phase 29 builds the architecture described in flywheel.md and
+Phase 33 completes the full retrain on ~1265 examples. Phase 34 builds the architecture described in flywheel.md and
 holy-grail-architecture.md. This is when the self-improving loop becomes reality.
 
 **Key Components:**
