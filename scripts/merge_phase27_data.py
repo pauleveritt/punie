@@ -91,7 +91,7 @@ def main():
     train_examples = all_examples[:split_index]
     valid_examples = all_examples[split_index:]
 
-    print(f"\nSplit:")
+    print("\nSplit:")
     print(f"  Train: {len(train_examples)} examples ({len(train_examples)/len(all_examples)*100:.1f}%)")
     print(f"  Valid: {len(valid_examples)} examples ({len(valid_examples)/len(all_examples)*100:.1f}%)")
 

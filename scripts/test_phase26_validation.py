@@ -258,8 +258,8 @@ def main():
     print("Phase 26 Validation Suite")
     print("="*60)
     print(f"Model: {model_path}")
-    print(f"Queries: 25 (5 categories × 5 queries)")
-    print(f"Target: 80%+ overall, 80%+ field access rate")
+    print("Queries: 25 (5 categories × 5 queries)")
+    print("Target: 80%+ overall, 80%+ field access rate")
     print("="*60)
     print()
 

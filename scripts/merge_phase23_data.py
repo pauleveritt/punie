@@ -97,7 +97,7 @@ def main():
     valid = all_examples[train_size:train_size + valid_size]
     test = all_examples[train_size + valid_size:]
 
-    print(f"\nSplit:")
+    print("\nSplit:")
     print(f"  Train: {len(train)} ({len(train)/total*100:.1f}%)")
     print(f"  Valid: {len(valid)} ({len(valid)/total*100:.1f}%)")
     print(f"  Test: {len(test)} ({len(test)/total*100:.1f}%)")

@@ -41,7 +41,7 @@ def test_git_status():
     # Parse it
     parsed = parse_git_status_output(result.stdout)
 
-    print(f"\n✅ Parser result:")
+    print("\n✅ Parser result:")
     print(f"  success: {parsed.success}")
     print(f"  file_count: {parsed.file_count}")
     print(f"  clean: {parsed.clean}")
@@ -53,7 +53,7 @@ def test_git_status():
     print(f"  unstaged_count: {parsed.file_count - staged_count - untracked_count}")
     print(f"  untracked_count: {untracked_count}")
 
-    print(f"\n📁 Sample files (first 10):")
+    print("\n📁 Sample files (first 10):")
     for i, file in enumerate(parsed.files[:10]):
         print(f"  {i+1}. {file.file}")
         print(f"     status={file.status}, staged={file.staged}")
@@ -62,7 +62,7 @@ def test_git_status():
         print(f"  ... and {len(parsed.files) - 10} more files")
 
     # Check for known bugs
-    print(f"\n🔍 Bug checks:")
+    print("\n🔍 Bug checks:")
     dual_status_files = [f for f in parsed.files if len(f.status) == 2 and f.status[0] != ' ' and f.status[1] != ' ']
     if dual_status_files:
         print(f"  ⚠️  Found {len(dual_status_files)} dual-status files (MM, AM, etc.):")
@@ -97,13 +97,13 @@ def test_git_diff():
     # Parse it
     parsed = parse_git_diff_output(result.stdout)
 
-    print(f"\n✅ Parser result:")
+    print("\n✅ Parser result:")
     print(f"  success: {parsed.success}")
     print(f"  file_count: {parsed.file_count}")
     print(f"  additions: {parsed.additions}")
     print(f"  deletions: {parsed.deletions}")
 
-    print(f"\n📁 Sample files (first 10):")
+    print("\n📁 Sample files (first 10):")
     for i, file in enumerate(parsed.files[:10]):
         print(f"  {i+1}. {file.file}")
         print(f"     +{file.additions} -{file.deletions}")
@@ -112,7 +112,7 @@ def test_git_diff():
         print(f"  ... and {len(parsed.files) - 10} more files")
 
     # Check for known bugs
-    print(f"\n🔍 Bug checks:")
+    print("\n🔍 Bug checks:")
     print("  Testing with binary file and deleted file scenarios...")
 
     # Test binary file parsing
@@ -160,17 +160,17 @@ def test_git_log():
 
     parsed_oneline = parse_git_log_output(result_oneline.stdout)
 
-    print(f"\n✅ Parser result:")
+    print("\n✅ Parser result:")
     print(f"  success: {parsed_oneline.success}")
     print(f"  commit_count: {parsed_oneline.commit_count}")
 
-    print(f"\n📝 Sample commits (first 3):")
+    print("\n📝 Sample commits (first 3):")
     for i, commit in enumerate(parsed_oneline.commits[:3]):
         print(f"  {i+1}. {commit.hash}: {commit.message}")
         print(f"     author={commit.author}, date={commit.date}")
 
     # THE CRITICAL BUG CHECK
-    print(f"\n🔍 CRITICAL BUG CHECK:")
+    print("\n🔍 CRITICAL BUG CHECK:")
     all_authors_none = all(c.author is None for c in parsed_oneline.commits)
     all_dates_none = all(c.date is None for c in parsed_oneline.commits)
 

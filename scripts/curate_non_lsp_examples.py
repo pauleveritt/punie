@@ -106,8 +106,8 @@ def main():
     print(f"✓ Saved to {output_file}")
 
     # Statistics
-    print(f"\nStatistics:")
-    print(f"  Source: Phase 26 merged (Phase 22-26 patterns)")
+    print("\nStatistics:")
+    print("  Source: Phase 26 merged (Phase 22-26 patterns)")
     print(f"  Original: {len(all_examples)} examples")
     print(f"  Curated: {len(curated)} examples (top {len(curated)/len(all_examples)*100:.1f}%)")
 

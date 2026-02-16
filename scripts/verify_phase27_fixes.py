@@ -171,7 +171,7 @@ def verify_git_log_uniqueness(train_file: Path, valid_file: Path) -> tuple[bool,
         if total_count > 0 and unique_count != total_count:
             return False, f"❌ {filepath.name}: {unique_count} unique out of {total_count} git_log responses (expected all unique)"
 
-    return True, f"✅ All git_log responses are unique in both files"
+    return True, "✅ All git_log responses are unique in both files"
 
 
 def verify_author_diversity(train_file: Path, valid_file: Path) -> tuple[bool, str]:

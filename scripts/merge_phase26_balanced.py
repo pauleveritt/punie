@@ -56,7 +56,7 @@ def main():
     train_examples = all_examples[:split_point]
     valid_examples = all_examples[split_point:]
 
-    print(f"\n4. Splitting train/valid (90/10)...")
+    print("\n4. Splitting train/valid (90/10)...")
     print(f"   Train: {len(train_examples)} examples")
     print(f"   Valid: {len(valid_examples)} examples")
 
@@ -84,14 +84,14 @@ def main():
     print(f"\n✓ Saved to {output_dir}/")
     print(f"  - train.jsonl ({len(train_examples)} examples)")
     print(f"  - valid.jsonl ({len(valid_examples)} examples)")
-    print(f"  - metadata.json")
+    print("  - metadata.json")
 
     # Statistics
-    print(f"\nDataset composition:")
+    print("\nDataset composition:")
     print(f"  Total: {len(all_examples)}")
     print(f"  LSP: {len(lsp_examples)} (50.0%)")
     print(f"  Non-LSP: {len(non_lsp_examples)} (50.0%)")
-    print(f"\nSplit:")
+    print("\nSplit:")
     print(f"  Train: {len(train_examples)} (90%)")
     print(f"  Valid: {len(valid_examples)} (10%)")
 

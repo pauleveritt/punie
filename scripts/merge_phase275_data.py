@@ -56,14 +56,14 @@ def main():
 
     # Shuffle
     random.shuffle(unique_examples)
-    print(f"\n4. Shuffled examples")
+    print("\n4. Shuffled examples")
 
     # Split 90/10
     split_idx = int(len(unique_examples) * 0.9)
     train_examples = unique_examples[:split_idx]
     valid_examples = unique_examples[split_idx:]
 
-    print(f"\n5. Split into train/valid:")
+    print("\n5. Split into train/valid:")
     print(f"   Train: {len(train_examples)} examples")
     print(f"   Valid: {len(valid_examples)} examples")
 

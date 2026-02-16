@@ -166,11 +166,11 @@ def main():
                     if before:
                         has_preambles += 1
                         if has_preambles == 1:
-                            print(f"  WARNING: Found preamble in train.jsonl:")
+                            print("  WARNING: Found preamble in train.jsonl:")
                             print(f"    {before[:100]}...")
 
     if has_preambles == 0:
-        print(f"  ✅ train.jsonl: 0 preambles remaining")
+        print("  ✅ train.jsonl: 0 preambles remaining")
     else:
         print(f"  ❌ train.jsonl: {has_preambles} preambles remaining (ERROR!)")
 
@@ -186,7 +186,7 @@ def main():
                         has_preambles += 1
 
     if has_preambles == 0:
-        print(f"  ✅ valid.jsonl: 0 preambles remaining")
+        print("  ✅ valid.jsonl: 0 preambles remaining")
     else:
         print(f"  ❌ valid.jsonl: {has_preambles} preambles remaining (ERROR!)")
 

@@ -211,7 +211,7 @@ def main():
 
     print(f"\\n{'=' * 60}")
     print(f"Total new examples: {len(all_examples)}")
-    print(f"Previous: 1053 (Phase 27 augmented)")
+    print("Previous: 1053 (Phase 27 augmented)")
     print(f"New total: {1053 + len(all_examples)} examples")
     print(f"{'=' * 60}")
 

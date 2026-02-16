@@ -8,7 +8,6 @@ will CRASH (lines 110-115), breaking ALL LSP tools including the working ones!
 
 import asyncio
 import json
-import subprocess
 import sys
 from pathlib import Path
 

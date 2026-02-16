@@ -16,7 +16,6 @@ import sys
 import time
 from pathlib import Path
 
-import mlx.core as mx
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -141,7 +140,7 @@ def test_query(
             print(f"  ❌ FAIL: Expected to access fields {expect_fields}")
             success = False
         else:
-            print(f"  ✅ PASS: Accessed result fields")
+            print("  ✅ PASS: Accessed result fields")
 
     # Fallback: if no expectations, just check it's not empty/error
     if not expect_no_tools and not expect_tools and not expect_fields:
@@ -380,13 +379,13 @@ def run_validation(model_path: str):
 
     print(f"\n{'=' * 80}")
     print(f"Overall: {total_passed}/{total_queries} ({overall_percentage:.0f}%)")
-    print(f"Target: ≥85% (34/40)")
+    print("Target: ≥85% (34/40)")
     print(f"Status: {'✅ PASS' if overall_percentage >= 85 else '❌ FAIL'}")
     print(f"{'=' * 80}")
 
     # Performance stats
     avg_time = sum(times) / len(times) if times else 0
-    print(f"\nPerformance:")
+    print("\nPerformance:")
     print(f"  Average generation time: {avg_time:.2f}s")
     print(f"  Total validation time: {sum(times):.2f}s")
 

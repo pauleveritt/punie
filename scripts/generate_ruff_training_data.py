@@ -34,12 +34,12 @@ def generate_simple_lint_checks():
     ]
 
     for query in queries:
-        code = f"""result = ruff_check("src/")
+        code = """result = ruff_check("src/")
 if result.success:
     print("✓ No violations found")
 else:
-    print(f"Found {{result.violation_count}} violations")
-    print(f"{{result.fixable_count}} are fixable")"""
+    print(f"Found {result.violation_count} violations")
+    print(f"{result.fixable_count} are fixable")"""
 
         examples.append({
             "messages": [
@@ -206,10 +206,10 @@ def main():
             f.write(json.dumps(example) + "\n")
 
     print(f"✓ Generated {len(examples)} ruff training examples")
-    print(f"  Simple lint checks: 15")
-    print(f"  Fix violations: 15")
-    print(f"  Combined with typecheck: 10")
-    print(f"  Direct answers: 10")
+    print("  Simple lint checks: 15")
+    print("  Fix violations: 15")
+    print("  Combined with typecheck: 10")
+    print("  Direct answers: 10")
     print(f"  Output: {output_file}")
 
 

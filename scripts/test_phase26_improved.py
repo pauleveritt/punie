@@ -24,7 +24,6 @@ Overall target: 80%+ (20/25)
 Critical metric: Strict accuracy ≥80% (validates code quality, not just pattern matching)
 """
 
-import ast
 import json
 import re
 import sys
@@ -42,7 +41,6 @@ from punie.agent.prompt_utils import (
     is_tool_response,
     validate_python_code,
 )
-from punie.agent.typed_tools import RuffResult, TestResult, TypeCheckResult
 
 # Type for expected tool
 ExpectedTool = Literal["typecheck", "ruff_check", "pytest_run", "run_command", "any"]
@@ -403,7 +401,7 @@ def run_validation_suite(model_path: str) -> dict:
             print(f"Soft: {soft_status}  Strict: {strict_status} ({elapsed:.2f}s)")
 
             if not strict_pass and strict_issues:
-                print(f"Issues found:")
+                print("Issues found:")
                 for issue in strict_issues:
                     print(f"  - {issue}")
 
@@ -445,16 +443,16 @@ def run_validation_suite(model_path: str) -> dict:
     print(f"\n{'='*80}")
     print("OVERALL RESULTS")
     print(f"{'='*80}")
-    print(f"\nSOFT SCORING (Phase 26.0 - substring matching):")
+    print("\nSOFT SCORING (Phase 26.0 - substring matching):")
     print(f"  Total: {soft_correct}/{total_queries} ({soft_accuracy:.1f}%)")
     print(f"  Field access rate: {soft_field_access_correct}/{field_access_total} ({soft_field_rate:.1f}%)")
 
-    print(f"\nSTRICT SCORING (Phase 26.1 - full validation):")
+    print("\nSTRICT SCORING (Phase 26.1 - full validation):")
     print(f"  Total: {strict_correct}/{total_queries} ({strict_accuracy:.1f}%)")
     print(f"  Field access rate: {strict_field_access_correct}/{field_access_total} ({strict_field_rate:.1f}%)")
 
     print(f"\nACCURACY GAP: {soft_accuracy - strict_accuracy:.1f} percentage points")
-    print(f"This gap represents code that LOOKS right but would FAIL at runtime\n")
+    print("This gap represents code that LOOKS right but would FAIL at runtime\n")
 
     # Category breakdown
     print("Category Breakdown (Soft / Strict):")
@@ -507,9 +505,9 @@ def main():
     print("Phase 26 Improved Validation Suite")
     print("="*80)
     print(f"Model: {model_path}")
-    print(f"Queries: 25 (5 categories × 5 queries)")
-    print(f"Scoring: Dual (soft + strict)")
-    print(f"Target: 80%+ strict accuracy")
+    print("Queries: 25 (5 categories × 5 queries)")
+    print("Scoring: Dual (soft + strict)")
+    print("Target: 80%+ strict accuracy")
     print("="*80)
     print()
 

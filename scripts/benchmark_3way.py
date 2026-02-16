@@ -149,7 +149,7 @@ def benchmark_model(model_path: str, model_name: str, verbose: bool = True) -> d
 
     if verbose:
         print(f"\n{'='*80}")
-        print(f"Results:")
+        print("Results:")
         print(f"  Accuracy: {'100%' if all_correct else '0% (at least one failure)'}")
         print(f"  Warm-up time: {warmup_time:.2f}s")
         print(f"  Steady-state avg: {steady_state_avg:.2f}s")

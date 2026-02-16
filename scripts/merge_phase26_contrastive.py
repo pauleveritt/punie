@@ -56,7 +56,7 @@ def main():
     train_examples = all_examples[:split_idx]
     valid_examples = all_examples[split_idx:]
 
-    print(f"\nSplit:")
+    print("\nSplit:")
     print(f"  Train: {len(train_examples)} examples")
     print(f"  Valid: {len(valid_examples)} examples")
 

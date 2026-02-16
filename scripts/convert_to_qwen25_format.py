@@ -280,7 +280,7 @@ def main():
     print("\n" + "="*80)
     print("CONVERSION SUMMARY")
     print("="*80)
-    print(f"\nTotal examples by format:")
+    print("\nTotal examples by format:")
     for format_type, count in sorted(total_stats.items()):
         print(f"  {format_type}: {count}")
 

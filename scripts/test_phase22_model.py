@@ -188,7 +188,7 @@ def analyze_training_data():
         print(f"    - execute_code: {execute_code_count}")
         print(f"    - Other tools: {tool_call_count - execute_code_count}")
         print(f"  Direct answers: {direct_count} ({int(direct_count/len(examples)*100)}%)")
-        print(f"  Python patterns:")
+        print("  Python patterns:")
         print(f"    - Loops (for): {loop_count}")
         print(f"    - Conditionals (if): {conditional_count}")
         print()
@@ -213,8 +213,8 @@ def show_model_info():
         size = result.stdout.split()[0] if result.stdout else "Unknown"
         print(f"Model: {model_path}")
         print(f"Size: {size}")
-        print(f"Quantization: 5-bit")
-        print(f"Base: Qwen3-Coder-30B-A3B-Instruct")
+        print("Quantization: 5-bit")
+        print("Base: Qwen3-Coder-30B-A3B-Instruct")
         print()
 
         # Check for adapter

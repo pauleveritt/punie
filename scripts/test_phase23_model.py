@@ -9,7 +9,6 @@ Tests 5 ty-specific queries:
 """
 
 import asyncio
-from pathlib import Path
 
 # Test queries focused on ty integration
 TEST_QUERIES = [

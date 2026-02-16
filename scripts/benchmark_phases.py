@@ -180,7 +180,7 @@ def benchmark_model(model_path: str, verbose: bool = True) -> dict:
     if verbose:
         print(f"\n{'='*80}")
         print(f"Results: {correct}/{len(TEST_QUERIES)} correct ({accuracy:.0f}%)")
-        print(f"Timing breakdown:")
+        print("Timing breakdown:")
         print(f"  Warm-up (Q1): {warmup_time:.2f}s")
         print(f"  Steady-state avg (Q2-Q5): {steady_state_avg:.2f}s")
         print(f"  Overall avg (Q1-Q5): {avg_gen_time:.2f}s")

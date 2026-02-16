@@ -30,6 +30,6 @@ try:
     print(prompt)
 
 except Exception as e:
-    print(f"❌ ERROR: Tokenizer failed on role: 'tool'")
+    print("❌ ERROR: Tokenizer failed on role: 'tool'")
     print(f"Error: {e}")
     print("\nThis means we need to convert those 60 examples to use role: 'user' instead")

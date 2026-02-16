@@ -1350,7 +1350,7 @@ def main():
     # By turn count
     single_turn = sum(1 for ex in all_examples if len(ex["messages"]) == 3)
     multi_turn = sum(1 for ex in all_examples if len(ex["messages"]) > 3)
-    print(f"\nBy turn count:")
+    print("\nBy turn count:")
     print(f"  Single-turn: {single_turn} ({single_turn / total * 100:.1f}%)")
     print(f"  Multi-turn: {multi_turn} ({multi_turn / total * 100:.1f}%)")
 

@@ -215,10 +215,10 @@ def main():
             f.write(json.dumps(example) + "\n")
 
     print(f"✓ Generated {len(examples)} pytest training examples")
-    print(f"  Simple test runs: 15")
-    print(f"  Test + fix workflows: 15")
-    print(f"  Full quality pipeline: 10")
-    print(f"  Direct answers: 10")
+    print("  Simple test runs: 15")
+    print("  Test + fix workflows: 15")
+    print("  Full quality pipeline: 10")
+    print("  Direct answers: 10")
     print(f"  Output: {output_file}")
 
 

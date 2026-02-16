@@ -1,6 +1,5 @@
 """Tests for execute_code tool integration."""
 
-import pytest
 from pydantic_ai import RunContext
 
 from punie.agent.deps import ACPDeps

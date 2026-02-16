@@ -4,9 +4,6 @@
 Target: ~75 examples of multi-step workflows.
 """
 
-import json
-import random
-from pathlib import Path
 
 
 def create_cross_tool_examples():

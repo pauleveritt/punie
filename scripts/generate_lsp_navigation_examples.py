@@ -1283,11 +1283,11 @@ def main():
             f.write(json.dumps(example) + "\n")
 
     print(f"Generated {len(examples)} examples:")
-    print(f"  - Simple goto_definition: 15")
-    print(f"  - Simple find_references: 15")
-    print(f"  - Navigation + field access: 15")
-    print(f"  - Multi-step workflows: 15")
-    print(f"  - Direct answers: 10")
+    print("  - Simple goto_definition: 15")
+    print("  - Simple find_references: 15")
+    print("  - Navigation + field access: 15")
+    print("  - Multi-step workflows: 15")
+    print("  - Direct answers: 10")
     print(f"\nOutput: {output_file}")
 
 

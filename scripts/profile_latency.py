@@ -277,7 +277,7 @@ def print_summary(report: ProfileReport) -> None:
     print("PROFILING RESULTS")
     print("=" * 80)
     print(f"\nAccuracy: {report.accuracy:.1f}% ({int(report.accuracy/20)}/5)")
-    print(f"\nAverage latency breakdown per query:")
+    print("\nAverage latency breakdown per query:")
     print(f"  Total:      {report.avg_total_ms:7.1f}ms (100.0%)")
     print(f"  Generation: {report.avg_generation_ms:7.1f}ms ({report.generation_pct:5.1f}%)")
     print(f"  Tool exec:  {report.avg_tool_ms:7.1f}ms ({report.tool_pct:5.1f}%)")

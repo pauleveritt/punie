@@ -163,7 +163,7 @@ def create_document_symbols_discrimination_examples() -> list[dict]:
                 {"role": "user", "content": query},
                 {
                     "role": "assistant",
-                    "content": f"I'll use document_symbols to get the file structure.",
+                    "content": "I'll use document_symbols to get the file structure.",
                 },
                 {
                     "role": "user",
@@ -375,7 +375,7 @@ def main():
     # Print distribution
     single_turn = sum(1 for ex in all_examples if len(ex["messages"]) == 3)
     multi_turn = sum(1 for ex in all_examples if len(ex["messages"]) == 5)
-    print(f"\nDistribution:")
+    print("\nDistribution:")
     print(f"  Single-turn: {single_turn} ({single_turn/len(all_examples)*100:.1f}%)")
     print(f"  Multi-turn: {multi_turn} ({multi_turn/len(all_examples)*100:.1f}%)")
 

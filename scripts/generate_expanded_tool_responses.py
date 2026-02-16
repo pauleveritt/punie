@@ -167,10 +167,10 @@ def main():
 
     # Generate 25 per tool (6 tools = 150 total)
     all_examples.extend(create_hover_examples())
-    print(f"  - hover: 25 examples")
+    print("  - hover: 25 examples")
 
     all_examples.extend(create_git_status_examples())
-    print(f"  - git_status: 25 examples")
+    print("  - git_status: 25 examples")
 
     # Add similar generators for other tools...
     # (I'll create simplified versions for the other 4 tools to reach 150)

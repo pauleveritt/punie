@@ -17,7 +17,6 @@ import sys
 import time
 from pathlib import Path
 
-import mlx.core as mx
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -231,13 +230,13 @@ def run_validation(model_path: str):
 
     print(f"\n{'=' * 80}")
     print(f"Overall: {total_passed}/{total_queries} ({overall_percentage:.0f}%)")
-    print(f"Target: ≥85% (34/40)")
+    print("Target: ≥85% (34/40)")
     print(f"Status: {'✓ PASS' if overall_percentage >= 85 else '✗ FAIL'}")
     print(f"{'=' * 80}")
 
     # Performance stats
     avg_time = sum(times) / len(times) if times else 0
-    print(f"\nPerformance:")
+    print("\nPerformance:")
     print(f"  Average generation time: {avg_time:.2f}s")
     print(f"  Total validation time: {sum(times):.2f}s")
 

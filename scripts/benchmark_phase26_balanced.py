@@ -178,7 +178,7 @@ def benchmark_model(model_path: str, verbose: bool = True) -> dict:
     if verbose:
         print(f"\n{'='*80}")
         print(f"Results: {correct}/{len(TEST_QUERIES)} correct ({accuracy:.0f}%)")
-        print(f"Timing breakdown:")
+        print("Timing breakdown:")
         print(f"  Warm-up (Q1): {warmup_time:.2f}s")
         print(f"  Steady-state avg (Q2-Q5): {steady_state_avg:.2f}s")
         print(f"  Overall avg (Q1-Q5): {avg_gen_time:.2f}s")
@@ -265,7 +265,7 @@ def print_comparison_table(benchmarks: list[dict]) -> None:
         print(f"  Accuracy: {phase26_balanced['accuracy_pct']:.0f}% ({phase26_balanced['correct']}/{phase26_balanced['total']})")
 
     if phase21 and phase26_balanced:
-        print(f"\nPhase 26 Balanced vs Phase 21 (XML baseline):")
+        print("\nPhase 26 Balanced vs Phase 21 (XML baseline):")
         print(f"  Disk: {phase21['disk_size_gb']:.2f} GB → {phase26_balanced['disk_size_gb']:.2f} GB ({phase26_balanced['disk_size_gb']/phase21['disk_size_gb']*100-100:+.0f}%)")
         print(f"  Memory: {phase21['memory_gb']:.2f} GB → {phase26_balanced['memory_gb']:.2f} GB ({phase26_balanced['memory_gb']/phase21['memory_gb']*100-100:+.0f}%)")
         print(f"  Load: {phase21['load_time_s']:.2f}s → {phase26_balanced['load_time_s']:.2f}s ({phase26_balanced['load_time_s']/phase21['load_time_s']*100-100:+.0f}%)")

@@ -323,7 +323,7 @@ def main():
             print(f"   With system message: {details['with_system']} ({details['percentage']:.1f}%)")
             print(f"   Without system message: {details['without_system']}")
             if not passed:
-                print(f"   ⚠️  System message coverage below 90% threshold")
+                print("   ⚠️  System message coverage below 90% threshold")
 
         elif name == "Shuffle Quality":
             if not passed:

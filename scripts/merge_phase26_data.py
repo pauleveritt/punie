@@ -210,7 +210,7 @@ def main():
     valid = tuple(all_examples[train_size:train_size + valid_size])
     test = tuple(all_examples[train_size + valid_size:])
 
-    print(f"Split (80/10/10):")
+    print("Split (80/10/10):")
     print(f"  Train: {len(train)} examples ({len(train)/total*100:.1f}%)")
     print(f"  Valid: {len(valid)} examples ({len(valid)/total*100:.1f}%)")
     print(f"  Test: {len(test)} examples ({len(test)/total*100:.1f}%)")
@@ -231,9 +231,9 @@ def main():
 
     print()
     print("="*60)
-    print(f"Phase 26 training data ready!")
+    print("Phase 26 training data ready!")
     print(f"  Total: {total} examples")
-    print(f"  Format: messages (unified)")
+    print("  Format: messages (unified)")
     print(f"  Output: {OUTPUT_DIR}")
     print("="*60)
 

@@ -326,7 +326,7 @@ def main():
     lsp_count = sum(1 for ex in examples if "goto_definition" in str(ex) or "find_references" in str(ex))
     grep_count = sum(1 for ex in examples if "run_command" in str(ex) and "grep" in str(ex))
 
-    print(f"\nBreakdown:")
+    print("\nBreakdown:")
     print(f"  LSP examples (goto_definition/find_references): {lsp_count}")
     print(f"  Grep examples (run_command with grep): {grep_count}")
     print(f"  Total: {len(examples)}")

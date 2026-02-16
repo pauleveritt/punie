@@ -28,10 +28,10 @@ async def test_lsp_capabilities():
         print("\n📡 Starting ty LSP server...")
         await client.start(str(Path(__file__).parent.parent / "src"))
 
-        print(f"✅ Server started successfully")
+        print("✅ Server started successfully")
 
         # Check capabilities
-        print(f"\n🔍 Server capabilities:")
+        print("\n🔍 Server capabilities:")
         caps = client.server_capabilities
 
         if not caps:
@@ -55,7 +55,7 @@ async def test_lsp_capabilities():
         print(f"  referencesProvider (existing): {has_references}")
 
         # Verdict
-        print(f"\n📊 VERDICT:")
+        print("\n📊 VERDICT:")
         all_supported = all([has_hover, has_document_symbols, has_workspace_symbols])
 
         if all_supported:
@@ -101,23 +101,23 @@ async def test_hover():
         # Test on a real file - monty_runner.py, line 20, symbol "LSPClient"
         test_file = str(Path(__file__).parent.parent / "src" / "punie" / "agent" / "monty_runner.py")
         print(f"\n📁 Test file: {test_file}")
-        print(f"   Symbol: LSPClient (import at top of file)")
+        print("   Symbol: LSPClient (import at top of file)")
 
         # Try to hover over the LSPClient import
         result = await client.hover(test_file, line=20, column=30, symbol="LSPClient")
 
-        print(f"\n✅ Result:")
+        print("\n✅ Result:")
         print(f"  success: {result.success}")
         print(f"  symbol: {result.symbol}")
         print(f"  type_info: {result.type_info}")
         print(f"  docstring: {result.docstring[:200] if result.docstring else None}...")
 
         if not result.success:
-            print(f"\n⚠️  Hover FAILED!")
-            print(f"  This could mean:")
-            print(f"    1. ty doesn't support hover")
-            print(f"    2. The line/column are wrong")
-            print(f"    3. The file isn't indexed yet")
+            print("\n⚠️  Hover FAILED!")
+            print("  This could mean:")
+            print("    1. ty doesn't support hover")
+            print("    2. The line/column are wrong")
+            print("    3. The file isn't indexed yet")
 
         return result.success
 
@@ -151,18 +151,18 @@ async def test_document_symbols():
 
         result = await client.document_symbols(test_file)
 
-        print(f"\n✅ Result:")
+        print("\n✅ Result:")
         print(f"  success: {result.success}")
         print(f"  symbol_count: {result.symbol_count}")
 
-        print(f"\n📝 Sample symbols (first 10):")
+        print("\n📝 Sample symbols (first 10):")
         for i, symbol in enumerate(result.symbols[:10]):
             print(f"  {i+1}. {symbol.name} ({symbol.kind}) - line {symbol.line}")
             if symbol.children:
                 print(f"     {len(symbol.children)} children")
 
         if not result.success:
-            print(f"\n⚠️  document_symbols FAILED!")
+            print("\n⚠️  document_symbols FAILED!")
 
         return result.success
 
@@ -190,23 +190,23 @@ async def test_workspace_symbols():
     try:
         await client.start(str(Path(__file__).parent.parent / "src"))
 
-        print(f"\n🔍 Searching for: 'LSPClient'")
+        print("\n🔍 Searching for: 'LSPClient'")
 
         result = await client.workspace_symbols("LSPClient")
 
-        print(f"\n✅ Result:")
+        print("\n✅ Result:")
         print(f"  success: {result.success}")
         print(f"  symbol_count: {result.symbol_count}")
 
-        print(f"\n📝 Sample symbols (first 5):")
+        print("\n📝 Sample symbols (first 5):")
         for i, symbol in enumerate(result.symbols[:5]):
             print(f"  {i+1}. {symbol.name} ({symbol.kind})")
             print(f"     {symbol.location.file}:{symbol.location.line}")
 
         if not result.success:
-            print(f"\n⚠️  workspace_symbols FAILED!")
-            print(f"  This is EXPECTED - the audit plan noted that workspace_symbols")
-            print(f"  may not be supported by ty at all.")
+            print("\n⚠️  workspace_symbols FAILED!")
+            print("  This is EXPECTED - the audit plan noted that workspace_symbols")
+            print("  may not be supported by ty at all.")
 
         return result.success
 

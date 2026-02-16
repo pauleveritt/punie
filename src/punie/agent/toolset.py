@@ -319,7 +319,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_terminal(), loop)
             return future.result(timeout=30)
 
-        def sync_typecheck(path: str):  # type: ignore[no-untyped-def]
+        def sync_typecheck(path: str):
             """Bridge from sync sandbox to async ty type checker via terminal."""
             from punie.agent.typed_tools import TypeCheckResult, parse_ty_output
 
@@ -346,7 +346,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_typecheck(), loop)
             return future.result(timeout=30)
 
-        def sync_ruff_check(path: str):  # type: ignore[no-untyped-def]
+        def sync_ruff_check(path: str):
             """Bridge from sync sandbox to async ruff linter via terminal."""
             from punie.agent.typed_tools import RuffResult, parse_ruff_output
 
@@ -373,13 +373,13 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_ruff(), loop)
             return future.result(timeout=30)
 
-        def sync_goto_definition(file_path: str, line: int, column: int, symbol: str):  # type: ignore[no-untyped-def]
+        def sync_goto_definition(file_path: str, line: int, column: int, symbol: str):
             """Bridge from sync sandbox to async LSP goto_definition."""
             from punie.agent.lsp_client import get_lsp_client
             from punie.agent.typed_tools import parse_definition_response
 
             # Use LSP client to query ty server
-            async def _goto_definition():  # type: ignore[no-untyped-def]
+            async def _goto_definition():
                 client = await get_lsp_client()
                 response = await client.goto_definition(file_path, line, column)
                 return parse_definition_response(response, symbol)
@@ -387,13 +387,13 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_goto_definition(), loop)
             return future.result(timeout=30)
 
-        def sync_find_references(file_path: str, line: int, column: int, symbol: str):  # type: ignore[no-untyped-def]
+        def sync_find_references(file_path: str, line: int, column: int, symbol: str):
             """Bridge from sync sandbox to async LSP find_references."""
             from punie.agent.lsp_client import get_lsp_client
             from punie.agent.typed_tools import parse_references_response
 
             # Use LSP client to query ty server
-            async def _find_references():  # type: ignore[no-untyped-def]
+            async def _find_references():
                 client = await get_lsp_client()
                 response = await client.find_references(file_path, line, column)
                 return parse_references_response(response, symbol)
@@ -401,7 +401,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_find_references(), loop)
             return future.result(timeout=30)
 
-        def sync_pytest_run(path: str):  # type: ignore[no-untyped-def]
+        def sync_pytest_run(path: str):
             """Bridge from sync sandbox to async pytest via terminal."""
             from punie.agent.typed_tools import TestResult, parse_pytest_output
 
@@ -428,13 +428,13 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_pytest(), loop)
             return future.result(timeout=30)
 
-        def sync_hover(file_path: str, line: int, column: int, symbol: str):  # type: ignore[no-untyped-def]
+        def sync_hover(file_path: str, line: int, column: int, symbol: str):
             """Bridge from sync sandbox to async LSP hover."""
             from punie.agent.lsp_client import get_lsp_client
             from punie.agent.typed_tools import parse_hover_response
 
             # Use LSP client to query ty server
-            async def _hover():  # type: ignore[no-untyped-def]
+            async def _hover():
                 client = await get_lsp_client()
                 response = await client.hover(file_path, line, column)
                 return parse_hover_response(response, symbol)
@@ -442,13 +442,13 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_hover(), loop)
             return future.result(timeout=30)
 
-        def sync_document_symbols(file_path: str):  # type: ignore[no-untyped-def]
+        def sync_document_symbols(file_path: str):
             """Bridge from sync sandbox to async LSP document symbols."""
             from punie.agent.lsp_client import get_lsp_client
             from punie.agent.typed_tools import parse_document_symbols_response
 
             # Use LSP client to query ty server
-            async def _document_symbols():  # type: ignore[no-untyped-def]
+            async def _document_symbols():
                 client = await get_lsp_client()
                 response = await client.document_symbols(file_path)
                 return parse_document_symbols_response(response, file_path)
@@ -456,13 +456,13 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_document_symbols(), loop)
             return future.result(timeout=30)
 
-        def sync_workspace_symbols(query: str):  # type: ignore[no-untyped-def]
+        def sync_workspace_symbols(query: str):
             """Bridge from sync sandbox to async LSP workspace symbols."""
             from punie.agent.lsp_client import get_lsp_client
             from punie.agent.typed_tools import parse_workspace_symbols_response
 
             # Use LSP client to query ty server
-            async def _workspace_symbols():  # type: ignore[no-untyped-def]
+            async def _workspace_symbols():
                 client = await get_lsp_client()
                 response = await client.workspace_symbols(query)
                 return parse_workspace_symbols_response(response, query)
@@ -470,7 +470,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_workspace_symbols(), loop)
             return future.result(timeout=30)
 
-        def sync_git_status(path: str):  # type: ignore[no-untyped-def]
+        def sync_git_status(path: str):
             """Bridge from sync sandbox to async git status via terminal."""
             from punie.agent.typed_tools import GitStatusResult, parse_git_status_output
 
@@ -497,7 +497,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_git_status(), loop)
             return future.result(timeout=30)
 
-        def sync_git_diff(path: str, staged: bool = False):  # type: ignore[no-untyped-def]
+        def sync_git_diff(path: str, staged: bool = False):
             """Bridge from sync sandbox to async git diff via terminal."""
             from punie.agent.typed_tools import GitDiffResult, parse_git_diff_output
 
@@ -528,7 +528,7 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_git_diff(), loop)
             return future.result(timeout=30)
 
-        def sync_git_log(path: str, count: int = 10):  # type: ignore[no-untyped-def]
+        def sync_git_log(path: str, count: int = 10):
             """Bridge from sync sandbox to async git log via terminal."""
             from punie.agent.typed_tools import GitLogResult, parse_git_log_output
 

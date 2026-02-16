@@ -15,12 +15,10 @@ Tests across 8 categories:
 Overall target: ≥75% (30/40) - Realistic after fixing training data
 """
 
-import re
 import sys
 import time
 from pathlib import Path
 
-import mlx.core as mx
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -91,9 +89,9 @@ def test_query(
     success = check_fn(response, *check_args)
 
     if not success:
-        print(f"❌ FAILED semantic check")
+        print("❌ FAILED semantic check")
     else:
-        print(f"✅ PASSED semantic check")
+        print("✅ PASSED semantic check")
 
     return success, response, elapsed
 
@@ -318,13 +316,13 @@ def run_validation(model_path: str):
 
     print(f"\n{'=' * 80}")
     print(f"Overall: {total_passed}/{total_queries} ({overall_percentage:.0f}%)")
-    print(f"Target: ≥75% (30/40) - Realistic baseline after audit")
+    print("Target: ≥75% (30/40) - Realistic baseline after audit")
     print(f"Status: {'✓ PASS' if overall_percentage >= 75 else '✗ FAIL'}")
     print(f"{'=' * 80}")
 
     # Performance stats
     avg_time = sum(times) / len(times) if times else 0
-    print(f"\nPerformance:")
+    print("\nPerformance:")
     print(f"  Average generation time: {avg_time:.2f}s")
     print(f"  Total validation time: {sum(times):.2f}s")
 

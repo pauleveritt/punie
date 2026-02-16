@@ -11,7 +11,6 @@ Usage:
     uv run python scripts/spike_ty_lsp.py
 """
 
-import asyncio
 import json
 import subprocess
 import sys
@@ -116,7 +115,7 @@ class LSPClient:
                 return message
 
             # This is a notification or unrelated message, keep reading
-            print(f"  (Received notification/other message, continuing...)")
+            print("  (Received notification/other message, continuing...)")
 
         raise ValueError(f"No response with id={request_id} after {max_attempts} attempts")
 

@@ -14,7 +14,6 @@ Output: data/phase26_lsp_merged/
 """
 
 import json
-import shutil
 from pathlib import Path
 
 
@@ -90,7 +89,7 @@ def main():
         json.dump(metadata, f, indent=2)
 
     print("✓ Merge complete")
-    print(f"\nOutput:")
+    print("\nOutput:")
     print(f"  {output_dir / 'train.jsonl'}")
     print(f"  {output_dir / 'valid.jsonl'}")
     print(f"  {output_dir / 'metadata.json'}")

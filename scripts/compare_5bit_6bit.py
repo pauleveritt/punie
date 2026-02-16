@@ -71,13 +71,13 @@ print("__RESULT_END__")
             json_str = output[start:end].strip()
             return json.loads(json_str)
         else:
-            print(f"Error: Could not parse result from output")
+            print("Error: Could not parse result from output")
             print(f"stdout: {output}")
             print(f"stderr: {result.stderr}")
             return None
 
     except subprocess.TimeoutExpired:
-        print(f"Error: Benchmark timed out after 5 minutes")
+        print("Error: Benchmark timed out after 5 minutes")
         return None
     except Exception as e:
         print(f"Error running benchmark: {e}")
@@ -148,9 +148,9 @@ def print_comparison(result_5bit: dict, result_6bit: dict) -> None:
     print(f"  Warm-up: 5-bit is {abs(warmup_diff):.1f}% {'faster' if warmup_diff < 0 else 'slower'} (one-time cost)")
     print(f"  Steady-state: 5-bit is {abs(steady_diff):.1f}% {'faster' if steady_diff < 0 else 'slower'} (per-query)")
     if not is_significant:
-        print(f"  ✓ Steady-state speeds are statistically equivalent (within 5%)")
+        print("  ✓ Steady-state speeds are statistically equivalent (within 5%)")
     else:
-        print(f"  ⚠ Steady-state speeds differ by more than 5% - investigate")
+        print("  ⚠ Steady-state speeds differ by more than 5% - investigate")
     print()
 
     print("Quality:")
@@ -164,15 +164,15 @@ def print_comparison(result_5bit: dict, result_6bit: dict) -> None:
 
     print("RECOMMENDATION:")
     if not is_significant and disk_diff < 0:
-        print(f"  ✓ Deploy 5-bit: Smaller size, equivalent speed/quality")
+        print("  ✓ Deploy 5-bit: Smaller size, equivalent speed/quality")
     elif not is_significant and disk_diff > 0:
-        print(f"  ✓ Deploy 6-bit: Equivalent speed/quality, if size isn't critical")
+        print("  ✓ Deploy 6-bit: Equivalent speed/quality, if size isn't critical")
     elif is_significant and steady_diff < 0:
-        print(f"  ✓ Deploy 5-bit: Significantly faster")
+        print("  ✓ Deploy 5-bit: Significantly faster")
     elif is_significant and steady_diff > 0:
-        print(f"  ⚠ Consider 6-bit: Significantly faster than 5-bit")
+        print("  ⚠ Consider 6-bit: Significantly faster than 5-bit")
     else:
-        print(f"  ⚠ Results inconclusive - run more tests")
+        print("  ⚠ Results inconclusive - run more tests")
     print()
 
 
@@ -200,13 +200,13 @@ def main():
     # Benchmark 5-bit
     result_5bit = run_single_model_benchmark(model_5bit)
     if not result_5bit or "error" in result_5bit:
-        print(f"Error: 5-bit benchmark failed")
+        print("Error: 5-bit benchmark failed")
         sys.exit(1)
 
     # Benchmark 6-bit
     result_6bit = run_single_model_benchmark(model_6bit)
     if not result_6bit or "error" in result_6bit:
-        print(f"Error: 6-bit benchmark failed")
+        print("Error: 6-bit benchmark failed")
         sys.exit(1)
 
     # Print comparison
