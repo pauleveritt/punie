@@ -22,7 +22,7 @@ from punie.agent import PunieAgent
 from punie.agent.deps import ACPDeps
 from punie.agent.factory import create_local_agent
 from punie.http.app import create_app
-from punie.http.runner import run_dual
+from punie.http.runner import run_http
 from punie.http.types import Host, Port
 
 app = typer.Typer(
@@ -212,7 +212,10 @@ async def run_serve_agent(
     port: int,
     log_level: str,
 ) -> None:
-    """Create agent and run dual-protocol mode.
+    """Create agent and run HTTP/WebSocket server.
+
+    Creates a single PunieAgent instance that handles WebSocket connections
+    from multiple clients (PyCharm, punie ask, Toad frontend, etc.).
 
     Args:
         model: Model name for agent
@@ -221,14 +224,14 @@ async def run_serve_agent(
         port: HTTP server port
         log_level: Logging level for HTTP server
     """
-    # Create agent
+    # Create agent (handles WebSocket connections)
     agent = PunieAgent(model=model, name=name)
 
-    # Create HTTP app
-    app_instance = create_app()
+    # Create HTTP app with agent reference (for WebSocket endpoint)
+    app_instance = create_app(agent)
 
-    # Run dual protocol (stdio + HTTP)
-    await run_dual(
+    # Run HTTP/WebSocket server only (clients connect via ws://host:port/ws)
+    await run_http(
         agent,
         app_instance,
         host=Host(host),
@@ -240,15 +243,10 @@ async def run_serve_agent(
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="Model name (overrides PUNIE_MODEL env var)",
-    ),
-    name: str = typer.Option(
-        "punie-agent",
-        "--name",
-        help="Agent name for identification",
+    server: str = typer.Option(
+        "ws://localhost:8000/ws",
+        "--server",
+        help="Punie server WebSocket URL",
     ),
     log_dir: Path = typer.Option(
         Path("~/.punie/logs"),
@@ -266,11 +264,18 @@ def main(
         help="Print version and exit",
     ),
 ) -> None:
-    """Run Punie ACP agent via stdio transport.
+    """Run Punie stdio bridge (connects to server via WebSocket).
 
-    The agent communicates with PyCharm over stdin/stdout using the Agent
-    Communication Protocol (ACP). All logging goes to files in ~/.punie/logs/
-    to avoid corrupting the JSON-RPC protocol on stdout.
+    Bridges stdin/stdout to WebSocket for PyCharm integration.
+    The bridge is a stateless proxy - all session state lives on the server.
+
+    Start the server first:
+        punie serve --model <model-name>
+
+    Then run the bridge:
+        punie
+
+    Or configure PyCharm to run `punie` directly (see: punie init --help)
     """
     # Handle --version flag (prints to stderr, not stdout)
     if version:
@@ -284,11 +289,10 @@ def main(
     # Setup logging (file-only, never stdout)
     setup_logging(log_dir, log_level)
 
-    # Resolve model from flag > env > default
-    resolved_model = resolve_model(model)
+    # Run stdio bridge (connects to server)
+    from punie.client.stdio_bridge import run_stdio_bridge
 
-    # Run ACP agent
-    asyncio.run(run_acp_agent(resolved_model, name))
+    asyncio.run(run_stdio_bridge(server))
 
 
 @app.command()
@@ -406,10 +410,15 @@ def serve(
         help="Logging level (debug, info, warning, error, critical)",
     ),
 ) -> None:
-    """Run Punie agent with dual protocol support.
+    """Run Punie server (HTTP/WebSocket only).
 
-    Starts ACP agent over stdio (for PyCharm) and HTTP server (for testing).
-    HTTP endpoints: /health, /echo
+    Starts HTTP server with WebSocket endpoint at ws://host:port/ws.
+    Multiple clients can connect simultaneously (PyCharm, punie ask, Toad, etc.).
+
+    Clients must connect via:
+    - punie (stdio bridge for PyCharm)
+    - punie ask (CLI questions)
+    - Toad frontend (browser, future)
     """
     # Setup logging (file-only, never stdout)
     setup_logging(log_dir, log_level)
@@ -418,10 +427,15 @@ def serve(
     resolved_model = resolve_model(model)
 
     # Startup message (OK for serve command before agent starts)
-    typer.echo("Starting Punie agent (dual protocol mode)")
+    typer.echo("Starting Punie server")
     typer.echo(f"  Model: {resolved_model}")
     typer.echo(f"  HTTP: http://{host}:{port}")
+    typer.echo(f"  WebSocket: ws://{host}:{port}/ws")
     typer.echo(f"  Logs: {log_dir.expanduser() / 'punie.log'}")
+    typer.echo("")
+    typer.echo("Clients can connect via:")
+    typer.echo("  - punie (stdio bridge)")
+    typer.echo("  - punie ask \"<question>\"")
     typer.echo("")
 
     # Run agent
@@ -528,10 +542,10 @@ async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:
 @app.command("ask")
 def ask(
     prompt: str = typer.Argument(..., help="Question or instruction for the agent"),
-    model: str = typer.Option(
-        "local",
-        "--model",
-        help="Model to use (e.g., 'local', 'openai:gpt-4o', 'anthropic:claude-3-5-sonnet')",
+    server: str = typer.Option(
+        "ws://localhost:8000/ws",
+        "--server",
+        help="Punie server WebSocket URL",
     ),
     workspace: Path = typer.Option(
         Path.cwd(),
@@ -542,89 +556,29 @@ def ask(
         help="Workspace directory",
     ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
-    perf: bool = typer.Option(False, "--perf", help="Generate performance report"),
 ) -> None:
-    """Ask the agent a question and get a response (without PyCharm).
+    """Ask the agent a question (connects to server via WebSocket).
 
-    Examples:
+    Start server first:
+        punie serve --model <model-name>
+
+    Then ask questions:
+        punie ask "What is dependency injection?"
         punie ask "How many Python files are in this project?"
-        punie ask "List all TODO comments" --model openai:gpt-4o
         punie ask "What does main.py do?" --workspace /path/to/project
-        punie ask "Count Python files" --perf  # Generate performance report
-        punie ask "Explain the code" --model local:  # Use LM Studio
 
-    For local models, start LM Studio (https://lmstudio.ai/) first and load a model.
-    Performance reporting can also be enabled via PUNIE_PERF=1 environment variable.
+    The server URL defaults to ws://localhost:8000/ws but can be overridden:
+        punie ask "test" --server ws://192.168.1.100:8000/ws
     """
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    # Resolve perf from flag or env var
-    resolved_perf = resolve_perf(perf)
+    from punie.client.ask_client import run_ask_client
 
-    asyncio.run(_run_ask(prompt, model, workspace, resolved_perf))
-
-
-async def _run_ask(
-    prompt: str,
-    model: str,
-    workspace: Path,
-    perf: bool = False,
-) -> None:
-    """Run a simple ask interaction."""
-    from datetime import datetime, timezone
-
-    from punie.acp.contrib.tool_calls import ToolCallTracker
-    from punie.agent.deps import ACPDeps
-    from punie.agent.factory import create_local_agent
-    from punie.perf import PerformanceCollector, generate_html_report
-
-    # Create performance collector if requested
-    collector = PerformanceCollector() if perf else None
-
-    # Create agent and client (uses default config)
-    agent, client = create_local_agent(
-        model=model, workspace=workspace, perf_collector=collector
-    )
-
-    # Start prompt timing if collecting performance
-    if collector:
-        # Determine backend from model name
-        backend = "local" if model.startswith("local") else "ide"
-        collector.start_prompt(model, backend)
-
-    # Create dependencies
-    deps = ACPDeps(
-        client_conn=client,
-        session_id="ask-session",
-        tracker=ToolCallTracker(),
-    )
-
-    # Run the agent
     try:
-        result = await agent.run(prompt, deps=deps)
-
-        # End prompt timing if collecting performance
-        if collector:
-            collector.end_prompt()
-
-        # Show the response
-        typer.echo(result.output)
-
-        # Generate and save performance report if requested
-        if collector:
-            report_data = collector.report()
-            html = generate_html_report(report_data)
-
-            # Generate filename with timestamp
-            timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
-            report_path = Path.cwd() / f"punie-perf-{timestamp}.html"
-
-            report_path.write_text(html)
-            typer.echo(f"\nPerformance report: {report_path}")
-
-    except Exception as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+        asyncio.run(run_ask_client(server, prompt, workspace))
+    except Exception as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
 

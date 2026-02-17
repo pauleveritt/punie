@@ -1445,7 +1445,10 @@ Adding `ty` as a typed tool demonstrates the path forward for domain tools. Inst
 is the first step toward the "holy grail" vision of rich domain tools.
 
 **Completion Summary:**
-Phase 23 successfully solidified Phase 22 infrastructure and added the first typed tool (typecheck). End-to-end validation revealed a critical gap: the model learned to call typed tools but not to access their structured fields (0% field access rate). This discovery led directly to Phase 26, which added 120 field access training examples and achieved 92% accuracy with 90% field access rate.
+Phase 23 successfully solidified Phase 22 infrastructure and added the first typed tool (typecheck). End-to-end
+validation revealed a critical gap: the model learned to call typed tools but not to access their structured fields (0%
+field access rate). This discovery led directly to Phase 26, which added 120 field access training examples and achieved
+92% accuracy with 90% field access rate.
 
 **Success Criteria:**
 
@@ -1456,6 +1459,7 @@ Phase 23 successfully solidified Phase 22 infrastructure and added the first typ
 - ✅ Production model deployed: `fused_model_qwen3_phase23_ty_5bit/` (20 GB)
 
 **Artifacts:**
+
 - Model: `fused_model_qwen3_phase23_ty_5bit/` (20 GB, val loss 0.610)
 - Training data: `data/phase23_merged/` (757 examples)
 - Scripts: `scripts/generate_ty_training_data.py`, `scripts/test_phase23_task11.py`
@@ -1616,7 +1620,8 @@ requires careful adaptation.
 **Goal:** Replace text-based tools (grep, read_file, write_file) with LSP operations for precise, semantic code
 manipulation.
 
-**Why Next:** LSP integration is lower risk than domain tools (Phase 32), faster to implement (~2 weeks), and establishes
+**Why Next:** LSP integration is lower risk than domain tools (Phase 32), faster to implement (~2 weeks), and
+establishes
 semantic tool patterns. It reuses existing ty infrastructure and provides immediate value for code navigation and
 refactoring.
 
@@ -1798,19 +1803,53 @@ in core Punie workflows.
 - Identify gaps where flywheel or performance hooks are missing from CLI paths
 - Add targeted smoke tests or scripts for `punie ask` regression coverage
 
+## Research: Devstral Small 2 Evaluation
+
+**Status:** Not Started
+
+**Goal:** Determine if Devstral Small 2 (24B dense, Mistral 3) can replace Qwen3-30B-A3B as Punie's local model via
+gated evaluation that fails fast and cheap.
+
+**Spec:** `agent-os/specs/2026-02-16-devstral-evaluation/shape.md`
+**Requirements:** `docs/research/minimum-model-requirements.md` (9 risks identified)
+
+**Gated Approach** (ordered by cost, cheapest first):
+
+- [ ] Gate 0: Tokenizer verification — single-token tool delimiters (~5 min)
+- [ ] Gate 1: MLX smoke test — download 5-bit model, test inference (~30 min)
+- [ ] Gate 2: Latency benchmark — measure generation time, kill if >15s (~30 min)
+- [ ] Gate 3: Zero-shot tool calling — test Mistral [TOOL_CALLS] format (~2 hours)
+- [ ] Gate 4: Small-scale LoRA — convert 100 examples, train 50 iters, kill if <60% (~3-4 hours)
+
+**Total pre-commitment cost:** ~4-7 hours across Gates 0-4
+**Full conversion (Gate 5):** 6-9 days, only if all gates pass — would be a separate phase
+
 ## 28. Frontend/Backend (Single-Project Server)
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-02-16)
 
 **Goal:** Add a centralized `punie server` with a WebSocket client for `punie ask`, still single-project and no
 subinterpreters.
 
-**Focus Areas:**
+**Achieved:**
 
-- Implement `punie server` WebSocket endpoint for a single project root
-- Rework `punie ask` into a long-lived WS client that can send multiple prompts
-- Define a minimal session handshake and keep-alive behavior
-- Preserve current tool policies and logging in server mode
+- ✅ Separated server (`punie serve`) to run HTTP/WebSocket only (no stdio)
+- ✅ Server runs in background successfully (`punie serve &` works)
+- ✅ Created 3 client modules (477 lines total):
+  - `client/connection.py` - WebSocket utilities and ACP handshake
+  - `client/stdio_bridge.py` - Bidirectional proxy for PyCharm integration
+  - `client/ask_client.py` - CLI question client for `punie ask`
+- ✅ Refactored `punie ask` to connect to WebSocket server (no longer runs local agent)
+- ✅ Session lifecycle with proper handshake and keep-alive
+- ✅ All 609 tests passing + 3 new integration tests
+- ✅ Full documentation in `agent-os/specs/2026-02-16-phase28-server-client-separation/`
+- ✅ Diary entry: `docs/diary/2026-02-16-phase28-server-client-separation.md`
+
+**Key Fix:** Removed `asyncio.wait(FIRST_COMPLETED)` pattern that caused server to die on stdin close. Server now runs independently of stdio lifecycle.
+
+**Architecture:** Server-only mode + multiple client types (stdio bridge, ask client, future Toad frontend)
+
+**Validation:** Successfully tested server running in background with multiple concurrent clients
 
 ## 29. Toad Frontend (ACP Over WebSocket)
 

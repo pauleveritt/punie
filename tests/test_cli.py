@@ -139,8 +139,8 @@ def test_cli_help():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "AI coding agent" in result.stdout
-    assert "--model" in result.stdout
-    assert "--name" in result.stdout
+    # Phase 28: Main command is now stdio bridge, not agent runner
+    assert "--server" in result.stdout  # Connects to server via WebSocket
     assert "--log-dir" in result.stdout
     assert "--log-level" in result.stdout
     assert "--version" in result.stdout
@@ -291,11 +291,11 @@ def test_cli_init_help():
 
 @pytest.mark.asyncio
 async def test_run_serve_agent_creates_agent(monkeypatch):
-    """run_serve_agent creates PunieAgent and calls run_dual."""
+    """run_serve_agent creates PunieAgent and calls run_http."""
     from punie.http.types import Host, Port
 
     agent_created = False
-    run_dual_called = False
+    run_http_called = False
 
     class MockAgent:
         def __init__(self, model, name):
@@ -304,21 +304,21 @@ async def test_run_serve_agent_creates_agent(monkeypatch):
             assert model == "test"
             assert name == "test-agent"
 
-    async def mock_run_dual(agent, app, host, port, log_level):
-        nonlocal run_dual_called
-        run_dual_called = True
+    async def mock_run_http(agent, app, host, port, log_level):
+        nonlocal run_http_called
+        run_http_called = True
         assert isinstance(agent, MockAgent)
         assert host == Host("127.0.0.1")
         assert port == Port(8000)
         assert log_level == "info"
 
     monkeypatch.setattr("punie.cli.PunieAgent", MockAgent)
-    monkeypatch.setattr("punie.cli.run_dual", mock_run_dual)
+    monkeypatch.setattr("punie.cli.run_http", mock_run_http)
 
     await run_serve_agent("test", "test-agent", "127.0.0.1", 8000, "info")
 
     assert agent_created
-    assert run_dual_called
+    assert run_http_called
 
 
 # === CLI integration tests: serve command ===
@@ -332,7 +332,8 @@ def test_cli_serve_help():
     assert "--port" in result.stdout
     assert "--model" in result.stdout
     assert "--name" in result.stdout
-    assert "dual protocol" in result.stdout.lower()
+    # Phase 28: Serve now runs HTTP/WebSocket only (not dual protocol)
+    assert "websocket" in result.stdout.lower()
 
 
 def test_cli_help_shows_subcommands():

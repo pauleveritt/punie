@@ -1,4 +1,9 @@
-"""Tests for CLI --perf flag and PUNIE_PERF env var."""
+"""Tests for CLI --perf flag and PUNIE_PERF env var.
+
+NOTE: Phase 28 changed `punie ask` to connect to server via WebSocket.
+Performance tracking needs to be reimplemented for server/client architecture.
+These tests are skipped pending that implementation.
+"""
 
 import re
 
@@ -6,6 +11,10 @@ import pytest
 from typer.testing import CliRunner
 
 from punie.cli import app, resolve_perf
+
+pytestmark = pytest.mark.skip(
+    reason="Phase 28: perf flag removed from ask command (needs server-side implementation)"
+)
 
 
 @pytest.fixture

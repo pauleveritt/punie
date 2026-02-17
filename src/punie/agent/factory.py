@@ -153,7 +153,8 @@ def _create_local_model(spec: str = "") -> Model:
     parsed = _parse_local_spec(spec)
     logger.info("Creating local model: %s at %s", parsed.model_name, parsed.base_url)
 
-    provider = OpenAIProvider(base_url=parsed.base_url)
+    # Local servers don't need authentication, but OpenAI client requires an API key
+    provider = OpenAIProvider(base_url=parsed.base_url, api_key="not-needed")
     return OpenAIChatModel(parsed.model_name, provider=provider)
 
 
@@ -179,7 +180,8 @@ def create_server_model(config: "ServerConfig") -> Model:
 
     logger.info("Creating server model at %s", config.base_url)
 
-    provider = OpenAIProvider(base_url=config.base_url)
+    # Local servers don't need authentication, but OpenAI client requires an API key
+    provider = OpenAIProvider(base_url=config.base_url, api_key="not-needed")
     # mlx_lm.server requires the actual model path in API requests
     return OpenAIChatModel(config.model_path, provider=provider)
 

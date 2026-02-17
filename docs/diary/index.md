@@ -2,6 +2,12 @@
 
 Reverse-chronological notes from ongoing work. Each entry is summarized and dated.
 
+## 2026-02-16 - [Gate 0 Failure: Devstral Small 2 Unsuitable for Punie](2026-02-16-devstral-gate0-failure.md)
+Evaluated Devstral Small 2 (24B) as Qwen3 replacement using gated approach. Gate 0 failed in 5 minutes: closing delimiter `[/TOOL_CALLS]` tokenizes as 7 pieces (not single token), would corrupt training data like Phase 25. Saved ~7 days of futile work. Decision: Continue using Qwen3-30B-A3B (Phase 27's 100% accurate model).
+
+## 2026-02-16 - [Phase 28: Server/Client Separation Architecture](2026-02-16-phase28-server-client-separation.md)
+Refactored Punie from monolithic dual-protocol to clean server/client separation. Server now runs HTTP/WebSocket only (no stdio), enabling background operation. Created 3 client modules (477 lines): stdio bridge for PyCharm, ask client for CLI, and connection utilities. All 609 tests passing, 3 new integration tests. Production ready: `punie serve &` now works!
+
 ## 2026-02-14 - [Phase 21: XML Format Fix Achieves 100% Tool-Calling Accuracy](2026-02-14-phase21-xml-format-fix.md)
 Fixed critical tool-calling regression (40% → 100% accuracy) by converting training data from JSON to XML format to match mlx_lm.server expectations. Model now production-ready: 20GB, 6.6s tool queries, 1.8s direct answers. Speculative decoding infrastructure implemented but benchmarking deferred in favor of Phase 22 (Code Mode).
 
