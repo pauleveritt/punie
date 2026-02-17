@@ -1,11 +1,10 @@
-"""Integration test for real stdio-based ACP connections.
+"""Integration tests for real-world scenarios.
 
-This test proves that an ACP editor (like PyCharm) can connect to a Punie agent
-over the actual ACP protocol using stdio (stdin/stdout) instead of in-process
-TCP loopback connections.
+Consolidates:
+- test_stdio_integration.py (3 tests) - STDIO integration scenarios
+- test_concurrency.py (1 test) - Concurrency edge cases
 
-These tests spawn real subprocesses and use the stdio transport, which is slower
-than unit tests but critical for verifying end-to-end connectivity.
+Total: 4 tests
 """
 
 import asyncio
@@ -14,9 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from punie.acp import PROTOCOL_VERSION, connect_to_agent
+from punie.acp import PROTOCOL_VERSION, connect_to_agent, text_block
 from punie.acp.schema import ClientCapabilities, Implementation
 from punie.testing import FakeClient
+
+
+# ============================================================================
+# STDIO Integration Tests (3 tests)
+# ============================================================================
 
 
 @pytest.mark.asyncio
@@ -78,8 +82,6 @@ async def test_stdio_connection_to_agent():
         assert session.session_id.startswith("punie-session-")
 
         # Step 3: Send a prompt and get response
-        from punie.acp import text_block
-
         response = await conn.prompt(
             session_id=session.session_id,
             prompt=[text_block("Hello, agent!")],
@@ -150,8 +152,6 @@ async def test_stdio_connection_lifecycle():
         assert session1.session_id != session2.session_id
 
         # Test prompting both sessions to prove they work independently
-        from punie.acp import text_block
-
         response1 = await conn.prompt(
             session_id=session1.session_id,
             prompt=[text_block("Test session 1")],
@@ -209,8 +209,6 @@ async def test_stdio_connection_notification_flow():
         session = await conn.new_session(mcp_servers=[], cwd=".")
 
         # Send prompt - agent will send session_update notifications
-        from punie.acp import text_block
-
         response = await conn.prompt(
             session_id=session.session_id,
             prompt=[text_block("Test prompt")],
@@ -232,3 +230,34 @@ async def test_stdio_connection_notification_flow():
             except asyncio.TimeoutError:
                 proc.kill()
                 await proc.wait()
+
+
+# ============================================================================
+# Concurrency Tests (1 test)
+# ============================================================================
+
+
+@pytest.mark.thread_unsafe
+async def test_concurrent_file_reads(connect, client):
+    """Test concurrent file operations via asyncio.gather.
+
+    Tests async concurrency: parallel reads should not interfere.
+    """
+    # Pre-populate files
+    for i in range(5):
+        client.files[f"/test/file{i}.txt"] = f"Content {i}"
+
+    client_conn, _ = connect()
+
+    # Define concurrent read operation
+    async def read_one(i: int):
+        return await client_conn.read_text_file(
+            session_id="sess", path=f"/test/file{i}.txt"
+        )
+
+    # Execute 5 reads in parallel
+    results = await asyncio.gather(*(read_one(i) for i in range(5)))
+
+    # Verify all reads succeeded with correct content
+    for i, res in enumerate(results):
+        assert res.content == f"Content {i}"

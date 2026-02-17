@@ -2333,4 +2333,629 @@ holy-grail-architecture.md. This is when the self-improving loop becomes reality
 - [Holy Grail Architecture Spec](../specs/2026-02-15-pydantic-ai-skills-analysis/holy-grail-architecture.md)
 - [Example tdom Skill](../specs/2026-02-15-pydantic-ai-skills-analysis/example-tdom-skill.md)
 
+## 35. Ollama Backend Infrastructure
+
+**Status:** ✅ Completed (2026-02-17) - Branch: `ollama`
+
+**Goal:** Add Ollama as a managed backend alongside mlx_lm.server to enable testing with GGUF models (Devstral, CodeLlama, etc.) without fine-tuning infrastructure.
+
+**Why Ollama:**
+
+Phase 25 (7B) and Devstral Gate 0 both failed due to tokenizer incompatibility with fine-tuning. Single-token delimiters are required for LoRA training, but `[/TOOL_CALLS]` tokenizes as 7 subword pieces in non-Qwen models. Ollama provides:
+- Cross-platform model serving (no MLX dependency)
+- GGUF format support (any model on Hugging Face)
+- Zero fine-tuning required (test Code Mode zero-shot first)
+- OpenAI-compatible API (drop-in replacement)
+
+**Implementation:**
+
+**Milestone 1: OllamaProcess (Subprocess Management)**
+- [x] Created `src/punie/training/ollama.py` (180 lines)
+- [x] OllamaProcess class with lifecycle management
+- [x] Health check via `/api/tags` endpoint
+- [x] Automatic model pulling via `ollama pull`
+- [x] Context manager support (async `__aenter__` / `__aexit__`)
+- [x] Graceful shutdown (SIGTERM → SIGKILL)
+- [x] Port configuration via `OLLAMA_HOST` environment variable
+- [x] Unit tests: 8 tests (all passing) ✅
+
+**Milestone 2: Factory Integration**
+- [x] Added `ollama:` prefix support in `create_pydantic_agent()`
+- [x] Pattern: `model="ollama:devstral"`, `model="ollama:qwen3:30b-a3b"`
+- [x] Uses OpenAI-compatible API at `http://localhost:11434/v1`
+- [x] Reuses existing OpenAIProvider + OpenAIChatModel pattern (+13 lines)
+- [x] Existing tests: 17/17 passing ✅
+
+**Milestone 3: Universal Code Mode Stubs**
+- [x] Removed Qwen3-specific XML wrapper from `stubs.py`
+- [x] Changed from `<tool_call>...</tool_call>` to plain Python code block
+- [x] Makes Code Mode example universal (not tied to specific model format)
+- [x] With native API tool calling, models never generate XML
+
+**Milestone 4: Model-Aware Stop Sequences**
+- [x] Added `default_stop_sequences(model: str)` helper to `config.py`
+- [x] Returns Qwen-specific sequences for Qwen models: `("<|im_end|>", "<|endoftext|>")`
+- [x] Returns `None` for Ollama/other backends (let server decide)
+- [x] Pattern matching: checks if "qwen" in model name or model == "local"
+
+**Milestone 5: CLI Documentation**
+- [x] Updated `--model` option help text with ollama examples
+- [x] Updated `punie serve` docstring with supported model types
+- [x] Documented: local (mlx), ollama:model, test models
+
+**Milestone 6: Comprehensive Documentation**
+- [x] `docs/ollama-integration-summary.md` - Technical implementation (231 lines)
+- [x] `docs/ollama-quickstart.md` - Quick start guide (271 lines)
+- [x] `docs/ollama-implementation-checklist.md` - Implementation tracking (274 lines)
+
+**Files Changed:**
+- New: `src/punie/training/ollama.py` (180 lines)
+- Modified: `src/punie/agent/factory.py` (+13 lines)
+- Modified: `src/punie/agent/stubs.py` (-10 lines)
+- Modified: `src/punie/agent/config.py` (+25 lines)
+- Modified: `src/punie/cli.py` (+5 lines)
+- New: `tests/test_training_ollama.py` (64 lines)
+- New: Documentation (776 lines)
+- **Total:** +1,308 lines
+
+**Quality Checks:**
+- ✅ Tests: 25/25 passing (8 new + 17 existing)
+- ✅ Linting: All files clean (ruff)
+- ✅ Type checking: No new errors
+- ✅ Backward compatibility: All existing functionality preserved
+
+**Usage:**
+```bash
+# Install ollama
+# https://ollama.ai/
+
+# Start ollama server
+ollama serve
+
+# Pull a model
+ollama pull devstral
+
+# Use with punie
+punie serve --model ollama:devstral
+punie ask "Check for type errors in src/"
+```
+
+**Success Criteria:**
+- ✅ OllamaProcess manages subprocess lifecycle
+- ✅ Factory accepts `ollama:` prefix
+- ✅ Code Mode stubs are universal (no XML)
+- ✅ Stop sequences are model-aware
+- ✅ CLI documentation updated
+- ✅ All tests passing
+- ✅ Comprehensive documentation
+
+**Next:** Phase 36 - Zero-shot validation framework
+
+## 36. Zero-Shot Validation Framework
+
+**Status:** ✅ Completed (2026-02-17) - Branch: `ollama`
+
+**Goal:** Create a comprehensive validation suite to measure Code Mode performance with un-fine-tuned models, revealing whether fine-tuning is necessary.
+
+**Key Insight:**
+
+The Phase 27 model achieves 100% accuracy (40/40 queries) on Code Mode tasks, but required 1104 training examples and 800 iterations of fine-tuning. Before adopting Devstral, we need to know: **Can it follow the Code Mode stubs zero-shot?**
+
+If zero-shot accuracy is ≥70%, we can skip fine-tuning entirely. If <50%, we need either fine-tuning or a different architecture (native PydanticAI tools).
+
+**Implementation:**
+
+**Milestone 1: Validation Script Design**
+- [x] Created `scripts/validate_zero_shot_code_mode.py` (285 lines)
+- [x] 20-query test suite across 4 categories (5 queries each)
+- [x] Category 1: Direct answers (expect NO tool calls)
+- [x] Category 2: Single tool calls (expect tool calls)
+- [x] Category 3: Multi-step Code Mode (expect execute_code)
+- [x] Category 4: Field access (expect structured result access)
+
+**Milestone 2: Query Selection**
+- [x] Direct answer queries test discrimination (tool vs direct)
+- [x] Single tool queries test basic tool calling
+- [x] Multi-step queries test Code Mode (chaining functions)
+- [x] Field access queries test structured result handling
+- [x] Queries chosen to be representative, not exhaustive
+
+**Milestone 3: Success Heuristics**
+- [x] Tool call detection via `ToolCallTracker._calls` dictionary
+- [x] Direct answer validation (length > 20 chars, no tool calls)
+- [x] Clear pass/fail criteria per query type
+- [x] Detailed per-query feedback during execution
+
+**Milestone 4: Interpretation Guidance**
+- [x] ≥70%: Excellent - use zero-shot (no fine-tuning needed)
+- [x] 50-69%: Good - consider few-shot examples in system prompt
+- [x] <50%: Needs work - fine-tune (Phase 27) or native tools
+- [x] Comparison to Phase 27 baseline (100% accuracy)
+
+**Milestone 5: Pre-Flight Checks**
+- [x] Ollama health check before starting (`/api/tags` endpoint)
+- [x] Clear error messages if ollama not running
+- [x] Instructions for starting ollama server
+- [x] Model pull verification (handled by OllamaProcess)
+
+**Query Breakdown:**
+
+**Category 1: Direct Answers (5 queries)**
+1. "What's the difference between git merge and git rebase?"
+2. "When should I use type hints in Python?"
+3. "What is dependency injection?"
+4. "Explain the difference between ruff and pytest"
+5. "What are LSP capabilities?"
+
+**Category 2: Single Tool Calls (5 queries)**
+1. "Check for type errors in src/"
+2. "Run ruff linter on src/punie/"
+3. "What files have changed? Show git status"
+4. "Read the README.md file"
+5. "Run pytest on tests/"
+
+**Category 3: Multi-Step Code Mode (5 queries)**
+1. "Find all Python files and count imports"
+2. "Run full quality check: ruff, pytest, and typecheck"
+3. "Count staged vs unstaged files using git"
+4. "List all test files and show their pass rates"
+5. "Find definition of PunieAgent and show its methods"
+
+**Category 4: Field Access (5 queries)**
+1. "Show only fixable ruff violations"
+2. "Count passed vs failed tests"
+3. "Filter type errors by severity"
+4. "Show git diff statistics with additions and deletions"
+5. "Count errors vs warnings in type check results"
+
+**Usage:**
+```bash
+# Ensure ollama is running
+ollama serve  # in separate terminal
+
+# Pull model
+ollama pull devstral
+
+# Run validation
+python scripts/validate_zero_shot_code_mode.py --model devstral
+
+# Optional: specify custom workspace
+python scripts/validate_zero_shot_code_mode.py --model devstral --workspace /path/to/project
+```
+
+**Output Format:**
+```
+================================================================================
+ZERO-SHOT CODE MODE VALIDATION
+================================================================================
+Model: devstral
+Workspace: /Users/pauleveritt/projects/pauleveritt/punie
+Backend: ollama (assumed running at http://localhost:11434)
+================================================================================
+
+Creating agent...
+
+================================================================================
+Category 1: Direct Answers (expect NO tool calls)
+================================================================================
+
+[Direct] Query: What's the difference between git merge and git rebase?...
+Response: Git merge creates a merge commit that combines two branches...
+Time: 2.34s
+  ✅ Correct behavior
+
+[... 19 more queries ...]
+
+================================================================================
+VALIDATION SUMMARY
+================================================================================
+✓ direct_answers        : 5/5 (100%)
+✓ single_tool          : 4/5 (80%)
+✓ multi_step           : 3/5 (60%)
+✓ field_access         : 4/5 (80%)
+
+================================================================================
+Overall: 16/20 (80%)
+Zero-shot target: ≥50% (10/20)
+Fine-tuned baseline: 100% (40/40)
+Status: ✓ PASS
+================================================================================
+
+Performance:
+  Average generation time: 3.42s
+  Total validation time: 68.40s
+
+================================================================================
+INTERPRETATION
+================================================================================
+✅ EXCELLENT - Model follows Code Mode stubs very well!
+   Zero-shot performance suggests minimal fine-tuning needed.
+```
+
+**Files Changed:**
+- New: `scripts/validate_zero_shot_code_mode.py` (285 lines)
+- Tests: Manual validation (requires ollama + model)
+
+**Quality Checks:**
+- ✅ Linting: ruff checks passed
+- ✅ Fixed f-string issues (F541)
+- ✅ Added noqa comments for E402 (sys.path manipulation)
+- ✅ Uses proper ToolCallTracker API (`._calls` dict)
+
+**Success Criteria:**
+- ✅ 20-query suite covers representative scenarios
+- ✅ Clear pass/fail criteria per category
+- ✅ Interpretation guidance for results
+- ✅ Pre-flight checks (ollama health)
+- ✅ Detailed output with per-query feedback
+- ✅ Performance metrics (time per query)
+
+**Validation Targets:**
+- Direct answers: 100% (must discriminate tool vs direct)
+- Single tool: 80% (basic tool calling)
+- Multi-step: 60% (harder - chaining functions)
+- Field access: 80% (structured result handling)
+- **Overall target:** ≥50% (zero-shot threshold)
+- **Baseline:** 100% (Phase 27 fine-tuned)
+
+**Next:** Phase 37 - Run validation with Devstral
+
+## 37. Devstral Zero-Shot Evaluation
+
+**Status:** ⏳ Ready to Execute - Branch: `ollama`
+
+**Goal:** Run the validation suite with Devstral to measure zero-shot Code Mode performance and decide if fine-tuning is needed.
+
+**Prerequisites:**
+- ✅ Phase 35: Ollama backend infrastructure (completed)
+- ✅ Phase 36: Validation framework (completed)
+- ⏳ Ollama installed locally
+- ⏳ Devstral model pulled (~14GB download)
+
+**Execution Steps:**
+
+**Milestone 1: Environment Setup (5-10 minutes)**
+```bash
+# Install ollama (if not already)
+# Visit: https://ollama.ai/
+# Download for macOS/Linux/Windows
+
+# Verify installation
+ollama --version
+
+# Start ollama server (keep running)
+ollama serve
+```
+
+**Milestone 2: Model Download (5-10 minutes)**
+```bash
+# Pull Devstral model (~14GB, first time only)
+ollama pull devstral
+
+# Verify model is available
+ollama list
+```
+
+**Milestone 3: Run Validation (5 minutes)**
+```bash
+# Execute validation suite
+python scripts/validate_zero_shot_code_mode.py --model devstral
+
+# Save results for analysis
+python scripts/validate_zero_shot_code_mode.py --model devstral > devstral_validation_results.txt
+```
+
+**Milestone 4: Analyze Results (2 minutes)**
+
+Review output and categorize:
+
+**Scenario A: ≥70% Accuracy** (Excellent)
+- **Interpretation:** Devstral follows Code Mode stubs very well zero-shot
+- **Action:** Use Devstral as-is (no fine-tuning needed) ✨
+- **Next:** Deploy to production, monitor performance
+- **Benefit:** Skip fine-tuning infrastructure entirely
+
+**Scenario B: 50-69% Accuracy** (Good)
+- **Interpretation:** Devstral shows promise but needs guidance
+- **Action:** Add few-shot examples to system prompt
+- **Next:** Enhance `PUNIE_INSTRUCTIONS` with 2-3 Code Mode examples
+- **Benefit:** Simple prompt engineering, no training needed
+
+**Scenario C: <50% Accuracy** (Needs Work)
+- **Interpretation:** Devstral struggles with Code Mode format
+- **Action:** Choose between two paths:
+  1. **Fine-tune Devstral** (if GGUF training is available)
+  2. **Promote typed tools to native PydanticAI tools** (skip Code Mode)
+- **Next:** Phase 38 - Model selection decision
+
+**Expected Results:**
+
+Based on Devstral's characteristics (24B code model, similar architecture to CodeLlama):
+- **Most likely:** 60-75% accuracy (Scenario B)
+- **Optimistic:** 75-85% accuracy (Scenario A)
+- **Pessimistic:** 40-60% accuracy (Scenario C)
+
+**Comparison to Phase 27:**
+- Phase 27 (fine-tuned Qwen3): 100% accuracy (40/40)
+- Target for Devstral (zero-shot): ≥50% accuracy (10/20)
+- Threshold for "good enough": ≥70% accuracy (14/20)
+
+**Data Collection:**
+
+Record for future reference:
+```bash
+# Create results directory
+mkdir -p docs/validation-results
+
+# Run and save
+python scripts/validate_zero_shot_code_mode.py --model devstral \
+    > docs/validation-results/devstral-zero-shot-$(date +%Y%m%d).txt
+
+# Document findings
+# Add summary to docs/devstral-evaluation-summary.md
+```
+
+**Success Criteria:**
+- ⏳ Ollama server running successfully
+- ⏳ Devstral model pulled and available
+- ⏳ Validation script executes without errors
+- ⏳ Results documented with accuracy breakdown
+- ⏳ Decision path identified based on results
+
+**Risks & Mitigations:**
+
+| Risk | Likelihood | Mitigation |
+|------|-----------|-----------|
+| Devstral <50% accuracy | Medium | Have fallback plans ready (fine-tune or native tools) |
+| Model download too slow | Low | One-time cost, can do overnight |
+| Ollama port conflict | Low | Configure custom port via OLLAMA_HOST |
+| Out of memory | Low | Devstral 24B fits in 24GB unified memory (M1/M2 Macs) |
+
+**Next:** Phase 38 - Based on results, decide model selection path
+
+## 38. Model Selection Decision
+
+**Status:** 🔮 Pending Phase 37 Results
+
+**Goal:** Based on Devstral zero-shot validation results, choose the optimal path forward for Punie's inference backend.
+
+**Decision Tree:**
+
+### Path A: Devstral Zero-Shot (≥70% Accuracy)
+
+**Scenario:** Devstral follows Code Mode stubs excellently without fine-tuning.
+
+**Implementation:**
+1. Set default model to `ollama:devstral` in production
+2. Update `punie init` to recommend devstral
+3. Document system requirements (24GB RAM minimum)
+4. Monitor performance in production
+5. Keep Phase 27 model as fallback/comparison
+
+**Benefits:**
+- ✅ No fine-tuning infrastructure needed
+- ✅ Easy model updates (just `ollama pull`)
+- ✅ Cross-platform (not tied to Apple Silicon)
+- ✅ Community model (benefits from upstream improvements)
+
+**Trade-offs:**
+- ⚠️ Slightly lower accuracy than fine-tuned (70-85% vs 100%)
+- ⚠️ Larger memory footprint (24B vs fine-tuned 30B, but both ~20GB)
+
+**Next Steps:**
+- Deploy devstral as primary model
+- Phase 27 model remains for specialized tasks
+- Monitor accuracy metrics in production
+- Consider fine-tuning if specific failure patterns emerge
+
+### Path B: Few-Shot Enhanced (50-69% Accuracy)
+
+**Scenario:** Devstral shows promise but needs guidance.
+
+**Implementation:**
+1. Add 2-3 Code Mode examples to `PUNIE_INSTRUCTIONS`
+2. Examples show: single tool, multi-step, field access
+3. Keep examples concise (~50 tokens each)
+4. Re-run validation to measure improvement
+5. Iterate on example selection if needed
+
+**Example Enhancement:**
+```python
+PUNIE_INSTRUCTIONS = f"""\
+You are Punie, an AI coding assistant...
+
+Code Mode Examples:
+
+Example 1 - Single tool:
+User: "Check for type errors in src/"
+```python
+result = typecheck("src/")
+if not result.success:
+    for error in result.errors:
+        print(f"{{error.file}}:{{error.line}} - {{error.message}}")
+```
+
+Example 2 - Multi-step:
+User: "Run full quality check"
+```python
+ruff_result = ruff_check("src/")
+test_result = pytest_run("tests/")
+type_result = typecheck("src/")
+print(f"Ruff: {{ruff_result.violation_count}} violations")
+print(f"Tests: {{test_result.passed}}/{{test_result.failed}}")
+print(f"Types: {{type_result.error_count}} errors")
+```
+
+{{get_stub_instructions()}}
+"""
+```
+
+**Benefits:**
+- ✅ Simple prompt engineering (no training)
+- ✅ Fast iteration (change prompt, test, repeat)
+- ✅ Can add domain-specific examples
+- ✅ Model-agnostic (works with any backend)
+
+**Trade-offs:**
+- ⚠️ Adds ~150 tokens to every prompt
+- ⚠️ May not generalize to all edge cases
+
+**Next Steps:**
+- Create few-shot examples branch
+- Measure accuracy improvement
+- If ≥70% after few-shot, adopt Path A
+- If still <70%, consider Path C
+
+### Path C1: Fine-Tune Devstral (40-59% Accuracy + GGUF Training Available)
+
+**Scenario:** Devstral needs fine-tuning, and GGUF training is feasible.
+
+**Prerequisites:**
+- Research GGUF fine-tuning options (llama.cpp, unsloth, etc.)
+- Verify Devstral is available in trainable format
+- Estimate GPU requirements for 24B LoRA training
+
+**Implementation:**
+1. Convert Phase 27 training data to GGUF-compatible format
+2. Set up GGUF fine-tuning pipeline
+3. Train LoRA adapters on Code Mode examples
+4. Merge adapters → quantize to 5-bit
+5. Validate merged model (target: ≥85% accuracy)
+
+**Training Pipeline:**
+```bash
+# Convert data
+scripts/convert_to_gguf_format.py data/phase27_merged/ data/devstral_training/
+
+# Train with llama.cpp or unsloth
+# (specifics depend on chosen framework)
+
+# Merge & quantize
+# (similar to Phase 27 pipeline)
+
+# Validate
+python scripts/validate_zero_shot_code_mode.py --model devstral-finetuned
+```
+
+**Benefits:**
+- ✅ Retains Devstral's code-specific knowledge
+- ✅ Can achieve 85-95% accuracy (based on Phase 27 results)
+- ✅ One-time training cost
+
+**Trade-offs:**
+- ⚠️ Requires GGUF training setup (new infrastructure)
+- ⚠️ May need GPU access for training
+- ⚠️ Training time: several hours to days
+- ⚠️ Complexity: new format, new tools
+
+**Next Steps:**
+- Research GGUF fine-tuning frameworks
+- Estimate GPU costs and timeline
+- Compare to Path C2 (native tools)
+- Prototype training pipeline
+
+### Path C2: Native PydanticAI Tools (40-59% Accuracy + GGUF Training Not Feasible)
+
+**Scenario:** Code Mode doesn't work well, and fine-tuning is impractical.
+
+**Implementation:**
+1. Promote 14 typed tools to individual PydanticAI tools
+2. Each tool becomes an async function (no sandbox needed)
+3. Model calls tools directly (no Code Mode)
+4. Lose multi-step capability (one tool per turn)
+5. Compensate with better tool descriptions
+
+**Architecture Change:**
+```python
+# Before (Code Mode):
+@agent.tool
+async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
+    # Sandbox executes Python that calls external functions
+    return monty_runner.run(code)
+
+# After (Native Tools):
+@agent.tool
+async def typecheck(ctx: RunContext[ACPDeps], path: str) -> TypeCheckResult:
+    # Direct LSP call, returns Pydantic model
+    return await ctx.deps.client_conn.typecheck(path)
+
+@agent.tool
+async def ruff_check(ctx: RunContext[ACPDeps], path: str) -> RuffResult:
+    return await ctx.deps.client_conn.ruff_check(path)
+
+# ... 12 more tools
+```
+
+**Benefits:**
+- ✅ Works with any model (no Code Mode dependency)
+- ✅ Simpler architecture (no sandbox)
+- ✅ Direct tool calling (standard PydanticAI pattern)
+- ✅ Better error handling (per-tool validation)
+
+**Trade-offs:**
+- ⚠️ Lose multi-step capability (one tool per turn)
+- ⚠️ Lose programmatic flexibility (no loops, conditionals)
+- ⚠️ Higher token cost (more round-trips)
+- ⚠️ Agent must orchestrate multi-step manually
+
+**Migration Path:**
+1. Keep `execute_code` as fallback
+2. Add 14 native tools alongside
+3. Model chooses between Code Mode and native
+4. Monitor which approach works better
+5. Eventually deprecate Code Mode if native tools suffice
+
+**Next Steps:**
+- Prototype native tools for 3 typed tools (typecheck, ruff, pytest)
+- Measure accuracy with native tools only
+- Compare round-trip count and token usage
+- Decide: hybrid approach or full migration
+
+### Path D: Stick with Phase 27 Model (Any Accuracy + Devstral Not Viable)
+
+**Scenario:** Devstral validation reveals issues, and alternatives aren't practical.
+
+**Implementation:**
+1. Continue using `fused_model_qwen3_phase27_5bit/`
+2. Keep Ollama infrastructure for experimentation
+3. Monitor for better models (Qwen3.5, CodeLlama 3, etc.)
+4. Revisit when new candidates emerge
+
+**Benefits:**
+- ✅ Known quality (100% accuracy)
+- ✅ Proven in production
+- ✅ No migration risk
+- ✅ Can experiment with ollama separately
+
+**Trade-offs:**
+- ⚠️ Tied to Apple Silicon (MLX)
+- ⚠️ Fine-tuning required for updates
+- ⚠️ Model size (30B) larger than ideal
+
+**Next Steps:**
+- Document Devstral findings for future reference
+- Keep ollama branch for experimentation
+- Monitor model releases for better candidates
+- Phase 27 remains production standard
+
+## Decision Matrix
+
+| Path | Accuracy Range | Infrastructure | Time to Deploy | Maintenance | Flexibility |
+|------|---------------|----------------|----------------|-------------|-------------|
+| A: Devstral Zero-Shot | 70-85% | ✅ Simple (ollama) | ✅ Immediate | ✅ Easy updates | ✅ Cross-platform |
+| B: Few-Shot Enhanced | 60-75% | ✅ Simple (prompt) | ✅ Hours | ✅ No training | ✅ Model-agnostic |
+| C1: Fine-Tune Devstral | 85-95% | ⚠️ GGUF training | ⚠️ Days to weeks | ⚠️ Retrain for updates | ⚠️ GPU needed |
+| C2: Native Tools | 70-85% | ✅ Simple (no sandbox) | ⚠️ Weeks (14 tools) | ✅ No fine-tuning | ⚠️ No multi-step |
+| D: Keep Phase 27 | 95-100% | ⚠️ MLX only | ✅ No change | ⚠️ Fine-tune updates | ❌ Apple Silicon only |
+
+## Success Criteria
+
+- ⏳ Decision made within 24 hours of Phase 37 completion
+- ⏳ Path chosen based on measured accuracy (not assumptions)
+- ⏳ Trade-offs understood and documented
+- ⏳ Migration plan ready (if path requires changes)
+- ⏳ Fallback identified (if chosen path fails)
+
+**Next:** Execute chosen path based on Phase 37 results
+
 ---

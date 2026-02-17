@@ -8,6 +8,33 @@ from dataclasses import dataclass
 
 from punie.agent.stubs import get_stub_instructions
 
+
+def default_stop_sequences(model: str) -> tuple[str, ...] | None:
+    """Get model-specific stop sequences.
+
+    Args:
+        model: Model name (e.g., "local", "ollama:devstral", "qwen3:30b-a3b")
+
+    Returns:
+        Stop sequences for the model, or None to let server decide
+
+    Examples:
+        >>> default_stop_sequences("local")  # Qwen model
+        ('<|im_end|>', '<|endoftext|>')
+
+        >>> default_stop_sequences("ollama:devstral")  # Ollama handles it
+        None
+
+        >>> default_stop_sequences("qwen3:30b-a3b")
+        ('<|im_end|>', '<|endoftext|>')
+    """
+    # Qwen models (local and mlx_lm.server) need explicit stop sequences
+    if "qwen" in model.lower() or model == "local":
+        return ("<|im_end|>", "<|endoftext|>")
+
+    # Ollama and other backends handle stop sequences internally
+    return None
+
 PUNIE_INSTRUCTIONS = f"""\
 You are Punie, an AI coding assistant that works inside PyCharm.
 

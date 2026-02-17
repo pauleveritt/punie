@@ -231,6 +231,15 @@ def create_pydantic_agent(
         model = _create_local_model("")
     elif isinstance(model, str) and model.startswith("local:"):
         model = _create_local_model(model.split(":", 1)[1])
+    elif isinstance(model, str) and model.startswith("ollama:"):
+        model_name = model.split(":", 1)[1]
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        logger.info("Creating ollama model: %s", model_name)
+        # Ollama uses OpenAI-compatible API at http://localhost:11434/v1
+        provider = OpenAIProvider(base_url="http://localhost:11434/v1", api_key="ollama")
+        model = OpenAIChatModel(model_name, provider=provider)
 
     # Build model settings dict with standard parameters
     model_settings_dict = {

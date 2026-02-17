@@ -347,8 +347,8 @@ Constraints:
 Example multi-step query:
 User: "Find all Python files and count imports"
 
-Response:
-<tool_call><function=execute_code><parameter=code>
+Use the execute_code tool with this code:
+```python
 # Find all Python files
 files_output = run_command("find", args=["-name", "*.py"])
 files = files_output.strip().split("\\n")
@@ -360,7 +360,7 @@ for file_path in files:
     total_imports += content.count("import ")
 
 print(f"Found {{total_imports}} imports across {{len(files)}} Python files")
-</parameter></function></tool_call>
+```
 """.format(
         stubs=generate_stubs()
     )

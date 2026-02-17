@@ -64,6 +64,7 @@ def test_resolve_model_default(monkeypatch):
 # === Pure function tests: setup_logging() ===
 
 
+@pytest.mark.thread_unsafe
 def test_setup_logging_creates_directory(tmp_path):
     """setup_logging() creates log directory if missing."""
     log_dir = tmp_path / "logs"
@@ -72,6 +73,7 @@ def test_setup_logging_creates_directory(tmp_path):
     assert (log_dir / "punie.log").exists()
 
 
+@pytest.mark.thread_unsafe
 def test_setup_logging_configures_file_handler(tmp_path):
     """Root logger gets RotatingFileHandler."""
     log_dir = tmp_path / "logs"
@@ -86,6 +88,7 @@ def test_setup_logging_configures_file_handler(tmp_path):
     assert str(log_dir / "punie.log") in str(file_handlers[0].baseFilename)
 
 
+@pytest.mark.thread_unsafe
 def test_setup_logging_no_stdout_handler(tmp_path):
     """No handler points to stdout (ACP owns stdout)."""
     log_dir = tmp_path / "logs"
@@ -100,6 +103,7 @@ def test_setup_logging_no_stdout_handler(tmp_path):
             assert handler.stream is not sys.stdout
 
 
+@pytest.mark.thread_unsafe
 def test_setup_logging_sets_level(tmp_path):
     """Root logger level matches config."""
     log_dir = tmp_path / "logs"
@@ -109,6 +113,7 @@ def test_setup_logging_sets_level(tmp_path):
     assert root.level == logging.DEBUG
 
 
+@pytest.mark.thread_unsafe
 def test_setup_logging_expands_user_path():
     """Tilde paths are expanded."""
     setup_logging(Path("~/.punie/logs"), "info")

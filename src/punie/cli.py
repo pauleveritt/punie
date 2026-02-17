@@ -392,7 +392,7 @@ def serve(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Model name (overrides PUNIE_MODEL env var)",
+        help="Model name (e.g., 'local', 'ollama:devstral', 'ollama:qwen3:30b-a3b'). Overrides PUNIE_MODEL env var.",
     ),
     name: str = typer.Option(
         "punie-agent",
@@ -414,6 +414,12 @@ def serve(
 
     Starts HTTP server with WebSocket endpoint at ws://host:port/ws.
     Multiple clients can connect simultaneously (PyCharm, punie ask, Toad, etc.).
+
+    Supported models:
+    - local: mlx_lm.server at http://localhost:1234/v1 (requires separate server)
+    - ollama:<model>: Ollama at http://localhost:11434/v1 (requires 'ollama serve' running)
+      Examples: ollama:devstral, ollama:qwen3:30b-a3b
+    - test: Enhanced test model (no actual LLM, useful for debugging)
 
     Clients must connect via:
     - punie (stdio bridge for PyCharm)

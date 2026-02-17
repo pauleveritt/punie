@@ -1,21 +1,22 @@
-"""Tests for typed tool Pydantic models."""
+"""Tests for typed tool parser functions.
+
+Tests parser functions that convert raw tool output to Pydantic models:
+- parse_ty_output (TypeCheckResult)
+- parse_ruff_output (RuffResult)
+- parse_pytest_output (TestResult)
+- parse_definition_response (GotoDefinitionResult)
+- parse_references_response (FindReferencesResult)
+- parse_hover_response (HoverResult)
+- parse_document_symbols_response (DocumentSymbolsResult)
+- parse_workspace_symbols_response (WorkspaceSymbolsResult)
+- parse_git_status_output (GitStatusResult)
+- parse_git_diff_output (GitDiffResult)
+- parse_git_log_output (GitLogResult)
+"""
 
 import json
 
-import pytest
-from pydantic import ValidationError
-
 from punie.agent.typed_tools import (
-    DefinitionLocation,
-    FindReferencesResult,
-    GotoDefinitionResult,
-    ReferenceLocation,
-    RuffResult,
-    RuffViolation,
-    TestCase,
-    TestResult,
-    TypeCheckError,
-    TypeCheckResult,
     parse_definition_response,
     parse_document_symbols_response,
     parse_git_diff_output,
@@ -30,144 +31,7 @@ from punie.agent.typed_tools import (
 )
 
 
-def test_typecheck_error_has_required_fields():
-    """TypeCheckError requires all fields."""
-    error = TypeCheckError(
-        file="test.py",
-        line=10,
-        column=5,
-        severity="error",
-        code="unresolved-reference",
-        message="Cannot resolve reference 'foo'",
-    )
-    assert error.file == "test.py"
-    assert error.line == 10
-    assert error.column == 5
-    assert error.severity == "error"
-    assert error.code == "unresolved-reference"
-    assert error.message == "Cannot resolve reference 'foo'"
-
-
-def test_typecheck_error_validation_fails_without_required_fields():
-    """TypeCheckError validates required fields."""
-    with pytest.raises(ValidationError):
-        TypeCheckError(file="test.py")  # Missing other required fields
-
-
-def test_typecheck_result_success():
-    """TypeCheckResult for successful check (no errors)."""
-    result = TypeCheckResult(
-        success=True, error_count=0, warning_count=0, errors=[]
-    )
-    assert result.success is True
-    assert result.error_count == 0
-    assert result.warning_count == 0
-    assert len(result.errors) == 0
-
-
-def test_typecheck_result_with_errors():
-    """TypeCheckResult with errors."""
-    error1 = TypeCheckError(
-        file="test.py",
-        line=10,
-        column=5,
-        severity="error",
-        code="unresolved-reference",
-        message="Cannot resolve reference 'foo'",
-    )
-    error2 = TypeCheckError(
-        file="test.py",
-        line=15,
-        column=10,
-        severity="warning",
-        code="unused-variable",
-        message="Variable 'bar' is not used",
-    )
-    result = TypeCheckResult(
-        success=False, error_count=1, warning_count=1, errors=[error1, error2]
-    )
-    assert result.success is False
-    assert result.error_count == 1
-    assert result.warning_count == 1
-    assert len(result.errors) == 2
-    assert result.errors[0].severity == "error"
-    assert result.errors[1].severity == "warning"
-
-
-def test_typecheck_result_allows_empty_errors_list():
-    """TypeCheckResult allows empty errors list."""
-    result = TypeCheckResult(
-        success=True, error_count=0, warning_count=0, errors=[]
-    )
-    assert result.errors == []
-
-
-def test_typecheck_error_can_be_serialized():
-    """TypeCheckError can be serialized to dict."""
-    error = TypeCheckError(
-        file="test.py",
-        line=10,
-        column=5,
-        severity="error",
-        code="unresolved-reference",
-        message="Cannot resolve reference 'foo'",
-    )
-    data = error.model_dump()
-    assert data["file"] == "test.py"
-    assert data["line"] == 10
-    assert data["severity"] == "error"
-
-
-def test_typecheck_result_can_be_serialized():
-    """TypeCheckResult can be serialized to dict."""
-    result = TypeCheckResult(
-        success=False, error_count=1, warning_count=0, errors=[]
-    )
-    data = result.model_dump()
-    assert data["success"] is False
-    assert data["error_count"] == 1
-    assert "errors" in data
-
-
-def test_typecheck_error_from_dict():
-    """TypeCheckError can be created from dict (JSON parsing)."""
-    data = {
-        "file": "test.py",
-        "line": 10,
-        "column": 5,
-        "severity": "error",
-        "code": "unresolved-reference",
-        "message": "Cannot resolve reference 'foo'",
-    }
-    error = TypeCheckError(**data)
-    assert error.file == "test.py"
-    assert error.line == 10
-
-
-def test_typecheck_result_from_dict():
-    """TypeCheckResult can be created from dict (JSON parsing)."""
-    data = {
-        "success": False,
-        "error_count": 1,
-        "warning_count": 0,
-        "errors": [
-            {
-                "file": "test.py",
-                "line": 10,
-                "column": 5,
-                "severity": "error",
-                "code": "unresolved-reference",
-                "message": "Cannot resolve reference 'foo'",
-            }
-        ],
-    }
-    result = TypeCheckResult(**data)
-    assert result.success is False
-    assert len(result.errors) == 1
-    assert result.errors[0].file == "test.py"
-
-
-# Parser tests
+# TypeCheck parsers
 
 
 def test_parse_ty_output_empty():
@@ -255,71 +119,13 @@ def test_parse_ty_output_malformed_json():
     assert "failed to parse" in result.parse_error.lower()
 
 
-# Ruff model tests
+def test_parse_ty_output_success_has_no_parse_error():
+    """parse_ty_output sets parse_error to None on success."""
+    result = parse_ty_output("")
+    assert result.parse_error is None
 
 
-def test_ruff_violation_has_required_fields():
-    """RuffViolation requires all fields."""
-    violation = RuffViolation(
-        file="test.py",
-        line=10,
-        column=5,
-        code="E501",
-        message="Line too long",
-        fixable=True,
-    )
-    assert violation.file == "test.py"
-    assert violation.line == 10
-    assert violation.column == 5
-    assert violation.code == "E501"
-    assert violation.message == "Line too long"
-    assert violation.fixable is True
-
-
-def test_ruff_violation_validation_fails_without_required_fields():
-    """RuffViolation validates required fields."""
-    with pytest.raises(ValidationError):
-        RuffViolation(file="test.py")  # Missing other required fields
-
-
-def test_ruff_result_success():
-    """RuffResult for successful check (no violations)."""
-    result = RuffResult(
-        success=True, violation_count=0, fixable_count=0, violations=[]
-    )
-    assert result.success is True
-    assert result.violation_count == 0
-    assert result.fixable_count == 0
-    assert len(result.violations) == 0
-
-
-def test_ruff_result_with_violations():
-    """RuffResult with violations."""
-    violation1 = RuffViolation(
-        file="test.py",
-        line=10,
-        column=5,
-        code="E501",
-        message="Line too long",
-        fixable=False,
-    )
-    violation2 = RuffViolation(
-        file="test.py",
-        line=15,
-        column=1,
-        code="F401",
-        message="`os` imported but unused",
-        fixable=True,
-    )
-    result = RuffResult(
-        success=False, violation_count=2, fixable_count=1, violations=[violation1, violation2]
-    )
-    assert result.success is False
-    assert result.violation_count == 2
-    assert result.fixable_count == 1
-    assert len(result.violations) == 2
-    assert result.violations[0].fixable is False
-    assert result.violations[1].fixable is True
+# Ruff parsers
 
 
 def test_parse_ruff_output_empty():
@@ -364,67 +170,24 @@ Found 1 error."""
     assert len(result.violations) == 1
 
 
-# Pytest model tests
+def test_parse_ruff_output_warns_on_unparseable_output():
+    """parse_ruff_output sets parse_error when output looks like violations but none parsed."""
+    # Output that looks like it should contain violations (has colons and numbers)
+    # but doesn't match the expected pattern
+    output = "some_file.py:10:5 Something went wrong"
+    result = parse_ruff_output(output)
+    # This will trigger the parse_error warning
+    assert result.parse_error is not None
+    assert "format change" in result.parse_error.lower()
 
 
-def test_test_case_has_required_fields():
-    """TestCase requires all fields."""
-    test = TestCase(
-        name="tests/test_foo.py::test_bar",
-        outcome="passed",
-        duration=0.05,
-        message=None,
-    )
-    assert test.name == "tests/test_foo.py::test_bar"
-    assert test.outcome == "passed"
-    assert test.duration == 0.05
-    assert test.message is None
+def test_parse_ruff_output_no_error_on_valid_empty():
+    """parse_ruff_output doesn't set parse_error on legitimately empty output."""
+    result = parse_ruff_output("")
+    assert result.parse_error is None
 
 
-def test_test_case_with_failure_message():
-    """TestCase can have failure message."""
-    test = TestCase(
-        name="tests/test_foo.py::test_bar",
-        outcome="failed",
-        duration=0.05,
-        message="AssertionError: expected 2 but got 3",
-    )
-    assert test.outcome == "failed"
-    assert test.message == "AssertionError: expected 2 but got 3"
-
-
-def test_test_result_success():
-    """TestResult for successful run (all tests passed)."""
-    result = TestResult(
-        success=True,
-        passed=5,
-        failed=0,
-        errors=0,
-        skipped=0,
-        duration=0.25,
-        tests=[],
-    )
-    assert result.success is True
-    assert result.passed == 5
-    assert result.failed == 0
-    assert result.errors == 0
-
-
-def test_test_result_with_failures():
-    """TestResult with test failures."""
-    result = TestResult(
-        success=False,
-        passed=3,
-        failed=2,
-        errors=0,
-        skipped=1,
-        duration=0.30,
-        tests=[],
-    )
-    assert result.success is False
-    assert result.passed == 3
-    assert result.failed == 2
-    assert result.skipped == 1
+# Pytest parsers
 
 
 def test_parse_pytest_output_empty():
@@ -479,32 +242,6 @@ tests/test_foo.py::test_qux SKIPPED
     assert len(result.tests) == 3
 
 
-# Parser error field tests
-
-
-def test_parse_ty_output_success_has_no_parse_error():
-    """parse_ty_output sets parse_error to None on success."""
-    result = parse_ty_output("")
-    assert result.parse_error is None
-
-
-def test_parse_ruff_output_warns_on_unparseable_output():
-    """parse_ruff_output sets parse_error when output looks like violations but none parsed."""
-    # Output that looks like it should contain violations (has colons and numbers)
-    # but doesn't match the expected pattern
-    output = "some_file.py:10:5 Something went wrong"
-    result = parse_ruff_output(output)
-    # This will trigger the parse_error warning
-    assert result.parse_error is not None
-    assert "format change" in result.parse_error.lower()
-
-
-def test_parse_ruff_output_no_error_on_valid_empty():
-    """parse_ruff_output doesn't set parse_error on legitimately empty output."""
-    result = parse_ruff_output("")
-    assert result.parse_error is None
-
-
 def test_parse_pytest_output_warns_on_unparseable_output():
     """parse_pytest_output sets parse_error when output looks like pytest but can't be parsed."""
     # Output that mentions "test" but doesn't match expected format
@@ -520,60 +257,7 @@ def test_parse_pytest_output_no_error_on_valid_empty():
     assert result.parse_error is None
 
 
-# LSP Navigation tests
-
-
-def test_definition_location_has_required_fields():
-    """DefinitionLocation requires all fields."""
-    location = DefinitionLocation(
-        file="/path/to/file.py",
-        line=10,
-        column=5,
-        end_line=10,
-        end_column=15,
-        preview="def foo():",
-    )
-    assert location.file == "/path/to/file.py"
-    assert location.line == 10
-    assert location.column == 5
-    assert location.end_line == 10
-    assert location.end_column == 15
-    assert location.preview == "def foo():"
-
-
-def test_goto_definition_result_success():
-    """GotoDefinitionResult for successful lookup."""
-    result = GotoDefinitionResult(
-        success=True,
-        symbol="UserService",
-        locations=[
-            DefinitionLocation(
-                file="/src/services.py",
-                line=20,
-                column=7,
-                end_line=20,
-                end_column=18,
-            )
-        ],
-    )
-    assert result.success is True
-    assert result.symbol == "UserService"
-    assert len(result.locations) == 1
-    assert result.locations[0].line == 20
-    assert result.parse_error is None
-
-
-def test_goto_definition_result_not_found():
-    """GotoDefinitionResult when symbol not found."""
-    result = GotoDefinitionResult(
-        success=False,
-        symbol="MissingClass",
-        locations=[],
-    )
-    assert result.success is False
-    assert result.symbol == "MissingClass"
-    assert len(result.locations) == 0
-    assert result.parse_error is None
+# LSP Navigation parsers - Goto Definition
 
 
 def test_parse_definition_response_single_location():
@@ -675,53 +359,7 @@ def test_parse_definition_response_malformed():
     assert "Unexpected result type" in result.parse_error
 
 
-def test_reference_location_has_required_fields():
-    """ReferenceLocation requires all fields."""
-    location = ReferenceLocation(
-        file="/path/to/file.py",
-        line=10,
-        column=5,
-        preview="user_service.process()",
-    )
-    assert location.file == "/path/to/file.py"
-    assert location.line == 10
-    assert location.column == 5
-    assert location.preview == "user_service.process()"
-
-
-def test_find_references_result_success():
-    """FindReferencesResult for successful lookup."""
-    result = FindReferencesResult(
-        success=True,
-        symbol="process_order",
-        reference_count=3,
-        references=[
-            ReferenceLocation(file="/src/app.py", line=15, column=10),
-            ReferenceLocation(file="/src/api.py", line=42, column=8),
-            ReferenceLocation(file="/tests/test_app.py", line=100, column=12),
-        ],
-    )
-    assert result.success is True
-    assert result.symbol == "process_order"
-    assert result.reference_count == 3
-    assert len(result.references) == 3
-    assert result.references[0].file == "/src/app.py"
-    assert result.parse_error is None
-
-
-def test_find_references_result_not_found():
-    """FindReferencesResult when no references found."""
-    result = FindReferencesResult(
-        success=False,
-        symbol="unused_function",
-        reference_count=0,
-        references=[],
-    )
-    assert result.success is False
-    assert result.symbol == "unused_function"
-    assert result.reference_count == 0
-    assert len(result.references) == 0
-    assert result.parse_error is None
+# LSP Navigation parsers - Find References
 
 
 def test_parse_references_response_success():
@@ -801,7 +439,7 @@ def test_parse_references_response_malformed():
     assert "Unexpected result type" in result.parse_error
 
 
-# Hover parser tests (NEW - Phase 27)
+# LSP Navigation parsers - Hover
 
 
 def test_parse_hover_response_markup_content():
@@ -922,7 +560,7 @@ def test_parse_hover_response_empty_content():
     assert result.parse_error is None
 
 
-# Document Symbols parser tests (NEW - Phase 27)
+# LSP Navigation parsers - Document Symbols
 
 
 def test_parse_document_symbols_response_hierarchical():
@@ -1046,7 +684,7 @@ def test_parse_document_symbols_response_empty_array():
     assert result.parse_error is None
 
 
-# Workspace Symbols parser tests (NEW - Phase 27)
+# LSP Navigation parsers - Workspace Symbols
 
 
 def test_parse_workspace_symbols_response_success():
@@ -1123,7 +761,7 @@ def test_parse_workspace_symbols_response_empty():
     assert result.parse_error is None
 
 
-# Git Status parser tests (NEW - Phase 27)
+# Git parsers - Git Status
 
 
 def test_parse_git_status_output_clean():
@@ -1180,7 +818,7 @@ R  old.py -> renamed.py"""
     assert result.parse_error is None
 
 
-# Git Diff parser tests (NEW - Phase 27)
+# Git parsers - Git Diff
 
 
 def test_parse_git_diff_output_empty():
@@ -1255,7 +893,7 @@ index 111222..333444 100644
     assert result.parse_error is None
 
 
-# Git Log parser tests (NEW - Phase 27)
+# Git parsers - Git Log
 
 
 def test_parse_git_log_output_empty():
