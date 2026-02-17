@@ -11,7 +11,10 @@ The adapter supports dynamic tool discovery via a three-tier fallback:
 3. Default (all 7 static tools)
 """
 
+import asyncio
 import logging
+import secrets
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -126,6 +129,24 @@ class PunieAgent:
             str, str
         ] = {}  # Store errors to send during first prompt
 
+        # Multi-client support (Phase 28)
+        self._connections: dict[str, Client] = {}  # client_id → client connection
+        self._session_owners: dict[str, str] = {}  # session_id → client_id
+        self._next_client_id = 0  # For unique client IDs
+
+        # Reconnection support (Phase 28.1)
+        self._disconnected_clients: dict[str, float] = {}  # client_id → disconnect_time
+        self._session_tokens: dict[str, str] = {}  # session_id → resume_token
+        self._grace_period = 300  # 5 minutes to reconnect
+        self._resuming_sessions: set[str] = set()  # Issue #9: Prevent cleanup during resume
+
+        # Issue #7: Add locks to protect shared state
+        self._state_lock = asyncio.Lock()  # Protects all dictionaries
+
+        # Cleanup task (started lazily when event loop is running)
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._cleanup_started = False
+
         # Performance reporting via PUNIE_PERF env var
         # TODO: Re-enable after fixing collector lifecycle issues
         # Temporarily disabled due to infinite loop when reusing collectors across prompts
@@ -138,6 +159,71 @@ class PunieAgent:
 
         logger.info("=== PunieAgent.__init__() complete ===")
 
+    async def shutdown(self) -> None:
+        """Shutdown agent and cleanup tasks."""
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("Agent shutdown complete")
+
+    async def _cleanup_expired_sessions(self) -> None:
+        """Background task to clean up expired disconnected sessions."""
+        while True:
+            try:
+                await asyncio.sleep(60)  # Check every minute
+                current_time = time.time()
+
+                async with self._state_lock:
+                    # Find expired disconnected clients
+                    expired = [
+                        client_id
+                        for client_id, disconnect_time in self._disconnected_clients.items()
+                        if current_time - disconnect_time > self._grace_period
+                    ]
+
+                    # Clean up expired sessions
+                    for client_id in expired:
+                        logger.info(f"Cleaning up expired client {client_id}")
+
+                        # Find sessions owned by this client (Issue #9: skip sessions being resumed)
+                        sessions_to_remove = [
+                            sid for sid, owner in self._session_owners.items()
+                            if owner == client_id and sid not in self._resuming_sessions
+                        ]
+
+                        for session_id in sessions_to_remove:
+                            self._sessions.pop(session_id, None)
+                            self._greeted_sessions.discard(session_id)
+                            self._pending_errors.pop(session_id, None)
+                            self._perf_collectors.pop(session_id, None)
+                            self._session_tokens.pop(session_id, None)
+                            del self._session_owners[session_id]
+
+                        # Only remove client if all sessions were cleaned up
+                        # (if some sessions are being resumed, keep client in grace period)
+                        remaining_sessions = [
+                            sid for sid, owner in self._session_owners.items()
+                            if owner == client_id
+                        ]
+                        if not remaining_sessions:
+                            del self._disconnected_clients[client_id]
+                            logger.info(
+                                f"Expired cleanup: {client_id}, removed {len(sessions_to_remove)} sessions"
+                            )
+                        else:
+                            logger.info(
+                                f"Client {client_id} still has {len(remaining_sessions)} sessions being resumed, keeping in grace period"
+                            )
+
+            except asyncio.CancelledError:
+                logger.info("Cleanup task cancelled")
+                break
+            except Exception as exc:
+                logger.exception(f"Error in cleanup task: {exc}")
+
     def on_connect(self, conn: Client) -> None:
         """Called when client connects."""
         logger.info("=== on_connect() called ===")
@@ -145,6 +231,84 @@ class PunieAgent:
         logger.info(f"Connection object: {conn}")
         self._conn = conn
         logger.info("=== on_connect() complete ===")
+
+    async def register_client(self, client_conn: Client) -> str:
+        """Register a new client connection.
+
+        Args:
+            client_conn: Client connection instance (e.g., WebSocket wrapper).
+
+        Returns:
+            Unique client ID for this connection.
+        """
+        # Start cleanup task on first client registration (lazy initialization)
+        if not self._cleanup_started and not self._legacy_agent:
+            self._cleanup_task = asyncio.create_task(self._cleanup_expired_sessions())
+            self._cleanup_started = True
+            logger.info("Started session cleanup task")
+
+        # Issue #6: Atomic registration to prevent race condition
+        async with self._state_lock:
+            client_id = f"client-{self._next_client_id}"
+            self._next_client_id += 1
+            self._connections[client_id] = client_conn
+            logger.info(f"Registered client {client_id}")
+            return client_id
+
+    async def unregister_client(self, client_id: str, allow_reconnect: bool = True) -> None:
+        """Unregister a client and optionally preserve sessions for reconnection.
+
+        Args:
+            client_id: Client ID to unregister.
+            allow_reconnect: If True, preserve sessions for grace period (default: True).
+        """
+        # Issue #7: Protect with lock
+        async with self._state_lock:
+            if client_id not in self._connections:
+                logger.warning(f"Attempted to unregister unknown client {client_id}")
+                return
+
+            # Remove client connection
+            del self._connections[client_id]
+
+            if allow_reconnect:
+                # Mark as disconnected but keep sessions alive
+                self._disconnected_clients[client_id] = time.time()
+                logger.info(
+                    f"Client {client_id} disconnected, sessions preserved for {self._grace_period}s"
+                )
+            else:
+                # Immediate cleanup (no reconnection allowed)
+                sessions_to_remove = [
+                    sid for sid, owner in self._session_owners.items() if owner == client_id
+                ]
+                for session_id in sessions_to_remove:
+                    logger.info(f"Cleaning up session {session_id} owned by {client_id}")
+                    # Issue #8: Remove sessions from _sessions dict (prevents stale reuse)
+                    self._sessions.pop(session_id, None)
+                    self._greeted_sessions.discard(session_id)
+                    self._pending_errors.pop(session_id, None)
+                    self._perf_collectors.pop(session_id, None)
+                    self._session_tokens.pop(session_id, None)
+                    del self._session_owners[session_id]
+
+                logger.info(
+                    f"Unregistered client {client_id}, cleaned up {len(sessions_to_remove)} sessions"
+                )
+
+    def get_client_connection(self, session_id: str) -> Client | None:
+        """Get the client connection that owns this session.
+
+        Args:
+            session_id: Session ID to look up.
+
+        Returns:
+            Client connection for the owning client, or None if not found.
+        """
+        client_id = self._session_owners.get(session_id)
+        if not client_id:
+            return None
+        return self._connections.get(client_id)
 
     async def _discover_and_build_toolset(self, session_id: str) -> SessionState:
         """Discover tools and build session state.
@@ -164,9 +328,14 @@ class PunieAgent:
                 f"=== _discover_and_build_toolset() for session {session_id} ==="
             )
             logger.info(f"Connection available: {self._conn is not None}")
+            logger.info(f"WebSocket clients: {len(self._connections)}")
             logger.info(f"Model: {self._model}")
 
-            if not self._conn:
+            # Check if we have any connection (stdio or WebSocket)
+            # For WebSocket, self._conn is None but we still want to create a toolset
+            has_any_connection = self._conn is not None or len(self._connections) > 0
+
+            if not has_any_connection:
                 # No connection: return Tier 3 default
                 logger.info("No connection, using Tier 3 default toolset")
                 toolset = create_toolset()
@@ -358,31 +527,77 @@ class PunieAgent:
         self,
         cwd: str,
         mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio],
+        client_id: str | None = None,
         **kwargs: Any,
     ) -> NewSessionResponse:
         """Create a new session and register tools.
 
         Discovers tools once and caches the result for the session lifetime.
         Skips registration if legacy agent mode is active or no connection.
+
+        Args:
+            cwd: Current working directory for the session.
+            mcp_servers: List of MCP server configurations.
+            client_id: Optional client ID for multi-client tracking (Phase 28).
+            **kwargs: Additional parameters.
+
+        Returns:
+            NewSessionResponse with session_id.
         """
         try:
             logger.info("=== new_session() called ===")
             logger.info(f"Current working directory: {cwd}")
             logger.info(f"MCP servers count: {len(mcp_servers)}")
+            logger.info(f"Client ID: {client_id}")
             logger.info(f"Legacy agent mode: {self._legacy_agent is not None}")
             logger.info(f"Connection established: {self._conn is not None}")
 
-            session_id = f"punie-session-{self._next_session_id}"
-            self._next_session_id += 1
-            logger.info(f"Generated session_id: {session_id}")
+            # Issue #2: Require client_id for WebSocket sessions (prevent unowned sessions)
+            # Exception: Allow legacy agent mode for backward compatibility
+            if self._conn is None and client_id is None and not self._legacy_agent:
+                raise RuntimeError(
+                    "client_id is required when no stdio connection is established"
+                )
+
+            # Issue #9: Validate client_id exists
+            if client_id is not None:
+                async with self._state_lock:
+                    if client_id not in self._connections:
+                        raise RuntimeError(
+                            f"Invalid client_id: {client_id} is not registered"
+                        )
+
+            # Issue #7: Protect session creation
+            resume_token = None
+            async with self._state_lock:
+                session_id = f"punie-session-{self._next_session_id}"
+                self._next_session_id += 1
+                logger.info(f"Generated session_id: {session_id}")
+
+                # Track session ownership for multi-client routing (Phase 28)
+                if client_id:
+                    self._session_owners[session_id] = client_id
+                    # Generate resume token for session recovery
+                    resume_token = secrets.token_urlsafe(32)
+                    self._session_tokens[session_id] = resume_token
+                    logger.info(f"Session {session_id} owned by client {client_id}")
+
+                # If client was disconnected, remove from disconnected list (reconnected)
+                if client_id and client_id in self._disconnected_clients:
+                    del self._disconnected_clients[client_id]
+                    logger.info(f"Client {client_id} reconnected before grace period expired")
 
             # Greeting is now sent during first prompt() call to avoid protocol issues
 
             # Register tools if not in legacy mode and connection exists
-            if not self._legacy_agent and self._conn:
+            # Note: For WebSocket clients, client_id is set but self._conn may be None
+            has_connection = self._conn is not None or client_id is not None
+            if not self._legacy_agent and has_connection:
                 logger.info("Starting tool registration...")
                 state = await self._discover_and_build_toolset(session_id)
-                self._sessions[session_id] = state
+                # Issue #7: Protect state write
+                async with self._state_lock:
+                    self._sessions[session_id] = state
                 tool_names = _get_agent_tool_names(state.agent)
                 tool_count = len(tool_names)
                 logger.info(
@@ -392,7 +607,15 @@ class PunieAgent:
             else:
                 logger.info("Skipping tool registration (legacy mode or no connection)")
 
-            response = NewSessionResponse(session_id=session_id)
+            # Include resume token in response metadata for reconnection support
+            field_meta = None
+            if resume_token:
+                field_meta = {"resume_token": resume_token}
+
+            response = NewSessionResponse(
+                session_id=session_id,
+                field_meta=field_meta
+            )
             logger.info(f"new_session() successful, returning: {response}")
             logger.info("=== new_session() complete ===")
             return response
@@ -446,9 +669,78 @@ class PunieAgent:
         cwd: str,
         session_id: str,
         mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
+        client_id: str | None = None,
+        resume_token: str | None = None,
         **kwargs: Any,
     ) -> ResumeSessionResponse:
-        """Resume an existing session."""
+        """Resume an existing session after reconnection.
+
+        Args:
+            cwd: Current working directory.
+            session_id: Session ID to resume.
+            mcp_servers: MCP server configurations (optional).
+            client_id: New client ID for reconnected client.
+            resume_token: Authentication token from original session.
+            **kwargs: Additional parameters.
+
+        Returns:
+            ResumeSessionResponse.
+
+        Raises:
+            RuntimeError: If session not found, token invalid, or session expired.
+        """
+        logger.info(f"=== resume_session() called for {session_id} ===")
+
+        async with self._state_lock:
+            # Validate session exists
+            if session_id not in self._sessions:
+                raise RuntimeError(f"Session {session_id} not found or expired")
+
+            # Validate resume token
+            expected_token = self._session_tokens.get(session_id)
+            if not expected_token or expected_token != resume_token:
+                raise RuntimeError("Invalid resume token")
+
+            # Get original owner
+            original_owner = self._session_owners.get(session_id)
+            if not original_owner:
+                raise RuntimeError("Session has no owner (cannot resume)")
+
+            # Check if original owner is in grace period
+            if original_owner not in self._disconnected_clients:
+                raise RuntimeError(
+                    f"Session owner {original_owner} is not disconnected (already connected?)"
+                )
+
+            # Issue #9: Mark as being resumed to prevent cleanup race
+            self._resuming_sessions.add(session_id)
+
+            try:
+                # Transfer ownership to new client_id
+                if client_id:
+                    logger.info(f"Transferring session {session_id} from {original_owner} to {client_id}")
+                    self._session_owners[session_id] = client_id
+
+                    # Remove old client from disconnected list
+                    del self._disconnected_clients[original_owner]
+
+                    # Clean up old client's other sessions (if any)
+                    old_sessions = [
+                        sid for sid, owner in self._session_owners.items()
+                        if owner == original_owner and sid != session_id
+                    ]
+                    for sid in old_sessions:
+                        self._sessions.pop(sid, None)
+                        self._greeted_sessions.discard(sid)
+                        self._pending_errors.pop(sid, None)
+                        self._perf_collectors.pop(sid, None)
+                        self._session_tokens.pop(sid, None)
+                        del self._session_owners[sid]
+            finally:
+                # Always remove from resuming set
+                self._resuming_sessions.discard(session_id)
+
+        logger.info(f"Successfully resumed session {session_id}")
         return ResumeSessionResponse()
 
     async def authenticate(self, method_id: str, **kwargs: Any) -> AuthenticateResponse:
@@ -465,6 +757,7 @@ class PunieAgent:
             | EmbeddedResourceContentBlock
         ],
         session_id: str,
+        calling_client_id: str | None = None,
         **kwargs: Any,
     ) -> PromptResponse:
         """Process a prompt and return response.
@@ -477,6 +770,18 @@ class PunieAgent:
         1. Call discover_tools() if available (IDE advertises tools)
         2. Use client_capabilities if no discovery (capability flags)
         3. Use all 7 static tools if no capabilities (backward compat)
+
+        Args:
+            prompt: List of content blocks containing the user's prompt.
+            session_id: Session ID for this prompt.
+            calling_client_id: ID of the client making this request (for multi-client security).
+            **kwargs: Additional parameters.
+
+        Returns:
+            PromptResponse with stop_reason.
+
+        Raises:
+            RuntimeError: If session access is denied or no connection exists.
         """
         from punie.acp.helpers import (
             text_block,
@@ -486,24 +791,49 @@ class PunieAgent:
 
         logger.info(f"=== prompt() called for session {session_id} ===")
 
-        # Extract text from prompt blocks
+        # Extract text from prompt blocks (handle both dict and Pydantic model formats)
         prompt_text = ""
         for block in prompt:
             if isinstance(block, TextContentBlock):
                 prompt_text += block.text
+            elif isinstance(block, dict) and block.get("type") == "text":
+                prompt_text += block.get("text", "")
 
         logger.info(
             f"Extracted prompt text ({len(prompt_text)} chars): {prompt_text[:200]}..."
         )
 
+        # Issue #1: Validate session ownership (prevent cross-client access)
+        async with self._state_lock:
+            session_owner = self._session_owners.get(session_id)
+
+        # If session has an owner, validate caller owns it
+        if session_owner is not None:
+            if calling_client_id is None:
+                # stdio connection doesn't provide calling_client_id
+                # Only allow if session is not owned by a WebSocket client
+                if session_owner.startswith("client-"):
+                    raise RuntimeError(
+                        f"Session {session_id} is owned by {session_owner}, "
+                        "cannot access from stdio connection"
+                    )
+            elif calling_client_id != session_owner:
+                # Cross-client access attempt - SECURITY VIOLATION
+                raise RuntimeError(
+                    f"Access denied: Session {session_id} is owned by {session_owner}, "
+                    f"cannot access from {calling_client_id}"
+                )
+
         # Send any pending errors and greeting for first prompt in session
-        if session_id not in self._greeted_sessions and self._conn:
+        # Issue #13: Support WebSocket greetings
+        conn = self.get_client_connection(session_id) or self._conn
+        if session_id not in self._greeted_sessions and conn:
             # Send pending errors first (e.g., local server not available)
             if session_id in self._pending_errors:
                 error_msg = self._pending_errors[session_id]
                 logger.info("Sending pending error message to client")
                 try:
-                    await self._conn.session_update(
+                    await conn.session_update(
                         session_id, update_agent_message(text_block(error_msg))
                     )
                     logger.info("Pending error sent successfully")
@@ -520,16 +850,13 @@ class PunieAgent:
                     "Ready to assist with your coding tasks!\n\n"
                     "---\n\n"
                 )
-                await self._conn.session_update(
+                await conn.session_update(
                     session_id, update_agent_message_text(greeting)
                 )
                 self._greeted_sessions.add(session_id)
                 logger.info("Greeting sent successfully")
             except Exception as greeting_exc:
                 logger.warning(f"Failed to send greeting: {greeting_exc}")
-
-        # Construct dependencies for Pydantic AI
-        conn = self._conn
         if not conn:
             logger.error("No client connection established")
             raise RuntimeError("No client connection established")
@@ -547,20 +874,33 @@ class PunieAgent:
             # Legacy mode: use pre-constructed agent
             logger.info("Using legacy agent mode")
             pydantic_agent = self._legacy_agent  # ty: ignore[invalid-assignment]
-        elif session_id in self._sessions:
-            # Use cached session state (registered in new_session)
-            state = self._sessions[session_id]
-            logger.info(f"Using cached session state (Tier {state.discovery_tier})")
-            pydantic_agent = state.agent
         else:
-            # Lazy fallback for callers that skip new_session()
-            logger.info("No cached session, performing lazy registration")
-            state = await self._discover_and_build_toolset(session_id)
-            self._sessions[session_id] = state
-            pydantic_agent = state.agent
-            logger.info(
-                f"Lazy registration for session {session_id}: Tier {state.discovery_tier}"
-            )
+            # Issue #7: Protect session read with lock
+            async with self._state_lock:
+                session_exists = session_id in self._sessions
+
+            if session_exists:
+                # Use cached session state (registered in new_session)
+                async with self._state_lock:
+                    state = self._sessions[session_id]
+                logger.info(f"Using cached session state (Tier {state.discovery_tier})")
+                pydantic_agent = state.agent
+            else:
+                # Issue #11: Lazy fallback with lock to prevent race condition
+                logger.info("No cached session, performing lazy registration")
+                async with self._state_lock:
+                    # Double-check after acquiring lock (another request may have created it)
+                    if session_id in self._sessions:
+                        state = self._sessions[session_id]
+                        logger.info("Session created by concurrent request, using it")
+                    else:
+                        # Actually create the session
+                        state = await self._discover_and_build_toolset(session_id)
+                        self._sessions[session_id] = state
+                        logger.info(
+                            f"Lazy registration for session {session_id}: Tier {state.discovery_tier}"
+                        )
+                pydantic_agent = state.agent
 
         # Log model and tool information
         logger.info(f"Agent model: {pydantic_agent.model}")
