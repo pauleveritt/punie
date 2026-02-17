@@ -51,6 +51,46 @@ uv run punie ask "What is dependency injection?"
 
 ## Client Examples
 
+### Toad Frontend Client
+
+For browser-based Toad frontend integration:
+
+```python
+from punie.client import run_toad_client, send_prompt_stream, create_toad_session
+
+# Simple streaming example
+async def on_chunk(update_type, content):
+    if update_type == "agent_message_chunk":
+        text = content.get("content", {}).get("text", "")
+        print(text, end="", flush=True)
+
+websocket, session_id = await create_toad_session(
+    server_url="ws://localhost:8000/ws",
+    cwd="/workspace"
+)
+result = await send_prompt_stream(ws, sid, "Your question", on_chunk)
+await websocket.close()
+
+# Persistent connection example
+async def on_update(update):
+    update_type = update.get("sessionUpdate")
+    print(f"Update: {update_type}")
+
+await run_toad_client(
+    "ws://localhost:8000/ws",
+    "/workspace",
+    on_update
+)
+```
+
+**Features:**
+- Streaming responses via callbacks
+- Tool execution visibility
+- Session management (create, reconnect, cleanup)
+- Browser-compatible API
+
+See [Toad Client Guide](toad-client-guide.md) for complete documentation.
+
 ### Python Client (WebSocket)
 
 ```python

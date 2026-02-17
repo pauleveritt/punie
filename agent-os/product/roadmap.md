@@ -1853,16 +1853,34 @@ subinterpreters.
 
 ## 29. Toad Frontend (ACP Over WebSocket)
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-02-16)
 
-**Goal:** Update Toad to connect to Punie over WebSocket, following the punie-server sketch.
+**Goal:** Build WebSocket client infrastructure in Punie repo to enable browser-based Toad frontend integration.
 
-**Focus Areas:**
+**Achieved:**
 
-- Implement WebSocketAgent in Toad (`~/PycharmProjects/toad`)
-- Add transport fields (ws_url, headers/auth, client_id) and selection logic
-- Reuse ACP request/response flow while swapping transport
-- Validate Toad connects to `punie server` and runs a full prompt lifecycle
+- ✅ Created 4 core functions for Toad integration (345 lines):
+  - `create_toad_session()` - Session creation with ACP handshake
+  - `send_prompt_stream()` - Streaming prompt execution via callbacks
+  - `handle_tool_update()` - Tool execution update parsing
+  - `run_toad_client()` - Persistent connection event loop
+- ✅ Comprehensive test suite (457 lines, 11 tests, all passing in 0.17s)
+- ✅ Complete API documentation (573 lines with browser integration examples)
+- ✅ Full spec documentation in `agent-os/specs/2026-02-16-2100-toad-frontend-websocket/`
+- ✅ Browser-compatible callback API (works with React, Vue, etc.)
+- ✅ All 620 tests passing (609 from Phase 28 + 11 new)
+- ✅ Type checking passed (ty), linting passed (ruff)
+- ✅ Diary entry: `docs/diary/2026-02-16-phase29-toad-websocket-client.md`
+
+**Architecture:** Punie provides WebSocket client utilities that Toad browser UI will consume. Clean separation: Punie owns protocol, Toad owns UI.
+
+**Key Features:**
+- Streaming support with 5-minute timeout for long operations
+- Tool execution visibility (ToolCallStart + ToolCallProgress)
+- Graceful error handling (timeout, disconnect, malformed JSON)
+- Session lifecycle management (create, reconnect, cleanup)
+
+**Next:** Toad UI implements WebSocket client using patterns from `docs/toad-client-guide.md`
 
 ## 30. Thin ACP Router
 

@@ -2,6 +2,9 @@
 
 Reverse-chronological notes from ongoing work. Each entry is summarized and dated.
 
+## 2026-02-16 - [Phase 29: Toad WebSocket Client Implementation](2026-02-16-phase29-toad-websocket-client.md)
+Built WebSocket client infrastructure for Toad frontend integration. Added 4 core functions (create_toad_session, send_prompt_stream, handle_tool_update, run_toad_client) with streaming support and tool execution visibility. 345 lines implementation + 457 lines tests (11 tests, all passing) + 573 lines documentation. Browser-compatible callback API. 620 total tests passing. Ready for Toad UI integration!
+
 ## 2026-02-16 - [Gate 0 Failure: Devstral Small 2 Unsuitable for Punie](2026-02-16-devstral-gate0-failure.md)
 Evaluated Devstral Small 2 (24B) as Qwen3 replacement using gated approach. Gate 0 failed in 5 minutes: closing delimiter `[/TOOL_CALLS]` tokenizes as 7 pieces (not single token), would corrupt training data like Phase 25. Saved ~7 days of futile work. Decision: Continue using Qwen3-30B-A3B (Phase 27's 100% accurate model).
 
