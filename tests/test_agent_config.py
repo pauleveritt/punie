@@ -172,3 +172,94 @@ def test_resolve_mode_flag_priority(monkeypatch):
     """CLI flag should take priority over env var."""
     monkeypatch.setenv("PUNIE_MODE", "local")
     assert resolve_mode("acp") == "acp"
+
+
+@pytest.mark.skip(reason="ollama_model removed in current phase")
+def test_create_ollama_agent():
+    """create_pydantic_agent should create OllamaChatModel for ollama: prefix."""
+    from punie.agent.ollama_model import OllamaChatModel
+
+    agent = create_pydantic_agent(model="ollama:devstral")
+
+    # Verify agent was created with OllamaChatModel
+    assert agent is not None
+    assert isinstance(agent.model, OllamaChatModel)
+
+
+@pytest.mark.skip(reason="ollama_model removed in current phase")
+def test_ollama_agent_no_stop_sequences():
+    """Ollama models should not have stop_sequences in model_settings."""
+    agent = create_pydantic_agent(model="ollama:devstral")
+
+    # Verify no stop_sequences for Ollama (they use model-specific defaults)
+    assert agent is not None
+    assert agent.model_settings is not None
+    # stop_sequences should not be set for Ollama models
+    assert "stop_sequences" not in agent.model_settings or agent.model_settings.get("stop_sequences") is None
+
+
+@pytest.mark.skip(reason="ollama_model removed in current phase")
+def test_create_local_agent_with_ollama_has_no_stop_sequences():
+    """create_local_agent with ollama: should not set stop_sequences."""
+    agent, client = create_local_agent(model="ollama:devstral", workspace=Path.cwd())
+
+    # Verify no stop_sequences for Ollama in local mode
+    assert agent is not None
+    assert agent.model_settings is not None
+    # stop_sequences should not be set for Ollama models
+    assert "stop_sequences" not in agent.model_settings or agent.model_settings.get("stop_sequences") is None
+
+
+def test_create_direct_toolset_returns_correct_count():
+    """create_direct_toolset should return 26 tools (3 base + 11 Code Tools + 12 Phase 32)."""
+    from punie.agent.toolset import create_direct_toolset
+
+    toolset = create_direct_toolset()
+    assert toolset is not None
+    # 3 base: read_file, write_file, run_command
+    # 11 Code Tools: typecheck_direct, ruff_check_direct, pytest_run_direct,
+    #   git_status_direct, git_diff_direct, git_log_direct,
+    #   goto_definition_direct, find_references_direct, hover_direct,
+    #   document_symbols_direct, workspace_symbols_direct
+    # 3 LibCST code tools (Phase 32): cst_find_pattern_direct, cst_rename_direct, cst_add_import_direct
+    # 9 Domain validators (Phase 32): validate_component_direct, check_render_tree_direct,
+    #   validate_escape_context_direct, validate_service_registration_direct,
+    #   check_dependency_graph_direct, validate_injection_site_direct,
+    #   validate_middleware_chain_direct, check_di_template_binding_direct,
+    #   validate_route_pattern_direct
+    assert len(toolset.tools) == 26
+
+
+@pytest.mark.skip(reason="ollama_model removed in current phase")
+def test_create_local_agent_ollama_uses_direct_toolset():
+    """create_local_agent with ollama: should use direct toolset."""
+    from punie.agent.config import PUNIE_DIRECT_INSTRUCTIONS
+
+    agent, client = create_local_agent(model="ollama:devstral", workspace=Path.cwd())
+
+    # Verify agent was created successfully
+    assert agent is not None
+    assert client is not None
+
+    # PydanticAI wraps toolsets, so check the actual FunctionToolset (last in list)
+    # Direct toolset has 26 tools vs Code Mode toolset has 8 tools
+    assert len(agent.toolsets) > 0
+    function_toolset = agent.toolsets[-1]  # Last toolset is the one we provided
+    assert len(function_toolset.tools) == 26
+
+
+def test_create_local_agent_local_uses_code_mode_toolset():
+    """create_local_agent with 'local' should use Code Mode toolset."""
+    from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS
+
+    agent, client = create_local_agent(model="local", workspace=Path.cwd())
+
+    # Verify agent was created successfully
+    assert agent is not None
+    assert client is not None
+
+    # PydanticAI wraps toolsets, so check the actual FunctionToolset (last in list)
+    # Code Mode toolset has 8 tools: read/write/run_command/execute_code + 4 terminal
+    assert len(agent.toolsets) > 0
+    function_toolset = agent.toolsets[-1]  # Last toolset is the one we provided
+    assert len(function_toolset.tools) == 8

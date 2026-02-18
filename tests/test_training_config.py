@@ -309,6 +309,81 @@ def test_build_train_command_with_all_optional_flags():
     assert "/config/lora.yaml" in cmd
 
 
+def test_build_train_command_with_grad_accumulation_steps():
+    """build_train_command includes --grad-accumulation-steps flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        grad_accumulation_steps=4,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--grad-accumulation-steps" in cmd
+    assert "4" in cmd
+
+
+def test_build_train_command_with_mask_prompt():
+    """build_train_command includes --mask-prompt flag when True."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        mask_prompt=True,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--mask-prompt" in cmd
+
+
+def test_build_train_command_with_lora_scale():
+    """build_train_command includes --lora-scale flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        lora_scale=20.0,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--lora-scale" in cmd
+    assert "20.0" in cmd
+
+
+def test_build_train_command_with_weight_decay():
+    """build_train_command includes --weight-decay flag."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+        weight_decay=0.01,
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--weight-decay" in cmd
+    assert "0.01" in cmd
+
+
+def test_build_train_command_new_fields_absent_by_default():
+    """build_train_command omits new flags when using defaults."""
+    config = LoRAConfig(
+        base_model="test-model",
+        data_directory=Path("/data"),
+        output_directory=Path("/output"),
+    )
+
+    cmd = build_train_command(config)
+
+    assert "--grad-accumulation-steps" not in cmd
+    assert "--mask-prompt" not in cmd
+    assert "--lora-scale" not in cmd
+    assert "--weight-decay" not in cmd
+
+
 # ============================================================================
 # Server Configuration Tests
 # ============================================================================

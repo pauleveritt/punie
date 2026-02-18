@@ -56,15 +56,16 @@ class OllamaProcess:
         Runs `ollama pull <model>` which is idempotent:
         - If model exists locally: exits immediately
         - If model needs download: shows progress
+
+        Raises:
+            subprocess.CalledProcessError: If pull command fails (check=True)
         """
         print(f"Ensuring model {self.model} is available...")
-        result = subprocess.run(
+        subprocess.run(
             ["ollama", "pull", self.model],
             capture_output=False,  # Show progress to user
             check=True,
         )
-        if result.returncode != 0:
-            raise RuntimeError(f"Failed to pull model {self.model}")
 
     async def start(self, timeout: float = 120.0) -> None:
         """Start the ollama subprocess and wait for it to be ready.

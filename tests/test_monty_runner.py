@@ -9,6 +9,9 @@ from punie.agent.monty_runner import (
     run_code_async,
 )
 from punie.agent.typed_tools import (
+    CstAddImportResult,
+    CstFindResult,
+    CstRenameResult,
     DocumentSymbolsResult,
     FindReferencesResult,
     GitDiffResult,
@@ -24,6 +27,7 @@ from punie.agent.typed_tools import (
     TypeCheckResult,
     WorkspaceSymbolsResult,
 )
+from punie.cst.domain_models import DomainValidationResult
 
 
 # Fake external functions for testing (fakes-over-mocks pattern)
@@ -198,6 +202,26 @@ def fake_git_log(path: str, count: int = 10) -> GitLogResult:
     return GitLogResult(success=True, commits=[], commit_count=0)
 
 
+def fake_cst_find_pattern(file_path: str, pattern: str) -> CstFindResult:
+    """Fake cst_find_pattern for testing."""
+    return CstFindResult(success=True, match_count=0, matches=[])
+
+
+def fake_cst_rename(file_path: str, old_name: str, new_name: str) -> CstRenameResult:
+    """Fake cst_rename for testing."""
+    return CstRenameResult(success=True, rename_count=0)
+
+
+def fake_cst_add_import(file_path: str, import_stmt: str) -> CstAddImportResult:
+    """Fake cst_add_import for testing."""
+    return CstAddImportResult(success=True, import_added=False)
+
+
+def fake_domain_validator(file_path: str) -> DomainValidationResult:
+    """Fake domain validator for testing."""
+    return DomainValidationResult(valid=True, domain="test", issues=[])
+
+
 @pytest.fixture
 def external_functions():
     """Fixture providing external functions registry."""
@@ -216,6 +240,18 @@ def external_functions():
         git_status=fake_git_status,
         git_diff=fake_git_diff,
         git_log=fake_git_log,
+        cst_find_pattern=fake_cst_find_pattern,
+        cst_rename=fake_cst_rename,
+        cst_add_import=fake_cst_add_import,
+        validate_component=fake_domain_validator,
+        check_render_tree=fake_domain_validator,
+        validate_escape_context=fake_domain_validator,
+        validate_service_registration=fake_domain_validator,
+        check_dependency_graph=fake_domain_validator,
+        validate_injection_site=fake_domain_validator,
+        validate_middleware_chain=fake_domain_validator,
+        check_di_template_binding=fake_domain_validator,
+        validate_route_pattern=fake_domain_validator,
     )
 
 

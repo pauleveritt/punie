@@ -1292,3 +1292,70 @@ def parse_git_log_output(output: str) -> GitLogResult:
         commit_count=len(commits),
         parse_error=None,
     )
+
+
+# LibCST Code Tool models (Phase 32)
+
+
+class CstMatch(BaseModel):
+    """A single node match from cst_find_pattern.
+
+    Attributes:
+        line: Line number in source file (1-based)
+        column: Column number in source file (0-based)
+        code_snippet: First line of the matched node's source code
+        node_type: LibCST node class name (e.g., "FunctionDef", "Call")
+    """
+
+    line: int
+    column: int
+    code_snippet: str
+    node_type: str
+
+
+class CstFindResult(BaseModel):
+    """Result of cst_find_pattern operation.
+
+    Attributes:
+        success: True if pattern search completed successfully
+        match_count: Number of nodes matching the pattern
+        matches: List of match details with line numbers
+        parse_error: Error message if file could not be parsed
+    """
+
+    success: bool
+    match_count: int
+    matches: list[CstMatch]
+    parse_error: str | None = None
+
+
+class CstRenameResult(BaseModel):
+    """Result of cst_rename operation.
+
+    Attributes:
+        success: True if rename completed successfully
+        rename_count: Number of Name nodes renamed
+        modified_source: Full modified source code with renames applied
+        parse_error: Error message if file could not be parsed
+    """
+
+    success: bool
+    rename_count: int
+    modified_source: str | None = None
+    parse_error: str | None = None
+
+
+class CstAddImportResult(BaseModel):
+    """Result of cst_add_import operation.
+
+    Attributes:
+        success: True if operation completed successfully
+        import_added: True if import was actually added (False if already present)
+        modified_source: Full modified source code with import added
+        parse_error: Error message if file could not be parsed
+    """
+
+    success: bool
+    import_added: bool
+    modified_source: str | None = None
+    parse_error: str | None = None

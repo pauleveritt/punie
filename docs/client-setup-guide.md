@@ -91,6 +91,22 @@ await run_toad_client(
 
 See [Toad Client Guide](toad-client-guide.md) for complete documentation.
 
+### Toad Integration Example
+
+For Toad developers implementing WebSocket transport:
+
+```python
+# See examples/toad_websocket_agent.py for reference implementation
+from examples.toad_websocket_agent import ToadWebSocketAgent
+
+agent = ToadWebSocketAgent("ws://localhost:8000/ws", "/workspace")
+await agent.connect()
+await agent.send_prompt("Your question")
+await agent.disconnect()
+```
+
+**Integration Guide:** See [docs/toad-integration-guide.md](toad-integration-guide.md) for step-by-step instructions on adding WebSocket transport to Toad's ACP agent.
+
 ### Python Client (WebSocket)
 
 ```python

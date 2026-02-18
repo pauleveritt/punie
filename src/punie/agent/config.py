@@ -145,6 +145,22 @@ Code navigation:
 - document_symbols_direct(file) - all symbols in a file (hierarchical)
 - workspace_symbols_direct(query) - search symbols across workspace
 
+LibCST code tools (structured Python manipulation):
+- cst_find_pattern_direct(file, pattern) - find nodes with line numbers ("FunctionDef", "call:print", "decorator:dataclass")
+- cst_rename_direct(file, old_name, new_name) - rename symbol, returns modified source
+- cst_add_import_direct(file, import_stmt) - add import idempotently, returns modified source
+
+Domain validators (tdom-svcs architecture):
+- validate_component_direct(file) - check @dataclass + __call__ -> Node + html() patterns
+- check_render_tree_direct(file) - check component composition and references
+- validate_escape_context_direct(file) - verify no f-strings in html() calls (XSS risk)
+- validate_service_registration_direct(file) - check @injectable + @dataclass + Inject[] fields
+- check_dependency_graph_direct(file) - detect service→component layer violations
+- validate_injection_site_direct(file) - verify Inject[] types are imported
+- validate_middleware_chain_direct(file) - check @middleware categories + __call__ signature
+- check_di_template_binding_direct(file) - verify html() context= for DI components
+- validate_route_pattern_direct(file) - validate route path syntax
+
 Query mapping examples:
 - "Find Python files" → run_command("find", ["-name", "*.py"])
 - "Type errors" or "type check" → typecheck_direct(path) then parse JSON result

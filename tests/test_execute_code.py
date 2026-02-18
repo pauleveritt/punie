@@ -5,6 +5,9 @@ from pydantic_ai import RunContext
 from punie.agent.deps import ACPDeps
 from punie.agent.monty_runner import ExternalFunctions, run_code
 from punie.agent.typed_tools import (
+    CstAddImportResult,
+    CstFindResult,
+    CstRenameResult,
     DocumentSymbolsResult,
     FindReferencesResult,
     GitDiffResult,
@@ -17,6 +20,7 @@ from punie.agent.typed_tools import (
     TypeCheckResult,
     WorkspaceSymbolsResult,
 )
+from punie.cst.domain_models import DomainValidationResult
 
 
 def test_execute_code_tool_exists():
@@ -96,10 +100,45 @@ def test_execute_code_runs_simple_python():
     def fake_git_log(path: str, count: int = 10) -> GitLogResult:
         return GitLogResult(success=True, commits=[], commit_count=0)
 
+    def fake_cst_find(fp: str, pat: str) -> CstFindResult:
+        return CstFindResult(success=True, match_count=0, matches=[])
+
+    def fake_cst_rename(fp: str, old: str, new: str) -> CstRenameResult:
+        return CstRenameResult(success=True, rename_count=0)
+
+    def fake_cst_add_import(fp: str, stmt: str) -> CstAddImportResult:
+        return CstAddImportResult(success=True, import_added=False)
+
+    def fake_domain(fp: str) -> DomainValidationResult:
+        return DomainValidationResult(valid=True, domain="test", issues=[])
+
     external_functions = ExternalFunctions(
-        fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest,
-        fake_goto_definition, fake_find_references, fake_hover, fake_document_symbols,
-        fake_workspace_symbols, fake_git_status, fake_git_diff, fake_git_log
+        read_file=fake_read,
+        write_file=fake_write,
+        run_command=fake_run,
+        typecheck=fake_typecheck,
+        ruff_check=fake_ruff,
+        pytest_run=fake_pytest,
+        goto_definition=fake_goto_definition,
+        find_references=fake_find_references,
+        hover=fake_hover,
+        document_symbols=fake_document_symbols,
+        workspace_symbols=fake_workspace_symbols,
+        git_status=fake_git_status,
+        git_diff=fake_git_diff,
+        git_log=fake_git_log,
+        cst_find_pattern=fake_cst_find,
+        cst_rename=fake_cst_rename,
+        cst_add_import=fake_cst_add_import,
+        validate_component=fake_domain,
+        check_render_tree=fake_domain,
+        validate_escape_context=fake_domain,
+        validate_service_registration=fake_domain,
+        check_dependency_graph=fake_domain,
+        validate_injection_site=fake_domain,
+        validate_middleware_chain=fake_domain,
+        check_di_template_binding=fake_domain,
+        validate_route_pattern=fake_domain,
     )
 
     code = """

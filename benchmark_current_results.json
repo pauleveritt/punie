@@ -1,0 +1,19 @@
+{
+  "model": "Phase 27 (Current production)",
+  "path": "fused_model_qwen3_phase27_cleaned_5bit",
+  "disk_size_gb": null,
+  "memory_gb": 19.55392075330019,
+  "load_time_s": 8.055409908294678,
+  "warmup_time_s": 11.551732063293457,
+  "steady_state_avg_s": 2.3445916175842285,
+  "steady_state_times_s": [
+    2.3416059017181396,
+    2.3473610877990723,
+    2.3448078632354736
+  ],
+  "accuracy_percent": 100.0,
+  "warmup_correct": true,
+  "steady_state_correct": 3,
+  "total_correct": 4,
+  "total_queries": 4
+}

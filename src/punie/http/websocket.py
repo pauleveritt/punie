@@ -55,9 +55,23 @@ async def websocket_endpoint(websocket: WebSocket, agent: PunieAgent) -> None:
         while True:
             # Receive JSON-RPC message with 5-minute idle timeout
             try:
-                data = await asyncio.wait_for(
-                    websocket.receive_text(), timeout=300.0
+                message = await asyncio.wait_for(
+                    websocket.receive(), timeout=300.0
                 )
+
+                # Handle different message types
+                if message["type"] == "websocket.disconnect":
+                    logger.info(f"Client {client_id} disconnected gracefully")
+                    break
+                elif message["type"] == "websocket.receive":
+                    if "text" not in message:
+                        logger.warning(f"Received non-text message from {client_id}")
+                        continue
+                    data = message["text"]
+                else:
+                    logger.warning(f"Unknown message type from {client_id}: {message['type']}")
+                    continue
+
             except asyncio.TimeoutError:
                 logger.info(f"Client {client_id} idle for 5 minutes, disconnecting")
                 break

@@ -1,0 +1,40 @@
+# Phase 33 training config for mlx_lm.lora
+# Full retrain on ~1276 examples (phase28_merged + phase32 domain tools)
+#
+# NOTE: This config was NOT used in Phase 33 training (CLI flags were used instead).
+# The cosine LR schedule below was never applied. Kept for reference only.
+#
+# Usage:
+#   mlx_lm.lora --config configs/phase33_training.yaml \
+#     --model mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit \
+#     --data data/phase33_merged \
+#     --adapter-path adapters_phase33
+#
+# Note: CLI flags override YAML values when both are specified.
+
+# LoRA architecture
+lora_layers: 8        # Number of transformer layers to adapt
+lora_rank: 8          # LoRA rank (adapter capacity)
+
+# Optimization
+learning_rate: 1e-4   # Peak learning rate
+lr_schedule:
+  name: cosine_decay
+  warmup: 50           # Linear warmup steps
+  arguments:
+    - 1e-7             # Minimum LR at end of schedule
+    - 800              # Total decay steps (matches --iters)
+
+# Training loop
+iters: 800
+batch_size: 1
+grad_accumulation_steps: 4   # Effective batch = 4
+
+# Prompt masking (train on completions only)
+mask_prompt: true
+
+# Checkpointing and evaluation
+save_every: 200
+steps_per_report: 10
+steps_per_eval: 50
+val_batches: 10

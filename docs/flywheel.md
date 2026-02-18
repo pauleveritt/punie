@@ -114,6 +114,49 @@ auto-fixing, ty for type correctness. Each layer adds semantic depth.
 This shifts the model from "how do I write this code?" to "what design should I implement?" The model makes
 architectural decisions, not just syntax choices.
 
+## The Key Insight: Minimize Model, Maximize Tools
+
+The architecture has a core strategic realization: **each domain tool reduces what the model needs to learn.**
+
+Two different mental models of what an AI coding agent does:
+
+**Traditional approach:**
+```
+[User Query] → [Big Smart Model] → [Answer]
+                      ↑
+              (must be very capable)
+```
+
+**Punie's approach:**
+```
+[User Query] → [Small Fast Model] → [Tool Call] → [Deterministic Tool] → [Structured Result]
+                      ↑                                    ↑
+              (just needs to route)            (this is where the real work happens)
+```
+
+The agentic loop has two kinds of time:
+
+| Time in model (non-deterministic) | Time in tools (deterministic) |
+|---|---|
+| Choosing which tool to call | Running typecheck, parsing AST, validating architecture |
+| Parsing result fields | LibCST analysis, pattern matching, scope resolution |
+| Deciding next step in sequence | Git operations, file I/O, test execution |
+| Generating natural language response | LSP navigation, symbol resolution |
+
+**The strategic goal: push as much work as possible from the left column to the right column.**
+
+A domain validator that checks "does this component have @view, return Element, and use html(t'...')" runs in milliseconds, deterministically, with 100% accuracy. The model doesn't need to know those rules — it just needs to know to call `validate_tdom_component()` and read the result.
+
+This inverts conventional wisdom: **Punie isn't trying to make a smarter model. It's trying to make a dumber model sufficient by making the tools smarter.**
+
+In this frame:
+- **The tools are the intelligence** (deterministic, fast, correct)
+- **The model is just the router** (which tool, what args, in what order)
+- **Fine-tuning teaches routing** (shallow correlations are the point, not a weakness)
+- **Each new tool shrinks what the model must learn** (knowledge moves from model to tools)
+
+This is fundamentally different from "competing with industrial labs at ML." It's closer to building a compiler with a thin ML-powered frontend.
+
 ## Spec Tools, Spec Skills
 
 Spec-driven development: a spec is a unit of work that generates all artifacts.
@@ -149,19 +192,22 @@ This teach-then-validate loop is how the model learns tool patterns.
 
 ## The Training Loop
 
-`TrainingCollector` captures every generation as JSONL traces. Each trace includes: query, generated code, validation
-result, and outcome.
+The real pipeline is simpler and more manual than initially envisioned:
 
-We filter for quality: only `validation_passed=True` examples make it to training. We augment with negative examples (
-common errors plus fixes) to teach correction patterns.
+1. **Data generation** — Write training examples alongside each new tool (20-50 examples per tool category)
+2. **Data merging** — Combine with existing dataset, deduplicate
+3. **LoRA training** — 2-hour run on Mac with proven hyperparameters (unchanged since Phase 7)
+4. **Fusion + quantization** — Dequantize to float16, fuse LoRA adapters, re-quantize to 5-bit (1-2 hours)
+5. **Validation** — Automated evaluation suite (27-57 queries across tool categories)
+6. **Deploy** — Swap model file, restart server
 
-We fine-tune with mlx_lm LoRA: train → fuse → quantize to 5-bit → deploy. The metrics we track: validation pass rate (>
-90%), retry count (<2), and velocity improvement (faster time-to-working-code).
+This isn't monthly automation. It's manual retraining triggered by toolset changes — every 3-6 months when enough new tools accumulate.
 
-Each phase produces a better model. That model generates better code. That code produces better training data. The
-flywheel spins.
+The aspirational goal: automatic trace collection from real usage, filtering, curation, and retraining. The reality: Phase 33 reached 1,282 examples through 27+ phases of manual data generation. Each phase required days of script writing, data auditing, and validation work.
 
-Read [Flywheel Capture](./research/flywheel-capture.md) for more details.
+The training data isn't about "learning to use tools" — it's about teaching the model **when to call which tool**, with what arguments, in what order. That routing knowledge is domain-specific. When a new domain validator is added, the model needs examples showing how it fits into multi-turn sequences.
+
+Read [Flywheel Capture](./research/flywheel-capture.md) and [Flywheel Critique Analysis](./research/flywheel-critique-analysis.md) for more details.
 
 ## The spec workflow
 
@@ -228,21 +274,91 @@ This is where the real Flywheel kicks in.
     - Make sure we don't mess up the model by retraining on the same data
     - Perhaps put `~/.punie` under version control to easily see what's already been trained
 
-## Current State
+## Where the Flywheel Stands Honestly
 
-**Working:** Tool discrimination (100%), Code Mode (perplexity 1.826), quality triad complete, 5-bit quantization (20GB,
-zero accuracy loss), automated training pipeline.
+**Production model (Phase 33b, Feb 2026):**
+- 1,282 training examples across 26 tools
+- Qwen3-30B-A3B base (3B active / 30B total MoE)
+- 5-bit quantized, 20 GB on disk
+- 82.4% eval accuracy (27-prompt held-out test)
+- 2-5 second average response time on M1 32GB
+- Tools: typecheck, ruff, pytest, LSP (8 tools), LibCST (3 tools), domain validators (12 tools)
 
-**Key gap:** The model calls tools correctly but doesn't reason about structured results. It generates tool calls but
-ignores the Pydantic objects they return. 0% field access rate. This needs targeted training data showing how to use
-`TypeCheckResult.errors`, not just how to call `typecheck()`.
+**What works:**
+- ✅ Tool discrimination (100%) — knows when to call a tool vs answer directly
+- ✅ Tool selection (100%) — chooses the right tool for each query
+- ✅ Field access (92%) — reads structured results from Pydantic models
+- ✅ Multi-tool workflows (81.9% overall) — chains tools in meaningful sequences
+- ✅ Code Mode — model writes Python code that calls tools as functions
+- ✅ LoRA training pipeline — proven config, 2-hour runs on Mac, automated validation
 
-**Next:** Field access training (teach structured result usage), LSP integration (Phase 26, semantic navigation), domain
-tools bootstrap (Phase 27, component/service/middleware validation), flywheel activation (Phase 28, full retrain with
-automatic collection).
+**What doesn't exist (but the early docs promised):**
+- ❌ Automatic trace collection from real usage (design exists, not implemented)
+- ❌ Monthly automated retraining (every phase is manual)
+- ❌ A/B testing before deployment (not implemented)
+- ❌ Metrics dashboards (not implemented)
+- ❌ Automated quality filtering (manual data audits)
+- ❌ TrainingCollector auto-capture (design only)
 
-**Constraint:** 30B MoE minimum for tool calling. 7B dense models conclusively failed in Phase 25. M1 32GB is the target
-hardware (20GB model + inference overhead).
+**Key findings across 27+ phases:**
+- **Model size**: 30B MoE is minimum for reliable tool calling. 7B dense failed conclusively (Phase 25).
+- **Quantization**: 5-bit optimal (32 levels preserve LoRA signal; 4-bit destroys it; 6-bit triggers memory warnings).
+- **Format alignment**: Prompt format mismatch causes 60-point accuracy drops (Phase 26.1 incident).
+- **Domain tools matter**: Multi-tool accuracy jumped from 35% to 81.9% when domain validators were added.
+
+**The colleague's critique (Feb 2026):**
+
+A colleague challenged the flywheel concept: "You're competing with industrial labs on ML when your advantage is domain knowledge. Fine-tuning requires infrastructure you don't have. The moment a tool changes format, the model breaks."
+
+The honest analysis ([documented here](./research/flywheel-critique-analysis.md)) found they were:
+- **Right about infrastructure**: The fully automated flywheel is over-engineered. 27+ phases = manual work, not automation.
+- **Right about cost**: Each phase took days of data generation, merging, validation — not just 2 hours of training.
+- **Wrong about LoRA lightweight**: 2-hour Mac training is NOT "GPU infrastructure." It's closer to running a cron job.
+- **Wrong about fragility**: Pydantic models abstract tool output. Format changes affect parsers, not trained model.
+- **Wrong about competition**: Training teaches tool **routing** for domain-specific tools no industrial lab has, not general intelligence.
+
+The strategic realization: **invest 70% in tools, 20% in lightweight retraining when tools change, 10% monitoring zero-shot foundation model progress.**
+
+**Next phases (see roadmap):** Fix Phase 28/29 bugs → ACP router infrastructure → simplified observability → smaller model experiment.
+
+## The Smaller Model Trajectory
+
+If "minimize model, maximize tools" succeeds, the model should get dumber over time — **on purpose.**
+
+Each new domain tool encodes knowledge the model no longer needs to reason about. Each LibCST validator replaces a judgment call with a deterministic check. Each Pydantic contract replaces ambiguous output parsing with typed field access. The model's job converges toward a small, well-defined task: **route queries to the right tool, in the right order, with the right arguments.**
+
+Routing is simpler than reasoning. Simpler tasks can be done by smaller models.
+
+**Model size trajectory:**
+
+| Phase | Model | Params (Active) | What the model does | What tools do |
+|-------|-------|-----------------|--------------------|----|
+| Phase 27 | Qwen3-30B-A3B | 3B active / 30B total | Route + reason + parse | Run tools, return JSON |
+| Phase 33 | Qwen3-30B-A3B | 3B active / 30B total | Route + parse (domain tools reason for it) | Run tools, validate architecture, return typed results |
+| Future | Qwen3-8B or similar? | 1-3B | Route only | All reasoning is in tools |
+
+**What a smaller model needs:**
+1. Python/HTML/CSS/JS literacy (not Go, Rust, Java, or 50+ other languages)
+2. Tool vocabulary (the 26 tool names, arguments, return types)
+3. Multi-turn sequencing (which tool next based on previous result)
+4. Discrimination (when to answer directly vs call a tool)
+
+**What a smaller model can shed:**
+1. General knowledge (history, science, math — not needed for tool routing)
+2. Non-target languages (shedding 50+ languages makes the model smaller)
+3. Deep code generation (Monty + domain tools handle validation)
+4. Long-form reasoning (tools do the thinking; model just orchestrates)
+
+**The experiment:** Phase 25 tried 7B and failed — the model lacked capacity for complex reasoning. But that was **before domain tools existed**. With 26 tools handling the reasoning, the 7B model only needed to route — a fundamentally easier job. Phase 33 consolidation (1,282 examples, 26 tools) is the right moment to revisit this question.
+
+**The test:** Fine-tune Qwen3-8B with the same 1,282 examples. If tool routing accuracy holds (≥80% on the 27-prompt eval), the tools-first strategy is validated. If it fails, 30B MoE remains the minimum.
+
+A smaller model that fits in 4-5 GB instead of 20 GB would:
+- Run on 8GB machines (not just 32GB)
+- Respond in <1s instead of 2.3s
+- Run alongside IDE without memory pressure
+
+This is the flywheel's real payoff, viewed differently: **each iteration doesn't just improve the current model — it makes a smaller model viable by moving intelligence into tools.** The flywheel shrinks the model, not just improves it.
 
 ## References
 
@@ -255,6 +371,11 @@ For detailed architecture and code examples:
 - [Research: Holy Grail Tools (Domain)](research/holy-grail-tools-domain.md) — Domain-specific tools research
 - [Research: Code Tools Convergence](research/code-tools-convergence.md) — Industry convergence (Anthropic, Cloudflare,
   Pydantic)
+
+For the flywheel critique and strategic analysis:
+
+- [Flywheel Critique Analysis](research/flywheel-critique-analysis.md) — Counter-arguments to colleague's critique, tool-first strategy, smaller model trajectory
+- [Colleague Counter-Argument](research/colleague-counter-argument.md) — Skeptical challenges to the counter-arguments (to be written)
 
 For the development narrative:
 

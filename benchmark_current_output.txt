@@ -1,0 +1,17 @@
+Current Production Model Benchmark
+================================================================================
+Model: Phase 27 (Current production)
+Path: fused_model_qwen3_phase27_cleaned_5bit
+Query: 'Show me how the protocol class is used in the codebase'
+Expected: Should call a tool
+
+================================================================================
+RESULTS
+================================================================================
+Disk size:          N/A
+Memory:             19.55 GB
+Load time:          8.06s
+Warm-up time:       11.55s
+Steady-state avg:   2.34s
+Accuracy:           100% (4/4)
+================================================================================

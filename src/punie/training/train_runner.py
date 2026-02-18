@@ -74,6 +74,18 @@ def build_train_command(config: LoRAConfig) -> list[str]:
     if config.config_file is not None:
         cmd.extend(["--config", str(config.config_file)])
 
+    if config.grad_accumulation_steps is not None:
+        cmd.extend(["--grad-accumulation-steps", str(config.grad_accumulation_steps)])
+
+    if config.mask_prompt:
+        cmd.append("--mask-prompt")
+
+    if config.lora_scale is not None:
+        cmd.extend(["--lora-scale", str(config.lora_scale)])
+
+    if config.weight_decay is not None:
+        cmd.extend(["--weight-decay", str(config.weight_decay)])
+
     return cmd
 
 

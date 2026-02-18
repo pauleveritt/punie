@@ -26,3 +26,7 @@ class LoRAConfig:
     steps_per_eval: int | None = None  # Run validation every N steps (--steps-per-eval)
     grad_checkpoint: bool = False  # Use gradient checkpointing to reduce memory (--grad-checkpoint)
     config_file: Path | None = None  # YAML config file for lora_rank and other settings (--config)
+    grad_accumulation_steps: int | None = None  # Accumulate gradients N steps before update (--grad-accumulation-steps)
+    mask_prompt: bool = False  # Train only on completions, not on system+user turns (--mask-prompt)
+    lora_scale: float | None = None  # LoRA scaling factor; None = use mlx_lm default (--lora-scale)
+    weight_decay: float | None = None  # AdamW weight decay for regularization (--weight-decay)

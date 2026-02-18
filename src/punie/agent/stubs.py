@@ -298,6 +298,226 @@ def generate_stubs() -> str:
     \"\"\"
     ...""")
 
+    stubs.append("""def cst_find_pattern(file_path: str, pattern: str) -> CstFindResult:
+    \"\"\"Find nodes matching a pattern in a Python file using LibCST.
+
+    Returns CstFindResult with:
+    - success: True if search completed without errors
+    - match_count: Number of matching nodes found
+    - matches: List of CstMatch objects with line, column, code_snippet, node_type
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Supported patterns:
+    - "FunctionDef" — all function definitions
+    - "ClassDef" — all class definitions
+    - "Call" — all function calls
+    - "Decorator" — all decorators
+    - "ImportFrom" — all from ... import ... statements
+    - "call:name" — calls to function named "name"
+    - "decorator:name" — uses of decorator named "name"
+    - "import:name" — imports from module named "name"
+
+    Example:
+        result = cst_find_pattern("src/components.py", "ClassDef")
+        if result.success:
+            for match in result.matches:
+                print(f"Class at line {match.line}: {match.code_snippet}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def cst_rename(file_path: str, old_name: str, new_name: str) -> CstRenameResult:
+    \"\"\"Rename all occurrences of a symbol in a Python file using LibCST.
+
+    Returns CstRenameResult with:
+    - success: True if rename completed successfully
+    - rename_count: Number of Name nodes renamed
+    - modified_source: Full modified source code (write to file to apply)
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = cst_rename("src/services.py", "UserService", "AccountService")
+        if result.success and result.rename_count > 0:
+            write_file("src/services.py", result.modified_source)
+            print(f"Renamed {result.rename_count} occurrences")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def cst_add_import(file_path: str, import_stmt: str) -> CstAddImportResult:
+    \"\"\"Add an import statement to a Python file (idempotent) using LibCST.
+
+    Returns CstAddImportResult with:
+    - success: True if operation completed successfully
+    - import_added: True if import was actually added (False if already present)
+    - modified_source: Full modified source code (write to file to apply)
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = cst_add_import("src/components.py", "from typing import Optional")
+        if result.success and result.import_added:
+            write_file("src/components.py", result.modified_source)
+            print("Added Optional import")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_component(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate tdom component patterns in a Python file.
+
+    Returns DomainValidationResult with:
+    - valid: True if no errors found
+    - domain: "tdom"
+    - issues: List of ValidationIssue objects with rule, severity, message, suggestion
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Checks: @dataclass present, __call__ returns Node, no f-strings in html().
+
+    Example:
+        result = validate_component("src/components/greeting.py")
+        if not result.valid:
+            for issue in result.issues:
+                print(f"[{issue.severity}] {issue.rule}: {issue.message}")
+                if issue.suggestion:
+                    print(f"  → {issue.suggestion}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def check_render_tree(file_path: str) -> DomainValidationResult:
+    \"\"\"Check component render tree composition in a Python file.
+
+    Returns DomainValidationResult with:
+    - valid: True if no errors found
+    - domain: "tdom"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = check_render_tree("src/components/page.py")
+        for issue in result.issues:
+            print(f"[{issue.severity}] {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_escape_context(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate that html() calls use safe t-strings, not f-strings.
+
+    Returns DomainValidationResult with:
+    - valid: True if no f-strings found in html() calls
+    - domain: "tdom"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = validate_escape_context("src/components/template.py")
+        if not result.valid:
+            print("WARNING: Unsafe f-string usage detected in html() calls!")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_service_registration(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate svcs service registration patterns in a Python file.
+
+    Returns DomainValidationResult with:
+    - valid: True if no errors found
+    - domain: "svcs"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Checks: @injectable present, @dataclass present, Inject[] fields typed correctly.
+
+    Example:
+        result = validate_service_registration("src/services/users.py")
+        if not result.valid:
+            for issue in result.issues:
+                print(f"[{issue.severity}] {issue.rule}: {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def check_dependency_graph(file_path: str) -> DomainValidationResult:
+    \"\"\"Check svcs dependency graph for layer violations.
+
+    Returns DomainValidationResult with:
+    - valid: True if no layer violations found
+    - domain: "svcs"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = check_dependency_graph("src/services/mixed.py")
+        if not result.valid:
+            for issue in result.issues:
+                print(f"Layer violation: {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_injection_site(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate Inject[] field sites reference imported types.
+
+    Returns DomainValidationResult with:
+    - valid: True if all Inject[] types are imported
+    - domain: "svcs"
+    - issues: List of ValidationIssue objects (usually warnings)
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = validate_injection_site("src/services/users.py")
+        for issue in result.issues:
+            print(f"[{issue.severity}] {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_middleware_chain(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate tdom-svcs middleware patterns in a Python file.
+
+    Returns DomainValidationResult with:
+    - valid: True if no errors found
+    - domain: "tdom-svcs"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Checks: @middleware has categories, correct __call__(self, target, props, context) sig.
+
+    Example:
+        result = validate_middleware_chain("src/middleware/auth.py")
+        if not result.valid:
+            for issue in result.issues:
+                print(f"[{issue.severity}] {issue.rule}: {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def check_di_template_binding(file_path: str) -> DomainValidationResult:
+    \"\"\"Check that DI components have context passed in html() calls.
+
+    Returns DomainValidationResult with:
+    - valid: True if no issues found
+    - domain: "tdom-svcs"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Example:
+        result = check_di_template_binding("src/views/main.py")
+        for issue in result.issues:
+            print(f"[{issue.severity}] {issue.message}")
+    \"\"\"
+    ...""")
+
+    stubs.append("""def validate_route_pattern(file_path: str) -> DomainValidationResult:
+    \"\"\"Validate route patterns in a Python file.
+
+    Returns DomainValidationResult with:
+    - valid: True if all routes are valid
+    - domain: "tdom-svcs"
+    - issues: List of ValidationIssue objects
+    - parse_error: Error message if file could not be parsed, None otherwise
+
+    Checks: paths start with /, balanced braces in path parameters.
+
+    Example:
+        result = validate_route_pattern("src/routes.py")
+        if not result.valid:
+            for issue in result.issues:
+                print(f"[{issue.severity}] Route error: {issue.message}")
+    \"\"\"
+    ...""")
+
     stubs.append("""def git_log(path: str, count: int = 10) -> GitLogResult:
     \"\"\"Get git commit history with structured commit information.
 

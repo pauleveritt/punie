@@ -1826,10 +1826,12 @@ gated evaluation that fails fast and cheap.
 
 ## 28. Frontend/Backend (Single-Project Server)
 
-**Status:** ✅ Complete (2026-02-16)
+**Status:** ⚠️ Shipped but Needs Fixes (2026-02-16)
 
 **Goal:** Add a centralized `punie server` with a WebSocket client for `punie ask`, still single-project and no
 subinterpreters.
+
+**Note:** This phase shipped core functionality but has known bugs and gaps that must be resolved before building infrastructure on top of it (see Phase 34 dependencies).
 
 **Achieved:**
 
@@ -1853,9 +1855,11 @@ subinterpreters.
 
 ## 29. Toad Frontend (ACP Over WebSocket)
 
-**Status:** ✅ Complete (2026-02-16)
+**Status:** ⚠️ Shipped but Needs Fixes (2026-02-16)
 
 **Goal:** Build WebSocket client infrastructure in Punie repo to enable browser-based Toad frontend integration.
+
+**Note:** This phase shipped Toad integration but has known bugs and limitations. Must be stabilized before Phase 34 flywheel instrumentation.
 
 **Achieved:**
 
@@ -1912,7 +1916,18 @@ subinterpreters.
 
 ## 32. Domain Typed Tools (Holy Grail Part B)
 
-**Status:** Planned (2026-02-15)
+**Status:** ✅ Completed (2026-02-17)
+
+**Accomplished:**
+
+- [x] 9 domain validators implemented across tdom, svcs, tdom-svcs stacks
+    - tdom: `validate_component`, `check_render_tree`, `validate_escape_context`
+    - svcs: `validate_service_registration`, `check_dependency_graph`, `validate_injection_site`
+    - tdom-svcs: `validate_middleware_chain`, `check_di_template_binding`, `validate_route_pattern`
+- [x] 3 LibCST code tools: `cst_find_pattern`, `cst_rename`, `cst_add_import`
+- [x] Tool count grew from 14 → 26; all return typed `DomainValidationResult` / `CstFindResult` etc.
+- [x] 156 training examples generated (`scripts/generate_phase32_domain_tool_examples.py`)
+- [x] All domain validators added to stubs.py and Monty sandbox
 
 **Goal:** Implement tools that think in domain vocabulary (components, services, middleware) instead of code syntax (
 classes, functions, decorators). This enables the model to reason about **design decisions**, not just code correctness.
@@ -2083,7 +2098,21 @@ that scale).
 
 ## 33. Full Retrain on Complete Dataset
 
-**Status:** Planned (2026-02-15)
+**Status:** ✅ Completed (2026-02-18) — Phase 33b re-run with corrected APIs
+
+**Accomplished:**
+
+- [x] Merged dataset: 1,282 examples (1,159 train + 123 valid) across all 26 tools
+- [x] Training: 800 iters, val loss 0.277, ~3.5h on Apple Silicon M-series
+- [x] Phase 33 audit found 2 fake issues (fabricated result attributes, `_direct` suffix mismatch)
+    - F1: All domain/CST templates used non-existent result attributes — rewrote generator
+    - F2: Generator used `_direct` suffix; Code Mode exposes bare names — fixed throughout
+- [x] Phase 33 audit found 2 regressions (batrachian-toad in pyproject, 4 broken Ollama tests) — fixed
+- [x] Eval methodology corrected: direct tool calls score 0.5 (not 1.0); 6 verbatim prompts replaced
+- [x] 3 missing domain eval prompts added (check_render_tree, validate_injection_site, check_di_template_binding)
+- [x] Phase 33b re-run: **82.4%** on 27-prompt corrected eval (target ≥80%) ✅
+    - text_tools 100%, validation 100%, git 100%, cst 100%, lsp 90%, domain 60%, multi_tool 35%
+- [x] Production model: `fused_model_qwen3_phase33b_5bit` (20 GB, 5-bit quantized)
 
 **Prerequisite:** Phase 32 (Domain Tools) must be complete — 150 domain tool examples are required.
 
@@ -2165,168 +2194,101 @@ This is a gate event: run once, evaluate, deploy. The flywheel infrastructure th
 
 ---
 
-## 34. Flywheel Architecture Implementation
+## 34. Flywheel Observability (Simplified)
 
-**Status:** Planned (after Phase 33 retrain)
+**Status:** Planned (after Phases 28/29 fixes and Phase 30)
 
-**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the
-self-improvement loop.
+**Dependencies:**
+- Phase 28/29 bug fixes (server/client stability)
+- Phase 30 (thin ACP router for real usage)
+
+**Goal:** Add lightweight observability to capture high-signal training data from real Punie usage. **Not** the full automated flywheel — that was over-engineered.
 
 **Context:**
 
-Phase 33 completes the full retrain on ~1215 examples. Phase 34 builds the architecture described in flywheel.md and
-holy-grail-architecture.md. This is when the self-improving loop becomes reality.
+A [colleague's critique](../../docs/research/flywheel-critique-analysis.md) and [honest counter-analysis](../../docs/research/colleague-counter-argument.md) revealed that the original Phase 34 vision (monthly automated retraining, A/B testing, metrics dashboards) is over-engineered for the current stage. The refined strategy: **invest 70% in tools, 20% in lightweight retraining when toolset changes, 10% monitoring zero-shot progress.**
 
-**Vision:**
+**What Phase 34 Now Does (Simplified):**
 
-The holy grail: **automatic training data collection from real usage**.
+1. **PunieEvent observability** — Lightweight logging of interesting moments
+2. **Training data generation integrated with tool development** — Each new tool ships with 30-50 training examples
+3. **Manual retrain triggered by toolset changes** — When enough new tools accumulate (every 3-6 months), retrain with proven pipeline
 
-```
-Real usage → Capture → Filter → Curate → Retrain → Deploy → Better model
-                                                              ↓
-                                                        More usage ← ← ←
-```
+**What Phase 34 Does NOT Do (Dropped from original plan):**
 
-This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes
-training data. The model gets smarter with use.
+- ❌ A/B testing infrastructure
+- ❌ Metrics dashboards
+- ❌ Weekly automated retraining
+- ❌ Curation UI
+- ❌ Fully automated data collection pipeline
 
-**Flywheel Loop:**
-
-**Phase 1: Capture**
-
-Every Punie interaction is logged:
-```python
-{
-    "query": "Add authentication to this app",
-    "code": ["result = validate_service_registration(...)", "write_file(...)"],
-    "tool_results": [...],
-    "outcome": "success",
-    "timestamp": "2026-03-15T10:30:00Z"
-}
-```
-
-**Phase 2: Filter**
-
-Automatic quality checks:
-- ✅ Successful outcome (no errors, tools used correctly)
-- ✅ Novel pattern (not duplicate of existing examples)
-- ✅ No sensitive data (no API keys, personal info)
-- ✅ Clear intent (query is understandable)
-- ✅ Correct tool usage (tools called with valid parameters)
-
-**Phase 3: Curate**
-
-Manual review for edge cases:
-- Complex multi-tool workflows
-- Novel domain patterns
-- Error handling examples
-- Teaching moments (model made mistake → learned)
-
-**Phase 4: Retrain**
-
-Scheduled retraining on growing dataset:
-- Monthly retrain with new examples
-- Track perplexity and benchmark scores over time
-- A/B test new models before deployment
-- Keep best-performing model
-
-**Phase 5: Deploy**
-
-- Roll out new model to production
-- Monitor performance on real queries
-- Collect more usage data
-- Repeat
-
-**Key Insight:**
-
-The flywheel only works if the tools are *rich enough* to be worth learning from:
-
-- Text tools: Limited learning (everyone knows grep)
-- Validation tools: Some learning (how to fix specific errors)
-- LSP: Good learning (semantic navigation patterns)
-- Domain tools: **Rich learning** (architectural design patterns)
-
-Domain tools are the key to the flywheel — they capture **design knowledge**, not just code mechanics.
-
-**Infrastructure Requirements:**
-
-1. **Logging system** — Capture all Punie interactions (query, code, results) in structured JSONL; respect privacy (no sensitive data)
-2. **Filtering pipeline** — Automatic quality checks, deduplication, diversity balancing
-3. **Curation tools** — UI for manual review, tagging, categorization, annotation
-4. **Retraining pipeline** — Automatic dataset merging, training script generation, benchmark evaluation, model versioning
-5. **Deployment system** — A/B testing infrastructure, rollback capability, performance monitoring
-
-**Future Enhancements:**
-
-- Active learning (model requests examples for weak areas)
-- Multi-user learning (aggregate patterns across users)
-- Domain expansion (new tools for new domains)
-- Cross-domain transfer (patterns from one domain inform another)
-
-**Key Components:**
-
-- **Skills Framework** — Progressive disclosure (list → load → execute)
-- **Monty Tool** — Model generates domain-specific tool implementations
-- **Schema Validation** — Pydantic models + AST/libcst validation layers
-- **Training Collector** — Automatic JSONL capture of all generations
-- **Bootstrap Dataset** — 30 tdom components, 20 svcs services as seed data
-- **Self-Improvement Loop** — Capture → Filter → Augment → Retrain → Deploy
+These may come later if evidence shows they're needed, but for now: simplicity over automation.
 
 **Implementation Path:**
 
-**Milestone 1: Skills Framework (1 week)**
+**Milestone 1: PunieEvent Logging (3 days)**
 
-- `punie/skills/` directory structure
-- Skill loader implementing list/load/execute pattern
-- SKILL.md parser with YAML frontmatter
-- Initial skills: tdom-components, svcs-services, middleware
+Add lightweight structured logging to capture high-signal moments:
+```python
+@dataclass
+class PunieEvent:
+    timestamp: datetime
+    event_type: str  # "tool_call", "retry", "user_correction", "user_confirmation"
+    query: str
+    code: list[str]
+    tool_results: list[dict]
+    outcome: str  # "success", "error", "user_corrected"
+    metadata: dict
+```
 
-**Milestone 2: Monty Tool + Validation (1 week)**
+Instrumentation points:
+- `src/punie/agent/toolset.py` → `tool_call` events
+- `src/punie/agent/typed_tools.py` → `domain_validation` events
+- `src/punie/agent/factory.py` → `retry` events
+- `src/punie/http/websocket.py` → `user_correction` / `user_confirmation` events
 
-- `generate_artifact` tool implementation
-- Schema registry (tdom, svcs, middleware)
-- Pydantic validators for each artifact type
-- ModelRetry integration for validation errors
-- Layered validation: ast → libcst matchers → libcst transformers → ty
+Output: `~/.punie/events/{project_name}/{session_id}.jsonl`
 
-**Milestone 3: Training Data Collector (3 days)**
+**Milestone 2: Training Data Generation (ongoing)**
 
-- `TrainingCollector` class in `punie.training`
-- Automatic trace recording on every generation
-- JSONL output format with full context
-- Conversion to ChatML training examples
-- Filtering for `validation_passed=True` only
+When adding new tools (LibCST transformations, new domain validators), generate training examples as part of tool development:
 
-**Milestone 4: Bootstrap Dataset (1 week)**
+- 20-30 single-tool examples
+- 10-20 multi-turn sequences showing how the tool fits into workflows
+- Examples follow existing patterns from Phase 33 dataset
 
-- 30 reference tdom components (varied complexity)
-- 20 reference svcs services (lifecycle patterns)
-- 15 reference middleware implementations
-- Annotations + descriptions for each example
-- Fine-tune initial adapter with bootstrap data
+This is NOT automatic — it's manual data generation alongside tool code. But it's **integrated** with tool development, not a separate phase.
 
-**Milestone 5: Self-Improvement Loop (ongoing)**
+**Milestone 3: Manual Retrain Pipeline (already exists)**
 
-- Automated data collection during daily work
-- Weekly fine-tuning jobs (continuous improvement)
-- Metrics dashboard (validation rates, retry counts, velocity)
-- A/B testing: Phase N vs Phase N+1
+Proven pipeline from Phase 33:
+1. Merge new examples with existing dataset
+2. LoRA train (2 hours on Mac, proven hyperparameters)
+3. Fuse + quantize (1 hour)
+4. Validate (27-prompt automated eval)
+5. Deploy if ≥80% accuracy
 
-**Success Criteria:**
+Trigger: when ~100-150 new examples accumulate (typically every 3-6 months as new tool categories are added).
 
-- ✅ Skills load dynamically (no upfront token cost for all skills)
-- ✅ Monty generates valid domain artifacts (>70% validation pass rate)
-- ✅ Training data collection is automatic (every generation logged to JSONL)
-- ✅ Model learns from corrections (retry count decreases over time)
-- ✅ Retraining happens regularly (monthly retrain with new examples)
-- ✅ Model improves continuously (benchmark scores rise with each retrain cycle)
-- ✅ Development velocity improves (faster time-to-working-code)
+**Success Criteria (Revised):**
+
+- ✅ PunieEvent logging captures interesting moments (retries, corrections, confirmations)
+- ✅ Events are structured and queryable (JSONL format)
+- ✅ Tool development includes training data generation (not an afterthought)
+- ✅ Retraining happens when toolset changes significantly (~2x/year)
+- ✅ Training pipeline remains fast and reliable (2-3 hours total)
+
+**What This Does NOT Measure (And That's OK):**
+
+- Monthly retraining cadence (not needed yet)
+- A/B testing (manual comparison is sufficient)
+- Automated quality filtering (manual review works fine at current scale)
 
 **References:**
 
-- [Flywheel Architecture](../../docs/flywheel.md)
-- [Holy Grail Architecture Spec](../specs/2026-02-15-pydantic-ai-skills-analysis/holy-grail-architecture.md)
-- [Example tdom Skill](../specs/2026-02-15-pydantic-ai-skills-analysis/example-tdom-skill.md)
+- [Flywheel Architecture (Updated)](../../docs/flywheel.md)
+- [Flywheel Critique Analysis](../../docs/research/flywheel-critique-analysis.md)
+- [Colleague Counter-Argument](../../docs/research/colleague-counter-argument.md)
 
 ## 35. Ollama Backend Infrastructure
 
@@ -2972,6 +2934,297 @@ async def ruff_check(ctx: RunContext[ACPDeps], path: str) -> RuffResult:
 - ❌ Verbose responses are the bottleneck (200+ tokens vs concise calls)
 - ✅ Fine-tuning ROI is excellent for production agents
 
-**Next:** Phase 39 - LibCST transformation tools with Qwen3
+**Next:** See "Recommended Phase Sequence" below for infrastructure-first ordering.
+
+---
+
+## 39. Insulation Layer Hardening
+
+**Status:** Planned
+
+**Goal:** Strengthen the typed API contracts between model and tools to address the weakest critique from the flywheel analysis — format fragility when tools change.
+
+**Context:**
+
+The [colleague counter-argument analysis](../../docs/research/colleague-counter-argument.md) identified that Pydantic abstraction claims are aspirational, not actual. When tool output formats change, both fine-tuned and zero-shot models benefit from typed APIs — but the insulation only works if we enforce it properly.
+
+**Implementation:**
+
+**Milestone 1: Version the Pydantic Typed API (1 week)**
+
+Add semantic versioning to all Pydantic tool result models:
+```python
+class TypeCheckResultV1(BaseModel):
+    """Phase 33 contract."""
+    success: bool
+    error_count: int
+    errors: list[TypeCheckError]
+
+class TypeCheckResultV2(TypeCheckResultV1):
+    """Phase 39+ contract — additive-only changes."""
+    warnings: list[TypeCheckWarning] | None = None  # New field
+    config_file_used: str | None = None  # New field
+```
+
+**Principles:**
+- **Additive-only evolution** — New fields OK, renaming/removing fields requires new version
+- **Training data references V1** — Model continues working even as V2 ships
+- **Tools return latest version** — `typecheck()` returns V2, but model sees V1 fields
+- **Gradual adoption** — Only retrain on V2 when enough new examples accumulate
+
+**Milestone 2: Schema Validation at Tool Boundary (3 days)**
+
+Enforce that parsers always return valid Pydantic models:
+```python
+def parse_ty_output(raw: str) -> TypeCheckResultV1:
+    try:
+        data = json.loads(raw)
+        return TypeCheckResultV1.model_validate(data)
+    except ValidationError as e:
+        # Parser bug — log and raise
+        logger.error(f"ty output violates TypeCheckResultV1 schema: {e}")
+        raise ToolParseError(f"Invalid ty output: {e}")
+```
+
+When ty changes format, the parser fails loudly **before** the model sees bad data. This is much better than silent corruption.
+
+**Milestone 3: Test Format Insulation (2 days)**
+
+Deliberately change a tool's output format and verify insulation:
+1. Change pytest JSON output structure
+2. Update parser to handle new format
+3. Verify: Pydantic model unchanged, training data still valid, model behavior unaffected
+4. Document: what broke, what didn't, lessons learned
+
+**Success Criteria:**
+
+- ✅ All tool result models have semantic versions (V1, V2, etc.)
+- ✅ Additive-only evolution policy documented and enforced
+- ✅ Parser validation catches format changes at boundary
+- ✅ Format change test demonstrates insulation working
+
+**Why This Matters:**
+
+This phase addresses the weakest defense in the flywheel counter-arguments. The claim is "Pydantic abstracts tool changes" — but only if we actually version the contracts and validate at boundaries. This phase makes the claim real.
+
+---
+
+## 40. Smaller Model Experiment
+
+**Status:** Planned (after Phase 33 consolidation)
+
+**Goal:** Test whether an 8B dense model can handle tool routing with the same accuracy as the 30B MoE, now that 26 domain tools handle most reasoning.
+
+**Context:**
+
+Phase 25 tried a 7B experiment and failed. But that was before domain tools existed. The [flywheel critique analysis](../../docs/research/flywheel-critique-analysis.md) argues that with 26 tools handling reasoning, the model's job is simpler — just routing. **If true, a smaller model should suffice.**
+
+**Hypothesis:**
+
+The 30B MoE (3B active) routes tool calls + handles some reasoning. With domain tools doing the reasoning, an 8B dense model might achieve ≥80% routing accuracy — which would be a major win (4-5 GB vs 20 GB, <1s vs 2.3s).
+
+**Pre-Registered Success Criteria (Must define BEFORE experiment):**
+
+| Metric | Target | Interpretation if Failed |
+|--------|--------|-------------------------|
+| Tool discrimination | ≥95% | Model too small even for simple tool/no-tool decision |
+| Tool selection | ≥90% | Model can't map queries to correct tools |
+| Multi-tool workflows | ≥75% | Multi-turn sequencing requires more capacity |
+| Domain reasoning | ≥60% | Domain tools didn't reduce reasoning load enough |
+| User satisfaction | ≥4/5 | Benchmarks lie; model feels frustratingly dumb in practice |
+
+If it fails ANY criterion, document **why**: capacity? data? architecture?
+
+**Implementation:**
+
+**Milestone 1: Model Selection (2 days)**
+
+Choose an 8B base model:
+- **Option A:** Qwen3-8B (if mlx-community version exists) — same family as current model
+- **Option B:** Phi-3-8B or similar — different architecture, might handle routing differently
+- **Option C:** Wait for Qwen4-8B release (2026 H1?)
+
+Criteria: good Python/HTML/CSS/JS performance, MLX-compatible, ≤8GB memory footprint.
+
+**Milestone 2: LoRA Training (1 day)**
+
+Fine-tune on Phase 33's 1,282 examples:
+- Same hyperparameters as Phase 33 (learning rate, LoRA rank, etc.)
+- Adjust LoRA layers for 8B architecture (likely ~12-16 out of ~32 total)
+- 5-bit quantization target
+
+**Milestone 3: Evaluation (1 day)**
+
+Run Phase 33's 27-prompt held-out eval suite:
+- Measure accuracy across all 5 criteria
+- Track speed (should be <1s per query)
+- Track memory footprint (should be ~4-5 GB)
+
+**Milestone 4: A/B Real-Usage Test (3 days)**
+
+Use both models for real work:
+- 30B MoE (Phase 33 production)
+- 8B dense (Phase 40 experiment)
+
+Track: speed, accuracy, frustration moments, recovery from errors. Benchmarks can lie — actual usage doesn't.
+
+**Milestone 5: Analyze and Document (1 day)**
+
+If it passes: smaller model trajectory is validated. Phase 41+ models shrink over time as tools get smarter.
+
+If it fails: document why. Was it capacity? Was the hypothesis wrong? Did domain tools not reduce reasoning load as much as claimed?
+
+**Success Criteria:**
+
+- ✅ Pre-registered criteria defined before experiment starts
+- ✅ Experiment runs with same rigor as Phase 33 (no shortcuts)
+- ✅ Results documented regardless of outcome
+- ✅ If it works: 8B becomes production, 30B is fallback
+- ✅ If it fails: understand why, inform Phase 41+ decisions
+
+**Why This Matters:**
+
+This tests the core "minimize model, maximize tools" hypothesis. If the model can shrink as tools get smarter, the architecture is validated. If not, we learn what the floor is for routing tasks.
+
+---
+
+## 41. Zero-Shot Benchmarking Baseline
+
+**Status:** Planned (repeatable infrastructure)
+
+**Goal:** Build a repeatable script for testing new foundation models zero-shot on Punie's 26-tool benchmark, so we know **when to stop fine-tuning**.
+
+**Context:**
+
+Foundation models improve fast. Claude 4, GPT-4 Turbo, Qwen4, Phi-4, Gemma-3 will all release in 2026. The [flywheel critique analysis](../../docs/research/flywheel-critique-analysis.md) recommends monitoring zero-shot progress (10% of effort). **If zero-shot accuracy crosses 90%, the fine-tuning advantage might disappear.**
+
+**Implementation:**
+
+**Milestone 1: Standardized Benchmark Script (2 days)**
+
+Create `scripts/benchmark_zero_shot.py`:
+```python
+"""
+Benchmark any model (MLX, Ollama, OpenAI-compatible) on Punie's 27-prompt eval.
+
+Usage:
+  python scripts/benchmark_zero_shot.py --model ollama:qwen4
+  python scripts/benchmark_zero_shot.py --model openai:gpt-4-turbo
+  python scripts/benchmark_zero_shot.py --model local:qwen3-30b-a3b
+"""
+```
+
+**Features:**
+- Uses Phase 33's 27-prompt held-out eval (same prompts as production model)
+- Supports multiple backends (MLX, Ollama, OpenAI-compatible APIs)
+- Outputs: accuracy by category, speed, consistency (std dev of response times)
+- Saves results to `benchmarks/zero_shot/{model_name}_{date}.json`
+
+**Milestone 2: Quarterly Cadence (ongoing)**
+
+Run the benchmark when new models release:
+- Qwen4 (expected Q1-Q2 2026)
+- Phi-4 (expected Q2 2026)
+- Claude 4 Opus (if they release a local/smaller version)
+- Gemma-3 (expected H2 2026)
+
+**Milestone 3: Decision Triggers (policy)**
+
+Define escalation triggers:
+- **If zero-shot ≥ fine-tuned - 10%**: Strategic review meeting
+- **If zero-shot ≥ fine-tuned**: Pause fine-tuning, rely on zero-shot for 30 days
+- **If zero-shot speed ≤ 5s and accuracy ≥85%**: Consider deprecating fine-tuning entirely
+
+These aren't automatic — they're **signals** that the landscape has shifted.
+
+**Milestone 4: Cost-Benefit Analysis (1 day per model)**
+
+For each zero-shot model, calculate:
+```
+Fine-tuning ROI = (fine-tuned_speed / zero-shot_speed) * (fine-tuned_accuracy / zero-shot_accuracy)
+
+If ROI < 2.0, fine-tuning advantage is marginal.
+If ROI < 1.5, zero-shot is competitive.
+If ROI < 1.2, fine-tuning isn't worth it.
+```
+
+Phase 37 Devstral example: ROI = (95s / 2.3s) * (0.84 / 1.00) = 34.6 → fine-tuning wins decisively.
+
+If a future model achieves 5s at 90% accuracy: ROI = (5s / 2.3s) * (0.90 / 1.00) = 2.0 → marginal.
+
+**Success Criteria:**
+
+- ✅ Repeatable benchmark script exists
+- ✅ Run once per quarter (or when major models release)
+- ✅ Decision triggers documented and followed
+- ✅ Cost-benefit analysis informs strategy (not just accuracy)
+
+**Why This Matters:**
+
+This is the **exit signal** for fine-tuning. When zero-shot catches up, Punie pivots from "fine-tune a small model" to "use a good foundation model with excellent system prompts." The 10% monitoring effort ensures we don't miss that inflection point.
+
+---
+
+## Recommended Phase Sequence (Infrastructure-First)
+
+**Key insight from the flywheel critique:** Before building observability and collecting data, **fix the infrastructure so Punie is actually usable**. Phases 28/29 shipped but have bugs. Phase 30 (ACP router) is a prerequisite for real usage. **Flywheel data collection only makes sense once Punie is being used productively.**
+
+**Recommended ordering:**
+
+### Near-Term (Q1 2026)
+
+1. **Phase 28/29 Bug Fixes** (unplanned, but necessary)
+   - Fix existing server/client issues
+   - Stabilize Toad WebSocket integration
+   - Get the frontend/backend working reliably
+   - **Why first:** Can't build on top of a shaky foundation
+
+2. **Phase 34a: Targeted LoRA Layering Investigation** (new, cheap)
+   - Use `fused_model_qwen3_phase33b_5bit` as base (not original Qwen3-Coder)
+   - Curate ~80 examples targeting Phase 33b weak spots: domain (60%) + multi_tool (35%)
+   - 300 iters, LR 5e-5 (lower than Phase 33b's 1e-4 — strong base needs gentler adjustment)
+   - **Success:** domain ≥80% AND multi_tool ≥60%, no regression on passing categories
+   - **Why now:** Fuse-then-retrain compounding is the pre-Flywheel improvement mechanism;
+     each phase is ~45 min vs 3.5h full retrain — tests whether layering fixes the gap cheaply
+   - **Reference:** `docs/research/lora-layering-incremental-improvement.md`
+
+3. **Phase 30: Thin ACP Router** (planned)
+   - Rewrite ACP as thin WebSocket router
+   - No more dual CLI/server codepaths
+   - Clean separation: router ↔ agent ↔ tools
+   - **Why:** Prerequisite for real multi-project usage
+
+4. **Phase 39: Insulation Layer Hardening** (new)
+   - Version Pydantic typed API contracts
+   - Additive-only schema evolution
+   - Schema validation at tool boundary
+   - **Why third:** Shores up weakest counter-argument defense before we cite it
+
+### Mid-Term (Q2 2026)
+
+5. **Phase 34: Flywheel Observability (Simplified)** (revised)
+   - PunieEvent logging (lightweight)
+   - Training data generation integrated with tool development
+   - Manual retrain when tools change
+   - **Why fourth:** Only makes sense once Punie is actually usable in production
+
+6. **Phase 40: Smaller Model Experiment** (new)
+   - Qwen3-8B with Phase 33's 1,282 examples
+   - Pre-registered pass/fail criteria
+   - Validates "minimize model, maximize tools" hypothesis
+   - **Why fifth:** Tests whether tools-first strategy enables smaller models
+
+### Ongoing
+
+7. **Phase 41: Zero-Shot Benchmarking Baseline** (new, repeatable)
+   - Run quarterly or when major models release
+   - Decision triggers for when to pivot away from fine-tuning
+   - **Why ongoing:** The "know when to stop" signal
+
+**Rationale:**
+
+The original Phase 34 (full flywheel) assumed Phases 28/29 were stable and Phase 30 was complete. But the reality: Phases 28/29 have bugs, Phase 30 doesn't exist yet, and jumping straight to flywheel instrumentation means collecting data from a system that isn't being used productively.
+
+**Fix the stack first, then instrument it.**
 
 ---

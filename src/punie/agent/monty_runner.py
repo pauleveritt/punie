@@ -17,6 +17,9 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from punie.agent.typed_tools import (
+        CstAddImportResult,
+        CstFindResult,
+        CstRenameResult,
         DocumentSymbolsResult,
         FindReferencesResult,
         GitDiffResult,
@@ -29,6 +32,7 @@ if TYPE_CHECKING:
         TypeCheckResult,
         WorkspaceSymbolsResult,
     )
+    from punie.cst.domain_models import DomainValidationResult
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,20 @@ class ExternalFunctions:
     git_status: Callable[[str], GitStatusResult]
     git_diff: Callable[[str, bool], GitDiffResult]
     git_log: Callable[[str, int], GitLogResult]
+    # LibCST code tools (Phase 32)
+    cst_find_pattern: Callable[[str, str], CstFindResult]
+    cst_rename: Callable[[str, str, str], CstRenameResult]
+    cst_add_import: Callable[[str, str], CstAddImportResult]
+    # Domain validators (Phase 32)
+    validate_component: Callable[[str], DomainValidationResult]
+    check_render_tree: Callable[[str], DomainValidationResult]
+    validate_escape_context: Callable[[str], DomainValidationResult]
+    validate_service_registration: Callable[[str], DomainValidationResult]
+    check_dependency_graph: Callable[[str], DomainValidationResult]
+    validate_injection_site: Callable[[str], DomainValidationResult]
+    validate_middleware_chain: Callable[[str], DomainValidationResult]
+    check_di_template_binding: Callable[[str], DomainValidationResult]
+    validate_route_pattern: Callable[[str], DomainValidationResult]
 
 
 class CodeExecutionError(Exception):
@@ -175,7 +193,24 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         >>> def fake_git_log(path: str, count: int) -> GitLogResult:
         ...     from punie.agent.typed_tools import GitLogResult
         ...     return GitLogResult(success=True, commits=[], commit_count=0)
-        >>> funcs = ExternalFunctions(fake_read, fake_write, fake_run, fake_typecheck, fake_ruff, fake_pytest, fake_goto_definition, fake_find_references, fake_hover, fake_document_symbols, fake_workspace_symbols, fake_git_status, fake_git_diff, fake_git_log)
+        >>> def fake_cst_find(fp: str, pat: str): ...
+        >>> def fake_cst_rename(fp: str, old: str, new: str): ...
+        >>> def fake_cst_add_import(fp: str, stmt: str): ...
+        >>> def fake_domain(fp: str): ...
+        >>> funcs = ExternalFunctions(
+        ...     read_file=fake_read, write_file=fake_write, run_command=fake_run,
+        ...     typecheck=fake_typecheck, ruff_check=fake_ruff, pytest_run=fake_pytest,
+        ...     goto_definition=fake_goto_definition, find_references=fake_find_references,
+        ...     hover=fake_hover, document_symbols=fake_document_symbols,
+        ...     workspace_symbols=fake_workspace_symbols, git_status=fake_git_status,
+        ...     git_diff=fake_git_diff, git_log=fake_git_log,
+        ...     cst_find_pattern=fake_cst_find, cst_rename=fake_cst_rename,
+        ...     cst_add_import=fake_cst_add_import, validate_component=fake_domain,
+        ...     check_render_tree=fake_domain, validate_escape_context=fake_domain,
+        ...     validate_service_registration=fake_domain, check_dependency_graph=fake_domain,
+        ...     validate_injection_site=fake_domain, validate_middleware_chain=fake_domain,
+        ...     check_di_template_binding=fake_domain, validate_route_pattern=fake_domain,
+        ... )
         >>> result = run_code('content = read_file("test.txt"); print(content)', funcs)
         >>> result.strip()
         'test content'
@@ -202,6 +237,20 @@ def run_code(code: str, external_functions: ExternalFunctions) -> str:
         "git_status": external_functions.git_status,
         "git_diff": external_functions.git_diff,
         "git_log": external_functions.git_log,
+        # LibCST code tools
+        "cst_find_pattern": external_functions.cst_find_pattern,
+        "cst_rename": external_functions.cst_rename,
+        "cst_add_import": external_functions.cst_add_import,
+        # Domain validators
+        "validate_component": external_functions.validate_component,
+        "check_render_tree": external_functions.check_render_tree,
+        "validate_escape_context": external_functions.validate_escape_context,
+        "validate_service_registration": external_functions.validate_service_registration,
+        "check_dependency_graph": external_functions.check_dependency_graph,
+        "validate_injection_site": external_functions.validate_injection_site,
+        "validate_middleware_chain": external_functions.validate_middleware_chain,
+        "check_di_template_binding": external_functions.check_di_template_binding,
+        "validate_route_pattern": external_functions.validate_route_pattern,
         "json": json,  # Available directly, no import needed
     }
 

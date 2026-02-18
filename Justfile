@@ -173,19 +173,27 @@ mlx-start:
         --port 5001 \
         --trust-remote-code
 
-# Stop MLX server
+# Stop MLX server (handles multiple orphaned processes)
 mlx-stop:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    PID=$(lsof -ti:5001 || true)
-    if [ -z "$PID" ]; then
-        echo "✓ MLX server is not running on port 5001"
+    PIDS=$(lsof -ti:5001 || true)
+    if [ -z "$PIDS" ]; then
+        echo "✓ No MLX servers running on port 5001"
     else
-        echo "🛑 Stopping MLX server (PID $PID)..."
-        kill $PID
+        # Count processes
+        COUNT=$(echo "$PIDS" | wc -l | tr -d ' ')
+        if [ "$COUNT" -eq 1 ]; then
+            echo "🛑 Stopping MLX server (PID $PIDS)..."
+        else
+            echo "🛑 Stopping $COUNT MLX servers (PIDs: $(echo $PIDS | tr '\n' ' '))..."
+        fi
+
+        # Kill all processes
+        echo "$PIDS" | xargs kill 2>/dev/null || true
         sleep 1
-        echo "✓ MLX server stopped"
+        echo "✓ MLX server(s) stopped"
     fi
 
 # Start both MLX and Punie servers with Phase 27 model (foreground)
@@ -246,6 +254,92 @@ server-stop:
 stop-all: server-stop mlx-stop
     @echo ""
     @echo "✓ All servers stopped"
+
+# Start Toad UI with WebSocket connection (requires Punie server running)
+toad-start:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if Punie server is running
+    if ! lsof -ti:8000 > /dev/null 2>&1; then
+        echo "⚠️  Punie server is not running on port 8000"
+        echo "   Start it with: just serve"
+        echo ""
+        echo "   Or use 'just toad-dev' to start both together"
+        echo ""
+        exit 1
+    fi
+
+    echo "🐸 Starting Toad UI with WebSocket connection..."
+    echo "   Punie server: http://localhost:8000"
+    echo "   WebSocket: ws://localhost:8000/ws"
+    echo ""
+    echo "✨ Using WebSocket transport (no subprocess!)"
+    echo ""
+    echo "Press Ctrl+D or 'quit' to exit Toad"
+    echo ""
+
+    # Run Toad with WebSocket agent subclass
+    uv run python scripts/run_toad_websocket.py
+
+# Start Punie server and Toad together (recommended for development)
+toad-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🚀 Starting Toad UI with Punie server..."
+    echo ""
+
+    # Check if Punie server is already running
+    if lsof -ti:8000 > /dev/null 2>&1; then
+        echo "   ✓ Punie server already running on port 8000"
+        echo "   ℹ️  Connecting Toad to existing server"
+        echo ""
+    else
+        # Check if MLX server is running
+        if ! lsof -ti:5001 > /dev/null 2>&1; then
+            echo "   🚀 Starting Punie server (includes MLX server)..."
+            echo "   ⏳ This takes ~15 seconds for model loading..."
+            echo ""
+        else
+            echo "   ✓ MLX server already running on port 5001"
+            echo "   🚀 Starting Punie server..."
+            echo ""
+        fi
+
+        # Start Punie server in background
+        just serve > punie-server.log 2>&1 &
+        PUNIE_PID=$!
+        echo "   Punie server starting (PID $PUNIE_PID, log: punie-server.log)"
+
+        # Wait for Punie to be ready
+        echo "   Waiting for Punie server to start..."
+        for i in {1..30}; do
+            if lsof -ti:8000 > /dev/null 2>&1; then
+                echo "   ✓ Punie server ready on port 8000"
+                break
+            fi
+            sleep 1
+            if [ $i -eq 30 ]; then
+                echo "   ❌ Punie server failed to start (timeout)"
+                echo "   Check punie-server.log for details"
+                exit 1
+            fi
+        done
+    fi
+
+    echo ""
+    echo "   Now starting Toad UI with WebSocket..."
+    echo ""
+
+    # Start Toad with WebSocket (foreground)
+    uv run python scripts/run_toad_websocket.py
+
+    # Note: Servers keep running after Toad exits
+    # Use 'just stop-all' to stop them
+    echo ""
+    echo "✓ Toad closed"
+    echo "ℹ️  Punie server still running (use 'just stop-all' to stop)"
 
 # Start both MLX and Punie servers (for development)
 dev-servers:

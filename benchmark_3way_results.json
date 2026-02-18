@@ -4,9 +4,9 @@
     "path": "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
     "disk_size_gb": 0.0,
     "memory_gb": 16.00100327283144,
-    "load_time_s": 4.197996139526367,
-    "warmup_time_s": 13.982969999313354,
-    "steady_state_avg_s": 12.357417265574137,
+    "load_time_s": 6.504075050354004,
+    "warmup_time_s": 15.148024082183838,
+    "steady_state_avg_s": 12.370033899943033,
     "accuracy_pct": 0,
     "all_correct": false
   },
@@ -15,9 +15,9 @@
     "path": "fused_model_qwen3_phase21_5bit",
     "disk_size_gb": 0.0,
     "memory_gb": 19.55392075330019,
-    "load_time_s": 6.178181171417236,
-    "warmup_time_s": 7.904079914093018,
-    "steady_state_avg_s": 1.8090713818868,
+    "load_time_s": 6.105233192443848,
+    "warmup_time_s": 5.1029839515686035,
+    "steady_state_avg_s": 1.8104136784871419,
     "accuracy_pct": 100,
     "all_correct": true
   },
@@ -26,9 +26,9 @@
     "path": "fused_model_qwen3_phase27_cleaned_5bit",
     "disk_size_gb": 0.0,
     "memory_gb": 19.55392075330019,
-    "load_time_s": 5.542887926101685,
-    "warmup_time_s": 5.139632940292358,
-    "steady_state_avg_s": 2.3320494492848716,
+    "load_time_s": 6.470530033111572,
+    "warmup_time_s": 7.415025234222412,
+    "steady_state_avg_s": 2.324279546737671,
     "accuracy_pct": 100,
     "all_correct": true
   }

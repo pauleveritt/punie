@@ -1,0 +1,47 @@
+# Punie Agent Configuration for Toad
+# Copy this file to ~/PycharmProjects/toad/src/toad/data/agents/punie.toml
+
+identity = "punie.local"
+name = "Punie (Local)"
+short_name = "punie"
+url = "http://localhost:8000"
+protocol = "acp"
+author_name = "Paul Everitt"
+author_url = "https://github.com/pauleveritt/punie"
+publisher_name = "Paul Everitt"
+publisher_url = "https://github.com/pauleveritt/punie"
+type = "coding"
+description = "Local Punie agent with custom fine-tuned Qwen3-30B-A3B model via WebSocket"
+tags = ["local", "websocket", "qwen3"]
+
+# Note: run_command is required by Toad but won't be used
+# Our WebSocketToadAgent overrides command property to return None
+run_command."*" = "echo 'Using WebSocket connection'"
+
+help = '''
+# Punie (Local)
+
+Fine-tuned Qwen3-30B-A3B model running locally via MLX.
+
+**WebSocket Connection**
+This agent connects to Punie server via WebSocket instead of spawning a subprocess.
+
+**Requirements:**
+- Punie server running on http://localhost:8000
+- Start with: `just serve` in Punie directory
+
+**Model:**
+- Qwen3-30B-A3B fine-tuned with 14 typed tools
+- Phase 27 training (100% validation accuracy)
+- Runs on Apple Silicon (24GB+ unified memory)
+
+**Tools Available:**
+- LSP: goto_definition, find_references, hover, document_symbols, workspace_symbols
+- Code Quality: ruff_check, pytest_run, typecheck
+- Git: git_status, git_diff, git_log
+- Files: read_file, write_file
+- Terminal: execute_command
+
+---
+Note: When launched via `just toad-dev`, the WebSocket agent is automatically configured.
+'''
