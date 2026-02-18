@@ -396,8 +396,8 @@ async def main() -> int:
             r = await probe.get(f"{server_url}/models", timeout=10.0)
             models_data = r.json()
             all_ids = [m["id"] for m in models_data.get("data", [])]
-            # Prefer the full local path (phase33 model)
-            model_id = next((mid for mid in all_ids if "phase33" in mid), all_ids[0] if all_ids else "default")
+            # Use first available model — we control the server, any loaded model is correct
+            model_id = all_ids[0] if all_ids else args.model
             print(f"  Using model ID: {model_id}\n")
         except Exception as e:
             model_id = args.model
