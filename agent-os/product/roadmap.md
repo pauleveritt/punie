@@ -3011,7 +3011,7 @@ This phase addresses the weakest defense in the flywheel counter-arguments. The 
 
 ## 40. Smaller Model Experiment
 
-**Status:** Planned (after Phase 33 consolidation)
+**Status:** Failed (after Phase 33 consolidation)
 
 **Goal:** Test whether an 8B dense model can handle tool routing with the same accuracy as the 30B MoE, now that 26 domain tools handle most reasoning.
 
@@ -3165,6 +3165,68 @@ This is the **exit signal** for fine-tuning. When zero-shot catches up, Punie pi
 
 ---
 
+## 42. Toad/WebSocket Stabilization (Phases 28/29 Bug Fixes)
+
+**Status:** Planned (prerequisite for Phase 34 Flywheel Observability)
+
+**Goal:** Fix the known bugs and gaps in the Phase 28 server/client separation and Phase 29 Toad WebSocket integration so the frontend/backend stack is reliable enough to build on.
+
+**Context:**
+
+Phase 29 shipped with the explicit note "has known bugs and limitations — must be stabilized before Phase 34 flywheel instrumentation." The recommended phase ordering lists this as item #1 under Near-Term work: *"Can't build on top of a shaky foundation."* Phase 34 (Flywheel Observability) and real Toad UI usage are both blocked until this is done.
+
+**Investigation First:**
+
+Before writing code, audit the actual failures:
+- Run `punie serve` + `punie ask` end-to-end and record what breaks
+- Attempt a real Toad browser UI connection and log all protocol errors
+- Review Phase 28/29 test coverage for gaps (what scenarios aren't tested?)
+- Check `src/punie/http/websocket.py` and `src/punie/client/` for TODO/FIXME comments
+
+**Known Issue Areas (from Phase 29 notes):**
+
+- Server/client stability under reconnect and timeout scenarios
+- Toad WebSocket session lifecycle (create, reconnect, cleanup edge cases)
+- ACP handshake reliability (malformed JSON, partial messages)
+- Streaming prompt execution callbacks under error conditions
+
+**Milestone 1: Bug Audit (1 day)**
+
+- Run all existing Phase 28/29 tests and document any failures
+- Write new failing tests for each known issue area
+- Produce a prioritized bug list with reproduction steps
+
+**Milestone 2: Fix Server/Client Issues (2-3 days)**
+
+- Fix each bug from Milestone 1 in priority order
+- Each fix accompanied by a regression test
+- Target: `punie serve` + `punie ask` work reliably for a 30-minute real session
+
+**Milestone 3: Fix Toad WebSocket Integration (2-3 days)**
+
+- Fix session lifecycle edge cases in `create_toad_session()` / `run_toad_client()`
+- Fix streaming callback error paths in `send_prompt_stream()`
+- Target: Toad browser UI can connect, send prompts, and receive streamed responses without errors for a 30-minute session
+
+**Milestone 4: Validation (1 day)**
+
+- All existing tests still pass
+- New regression tests added for each fixed bug
+- End-to-end smoke test: browser → WebSocket → Punie server → tool call → streamed response
+
+**Success Criteria:**
+
+- ✅ All Phase 28/29 bugs from audit are fixed with regression tests
+- ✅ `punie serve` + Toad browser UI runs a 30-minute session without crashes
+- ✅ No regressions in existing test suite
+- ✅ Phase 34 (Flywheel) unblocked
+
+**Why Before Phase 34:**
+
+Flywheel observability instruments `tool_call`, `retry`, `user_correction`, and `branch_merged` events. If the WebSocket stack is dropping messages or crashing sessions, the flywheel will capture corrupted or incomplete data. Fix the pipe before measuring what flows through it.
+
+---
+
 ## Recommended Phase Sequence (Infrastructure-First)
 
 **Key insight from the flywheel critique:** Before building observability and collecting data, **fix the infrastructure so Punie is actually usable**. Phases 28/29 shipped but have bugs. Phase 30 (ACP router) is a prerequisite for real usage. **Flywheel data collection only makes sense once Punie is being used productively.**
@@ -3173,10 +3235,10 @@ This is the **exit signal** for fine-tuning. When zero-shot catches up, Punie pi
 
 ### Near-Term (Q1 2026)
 
-1. **Phase 28/29 Bug Fixes** (unplanned, but necessary)
-   - Fix existing server/client issues
-   - Stabilize Toad WebSocket integration
-   - Get the frontend/backend working reliably
+1. **Phase 42: Toad/WebSocket Stabilization** (see Phase 42 entry)
+   - Fix existing server/client issues from Phases 28/29
+   - Stabilize Toad WebSocket session lifecycle and streaming
+   - Get the frontend/backend working reliably for 30-min sessions
    - **Why first:** Can't build on top of a shaky foundation
 
 2. **Phase 34a: Targeted LoRA Layering Investigation** (new, cheap)
@@ -3208,11 +3270,20 @@ This is the **exit signal** for fine-tuning. When zero-shot catches up, Punie pi
    - Manual retrain when tools change
    - **Why fourth:** Only makes sense once Punie is actually usable in production
 
-6. **Phase 40: Smaller Model Experiment** (new)
-   - Qwen3-8B with Phase 33's 1,282 examples
-   - Pre-registered pass/fail criteria
-   - Validates "minimize model, maximize tools" hypothesis
-   - **Why fifth:** Tests whether tools-first strategy enables smaller models
+6. **Phase 40: Smaller Model Experiment** ✅ COMPLETE — ❌ FAIL 18.5%
+   - Qwen3-8B: learned intent routing but not execute_code wrapper format
+   - Conclusively disproved 8B hypothesis; 30B MoE stays as production model
+
+7. **Phase 43: Model Variant Experiments** (new)
+   - **Experiment A:** Qwen3-Coder-30B-A3B fresh re-run — confirm 82.4% baseline,
+     target domain >60% and multi_tool >35% (`scripts/run_phase43a_coder30b.sh`)
+   - **Experiment B:** Qwen3-14B Dense — test MoE routing hypothesis
+     (`scripts/run_phase43b_14b_dense.sh`)
+   - Two competing hypotheses: (A) total parameter count decides capacity vs
+     (B) MoE routing specialization is structurally required
+   - If 14B ≥80%: smaller production model possible (~9 GB vs 20 GB, ~1-2s latency)
+   - If 14B <50%: MoE required; focus future work on improving 30B training data
+   - **Why now:** Phase 40 opened the question; Phase 43 closes it
 
 ### Ongoing
 

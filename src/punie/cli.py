@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -205,17 +206,58 @@ async def run_acp_agent(model: str, name: str) -> None:
         raise
 
 
+async def _maybe_start_mlx_server(
+    mlx_port: int = 5001,
+) -> tuple[str, object]:
+    """Auto-detect model and start mlx_lm server if needed.
+
+    Returns:
+        (model_url, server_or_none) tuple where server_or_none is a
+        ServerProcess if we started one, or None if we connected to existing.
+    """
+    from punie.training.server import ServerProcess
+    from punie.training.server_config import ServerConfig, find_local_model
+
+    # Check if port already in use
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        port_in_use = s.connect_ex(("127.0.0.1", mlx_port)) == 0
+
+    if port_in_use:
+        typer.echo(f"  MLX server already running on port {mlx_port}, connecting...")
+        return f"local:http://localhost:{mlx_port}/v1/default", None
+
+    model_path = find_local_model()
+    if model_path is None:
+        typer.secho(
+            "  Warning: No fused_model_* found, falling back to localhost:1234",
+            fg=typer.colors.YELLOW,
+        )
+        return "local", None
+
+    typer.echo(f"  Starting MLX server with model: {model_path.name}")
+    typer.echo("  (This takes ~15s for model loading...)")
+    config = ServerConfig(model_path=str(model_path), port=mlx_port)
+    server = ServerProcess(config)
+    await server.start()
+    typer.echo(f"  MLX server ready: http://localhost:{mlx_port}/v1")
+    model_url = f"local:http://localhost:{mlx_port}/v1/{model_path.name}"
+    return model_url, server
+
+
 async def run_serve_agent(
     model: str,
     name: str,
     host: str,
     port: int,
     log_level: str,
+    mlx_port: int = 5001,
 ) -> None:
     """Create agent and run HTTP/WebSocket server.
 
     Creates a single PunieAgent instance that handles WebSocket connections
     from multiple clients (PyCharm, punie ask, Toad frontend, etc.).
+
+    When model is "local", auto-detects and manages the MLX server.
 
     Args:
         model: Model name for agent
@@ -223,21 +265,30 @@ async def run_serve_agent(
         host: HTTP server bind address
         port: HTTP server port
         log_level: Logging level for HTTP server
+        mlx_port: Port for managed MLX server (only used when model="local")
     """
-    # Create agent (handles WebSocket connections)
-    agent = PunieAgent(model=model, name=name)
+    managed_server = None
+    try:
+        if model == "local":
+            model, managed_server = await _maybe_start_mlx_server(mlx_port)
 
-    # Create HTTP app with agent reference (for WebSocket endpoint)
-    app_instance = create_app(agent)
+        # Create agent (handles WebSocket connections)
+        agent = PunieAgent(model=model, name=name)
 
-    # Run HTTP/WebSocket server only (clients connect via ws://host:port/ws)
-    await run_http(
-        agent,
-        app_instance,
-        host=Host(host),
-        port=Port(port),
-        log_level=log_level,
-    )
+        # Create HTTP app with agent reference (for WebSocket endpoint)
+        app_instance = create_app(agent)
+
+        # Run HTTP/WebSocket server only (clients connect via ws://host:port/ws)
+        await run_http(
+            agent,
+            app_instance,
+            host=Host(host),
+            port=Port(port),
+            log_level=log_level,
+        )
+    finally:
+        if managed_server is not None:
+            await managed_server.stop()
 
 
 @app.callback(invoke_without_command=True)
@@ -409,6 +460,11 @@ def serve(
         "--log-level",
         help="Logging level (debug, info, warning, error, critical)",
     ),
+    mlx_port: int = typer.Option(
+        5001,
+        "--mlx-port",
+        help="Port for managed MLX server (used when --model local)",
+    ),
 ) -> None:
     """Run Punie server (HTTP/WebSocket only).
 
@@ -416,7 +472,10 @@ def serve(
     Multiple clients can connect simultaneously (PyCharm, punie ask, Toad, etc.).
 
     Supported models:
-    - local: mlx_lm.server at http://localhost:1234/v1 (requires separate server)
+    - local: Auto-detects fused_model_* directory, spawns mlx_lm.server on
+      --mlx-port (default 5001), then runs Punie. One command does everything.
+      If port is already occupied, connects to the existing MLX server.
+      Set PUNIE_MODEL_PATH to override the auto-detected model path.
     - ollama:<model>: Ollama at http://localhost:11434/v1 (requires 'ollama serve' running)
       Examples: ollama:devstral, ollama:qwen3:30b-a3b
     - test: Enhanced test model (no actual LLM, useful for debugging)
@@ -424,7 +483,7 @@ def serve(
     Clients must connect via:
     - punie (stdio bridge for PyCharm)
     - punie ask (CLI questions)
-    - Toad frontend (browser, future)
+    - Toad frontend (browser)
     """
     # Setup logging (file-only, never stdout)
     setup_logging(log_dir, log_level)
@@ -435,6 +494,8 @@ def serve(
     # Startup message (OK for serve command before agent starts)
     typer.echo("Starting Punie server")
     typer.echo(f"  Model: {resolved_model}")
+    if resolved_model == "local":
+        typer.echo(f"  MLX port: {mlx_port} (managed)")
     typer.echo(f"  HTTP: http://{host}:{port}")
     typer.echo(f"  WebSocket: ws://{host}:{port}/ws")
     typer.echo(f"  Logs: {log_dir.expanduser() / 'punie.log'}")
@@ -445,7 +506,7 @@ def serve(
     typer.echo("")
 
     # Run agent
-    asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level))
+    asyncio.run(run_serve_agent(resolved_model, name, host, port, log_level, mlx_port))
 
 
 async def _test_tool_calling(model: str, prompt: str, workspace: Path) -> bool:

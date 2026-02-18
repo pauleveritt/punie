@@ -226,7 +226,7 @@ def test_unknown_method_handling(test_app):
             assert response["jsonrpc"] == "2.0"
             assert response["id"] == 1
             assert "error" in response
-            assert response["error"]["code"] == -32603  # Internal error
+            assert response["error"]["code"] == -32601  # Method not found
             assert "Unknown method" in response["error"]["data"]
 
 
@@ -595,7 +595,14 @@ def test_websocket_handles_disconnect_gracefully(test_app):
 
 
 def test_websocket_handles_binary_messages(test_app):
-    """WebSocket should ignore binary messages with warning."""
+    """WebSocket accepts binary frames by decoding them as UTF-8.
+
+    Toad's jsonrpc.Request.body_json returns bytes, so prompts arrive as binary
+    WebSocket frames.  The server must decode them instead of silently dropping.
+
+    Invalid binary (non-JSON) returns a parse error; valid binary JSON is
+    dispatched normally.  The connection must survive in both cases.
+    """
     with TestClient(test_app).websocket_connect("/ws") as websocket:
         # Send initialize first
         init_request = {
@@ -611,19 +618,22 @@ def test_websocket_handles_binary_messages(test_app):
         response = websocket.receive_json()
         assert "result" in response
 
-        # Send binary data (like a ping frame)
+        # Send invalid binary data — server decodes, JSON parse fails, returns error
         websocket.send_bytes(b"\x00\x01\x02")
+        parse_error = websocket.receive_json()
+        assert parse_error["error"]["code"] == -32700
 
-        # Server should continue working - send another request
+        # Server should continue working after the parse error
+        import json
         new_session_request = {
             "jsonrpc": "2.0",
             "method": "new_session",
             "params": {"cwd": "/test"},
             "id": 2,
         }
-        websocket.send_json(new_session_request)
+        websocket.send_bytes(json.dumps(new_session_request).encode("utf-8"))
 
-        # Should still process requests
+        # Should dispatch the binary-framed request normally
         response = websocket.receive_json()
         assert response["id"] == 2
 
@@ -689,7 +699,7 @@ async def test_prompt_reaches_server(test_app):
         while updates_received < max_updates:
             try:
                 message = websocket.receive_json()  # ty: ignore[call-arg]
-                if message.get("method") == "session_update":
+                if message.get("method") == "session/update":
                     updates_received += 1
                     # Check that we're getting real updates
                     assert "params" in message

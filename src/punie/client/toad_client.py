@@ -6,13 +6,11 @@ with streaming support and tool execution visibility via callbacks.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import uuid
 from typing import Any, Callable
 
-import websockets
 from websockets.asyncio.client import ClientConnection
 
 from punie.client.connection import (
@@ -20,6 +18,7 @@ from punie.client.connection import (
     initialize_session,
     punie_session,
 )
+from punie.client.receiver import receive_messages
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,7 @@ __all__ = [
 async def create_toad_session(
     server_url: str,
     cwd: str,
+    capture: Any = None,
 ) -> tuple[ClientConnection, str]:
     """Create session and return (websocket, session_id).
 
@@ -43,9 +43,13 @@ async def create_toad_session(
     Args:
         server_url: WebSocket URL (e.g., ws://localhost:8000/ws)
         cwd: Current working directory for session
+        capture: Optional ToadCapture for diagnostic logging. When provided,
+                 the returned websocket is wrapped with DiagnosticWebSocket so
+                 all messages during initialize_session() and beyond are recorded.
 
     Returns:
-        Tuple of (websocket, session_id)
+        Tuple of (websocket, session_id). If capture is provided, websocket is
+        a DiagnosticWebSocket wrapping the real connection.
 
     Raises:
         websockets.exceptions.WebSocketException: If connection fails
@@ -65,17 +69,28 @@ async def create_toad_session(
         Caller is responsible for closing the websocket when done.
     """
     logger.info(f"Creating Toad session: {server_url}")
+    if capture is not None:
+        capture.phase("connect_start", server_url=server_url)
     websocket = await connect_to_server(server_url)
+    if capture is not None:
+        capture.phase("connect_done")
+        websocket = capture.wrap(websocket)  # type: ignore[assignment]
     try:
-        session_id = await initialize_session(websocket, cwd)
+        if capture is not None:
+            capture.phase("initialize_start")
+        session_id = await initialize_session(websocket, cwd)  # type: ignore[arg-type]
+        if capture is not None:
+            capture.phase("initialize_done", session_id=session_id)
         logger.info(f"Toad session created: {session_id}")
-        return websocket, session_id
-    except Exception:
+        return websocket, session_id  # type: ignore[return-value]
+    except Exception as exc:
+        if capture is not None:
+            capture.on_error("create_toad_session", exc)
         # Clean up on failure
         try:
             await websocket.close()
-        except Exception as exc:
-            logger.debug(f"Error closing WebSocket after failed handshake: {exc}")
+        except Exception as close_exc:
+            logger.debug(f"Error closing WebSocket after failed handshake: {close_exc}")
         raise
 
 
@@ -111,10 +126,8 @@ async def send_prompt_stream(
 
     Streaming Pattern:
         1. Send prompt request with UUID request_id
-        2. Loop receive messages with 5min timeout
-        3. For each session_update notification:
-           - Extract update_type from params.update.sessionUpdate
-           - Call on_chunk(update_type, content)
+        2. Use shared receive_messages() loop
+        3. For each session_update notification call on_chunk(update_type, content)
         4. Exit on response with matching request_id
         5. Return final result
     """
@@ -132,56 +145,18 @@ async def send_prompt_stream(
     logger.debug(f"Sending prompt request (id={request_id})")
     await websocket.send(json.dumps(request))
 
-    # Listen for session_update notifications (5-minute timeout for long operations)
-    while True:
+    def on_notification(update_type: str, update: dict[str, Any]) -> None:
         try:
-            data = await asyncio.wait_for(websocket.recv(), timeout=300.0)
-        except asyncio.TimeoutError:
-            raise RuntimeError("No response from server after 5 minutes")
-        except websockets.exceptions.ConnectionClosed as exc:
-            raise ConnectionError(f"Server disconnected during prompt: {exc}")
+            on_chunk(update_type, update)
+        except Exception as exc:
+            logger.error(f"Error in on_chunk callback: {exc}", exc_info=True)
 
-        # Handle malformed JSON
-        try:
-            message = json.loads(data)
-        except json.JSONDecodeError as exc:
-            logger.warning(f"Invalid JSON from server: {exc}")
-            continue  # Skip and wait for next message
-
-        logger.debug(f"Received message: {message.get('method', 'response')}")
-
-        # Handle session_update notifications (streaming updates)
-        if message.get("method") == "session_update":
-            update = message["params"]["update"]
-
-            # Extract update type (camelCase field!)
-            update_type = update.get("sessionUpdate")
-            if update_type:
-                # Call callback with update type and full update dict
-                try:
-                    on_chunk(update_type, update)
-                except Exception as exc:
-                    logger.error(f"Error in on_chunk callback: {exc}", exc_info=True)
-                    # Don't crash streaming - callback errors are caller's problem
-
-        # Handle final response (comes AFTER all notifications)
-        elif message.get("id") == request_id:
-            if "error" in message:
-                error = message["error"]
-                raise RuntimeError(
-                    f"Prompt (req={request_id}) failed: {error.get('message')} (code {error.get('code')})"
-                )
-            # Final response received - streaming complete
-            logger.debug("Received final response - prompt complete")
-            return message.get("result", {})
-
-        # Ignore other notifications
-        elif "method" in message:
-            logger.debug(f"Ignoring notification: {message['method']}")
-            continue
-        else:
-            logger.warning(f"Unknown message format: {message}")
-            continue
+    result = await receive_messages(
+        websocket,
+        request_id=request_id,
+        on_notification=on_notification,
+    )
+    return result or {}
 
 
 async def handle_tool_update(
@@ -292,7 +267,7 @@ async def run_toad_client(
 
     Pattern:
         1. Connect using punie_session context manager
-        2. Wait for messages in event loop
+        2. Wait for messages using shared receive_messages() in persistent mode
         3. Route session_update notifications to callback
         4. Maintain connection until explicitly closed (KeyboardInterrupt, etc.)
 
@@ -305,37 +280,22 @@ async def run_toad_client(
     async with punie_session(server_url, cwd) as (websocket, session_id):
         logger.info(f"Toad client connected: session_id={session_id}")
 
-        # Event loop: receive messages and route to callback
+        def on_notification(update_type: str, update: dict[str, Any]) -> None:
+            try:
+                on_update(update)
+            except Exception as exc:
+                logger.error(f"Error in on_update callback: {exc}", exc_info=True)
+
         try:
-            while True:
-                try:
-                    data = await websocket.recv()
-                except websockets.exceptions.ConnectionClosed as exc:
-                    logger.info(f"WebSocket connection closed: {exc}")
-                    break
-
-                # Handle malformed JSON
-                try:
-                    message = json.loads(data)
-                except json.JSONDecodeError as exc:
-                    logger.warning(f"Invalid JSON from server: {exc}")
-                    continue
-
-                # Route session_update notifications to callback
-                if message.get("method") == "session_update":
-                    update = message["params"]["update"]
-                    try:
-                        on_update(update)
-                    except Exception as exc:
-                        logger.error(
-                            f"Error in on_update callback: {exc}", exc_info=True
-                        )
-                        # Don't crash event loop - callback errors are caller's problem
-
-                # Log other notifications for debugging
-                elif "method" in message:
-                    logger.debug(f"Received notification: {message['method']}")
-
+            # Persistent mode: receive_messages loops until connection closes
+            await receive_messages(
+                websocket,
+                request_id=None,  # persistent mode
+                on_notification=on_notification,
+                timeout=None,  # no per-message timeout in persistent mode
+            )
+        except ConnectionError as exc:
+            logger.info(f"Toad client connection closed: {exc}")
         except KeyboardInterrupt:
             logger.info("Toad client interrupted by user")
         except Exception as exc:

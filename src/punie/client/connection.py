@@ -16,6 +16,8 @@ from typing import Any, AsyncIterator
 import websockets
 from websockets.asyncio.client import ClientConnection
 
+from punie.client.timeouts import CLIENT_TIMEOUTS
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["connect_to_server", "send_request", "initialize_session", "punie_session"]
@@ -40,7 +42,14 @@ async def connect_to_server(url: str) -> ClientConnection:
         await websocket.close()
     """
     logger.debug(f"Connecting to {url}")
-    websocket = await websockets.connect(url)
+    try:
+        websocket = await asyncio.wait_for(
+            websockets.connect(url), timeout=CLIENT_TIMEOUTS.connect_timeout
+        )
+    except asyncio.TimeoutError:
+        raise ConnectionError(
+            f"Connection to {url} timed out after {CLIENT_TIMEOUTS.connect_timeout}s"
+        )
     logger.info(f"Connected to {url}")
     return websocket
 
@@ -78,10 +87,13 @@ async def send_request(
     # Wait for response (Issue #1: add timeout protection)
     while True:
         try:
-            data = await asyncio.wait_for(websocket.recv(), timeout=30.0)
+            data = await asyncio.wait_for(
+                websocket.recv(), timeout=CLIENT_TIMEOUTS.request_timeout
+            )
         except asyncio.TimeoutError:
             raise RuntimeError(
-                f"Timeout waiting for {method} response (id={request_id}) after 30s"
+                f"Timeout waiting for {method} response (id={request_id}) "
+                f"after {CLIENT_TIMEOUTS.request_timeout}s"
             )
         except websockets.exceptions.ConnectionClosed as exc:
             raise ConnectionError(f"Server disconnected during {method}: {exc}")

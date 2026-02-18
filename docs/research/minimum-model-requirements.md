@@ -15,9 +15,17 @@ Punie requires specific model capabilities beyond just parameter count. Through 
 
 **Failed experiments:**
 - 7B dense (Phase 25b) - **Conclusively failed** even with perfect setup
+- 8B dense (Phase 40) - **Failed** — learned intent routing (18.5%) but not execute_code format
 - 1.5B dense (never attempted) - Would be catastrophic
 
-**Candidate under evaluation:** Devstral Small 2 (24B dense) - See full evaluation below
+**Production model confirmed:** Qwen3-Coder-30B-A3B (MoE) — Phase 33b scripts confirm this has
+always been the Coder variant, not a general Qwen3 base. Code-biased pretraining already active.
+
+**Phase 43 candidates under evaluation:**
+- Qwen3-14B Dense (Experiment B) — See Phase 43b analysis below (MoE hypothesis test)
+- Qwen3-Coder-30B-A3B re-run (Experiment A) — Baseline confirmation, domain/multi_tool focus
+
+**Devstral Small 2 (24B dense):** Evaluation below. Not yet tested. Speed concern (8x slower).
 
 ---
 
@@ -96,12 +104,14 @@ The model has enough parameters to:
 
 **Confirmed failures:**
 - **7B dense:** ❌ Failed conclusively (Phase 25b with perfect setup)
+- **8B dense:** ❌ Failed (Phase 40, 18.5%) — learned tool names but not execute_code format
 - **1.5B dense:** ❌ Would be catastrophic (never tested, extrapolated)
 
 **Confirmed successes:**
-- **30B MoE (3B active):** ✅ Production model (Qwen3-30B-A3B)
+- **30B MoE (3B active):** ✅ Production model (Qwen3-Coder-30B-A3B, Phase 33b: 82.4%)
 
-**Open questions:**
+**Open questions (Phase 43 experiments):**
+- **14B dense:** Testing in Phase 43b — cleanest test of MoE vs total-params hypothesis
 - **24B dense:** Untested - Devstral Small 2 would answer this
 - **14B MoE:** Untested - Could work if experts specialized enough
 - **20B dense:** Untested - Likely minimum for dense architectures
@@ -791,24 +801,59 @@ uv run python scripts/test_devstral_tool_calling.py
 
 ---
 
+## Phase 43 Evaluation: Qwen3-14B Dense
+
+### Profile
+
+**Architecture:**
+- 14B parameters (all active, dense model)
+- Qwen3 model family (same tokenizer, same tool tokens)
+- No Coder variant exists at 14B — general Qwen3 weights
+- Standard Qwen3 context window (32K)
+
+**Why this matters:**
+- Phase 40 proved 8B dense (8B active) fails vs 30B MoE (3B active)
+- 14B is the cleanest test: same family, more params, still dense
+- Either confirms MoE routing is structurally required, or shows total params matter more
+
+### Must-Have Assessment
+
+| Req | Status | Evidence | Notes |
+|-----|--------|----------|-------|
+| **M1: Tool tokens** | ✅ PASS | Qwen3 family — same `<tool_call>`/`<tool_response>` single tokens | No reformatting needed |
+| **M2: Capacity** | ❓ UNKNOWN | 14B > 8B (failed) but < 30B MoE (succeeded). Phase 43b answers this. | The key experiment |
+| **M3: Format compat** | ✅ PASS | Same Qwen3 ChatML template. Zero reformatting. | Direct drop-in |
+| **M4: Code pretraining** | 🟡 PARTIAL | General Qwen3-14B, not Coder variant (no 14B Coder exists) | Weaker code priors than production |
+
+### Phase 43b Success Criteria
+
+| Outcome | Score | Interpretation |
+|---------|-------|---------------|
+| Clear success | ≥80% | Hypothesis A wins: total params cross threshold at 14B |
+| Ambiguous | 50-79% | Mixed: capacity and routing both contribute |
+| Likely MoE required | <50% | Hypothesis B: MoE routing structurally necessary |
+| Strong MoE confirmed | ~18% | Same failure mode as Phase 40; 14B == 8B behavior |
+
+---
+
 ## Updated Comparison Table
 
-| Requirement | Qwen3-30B-A3B (Production) | Qwen2.5-7B (Failed) | Devstral-24B (Candidate) |
-|-------------|----------------------------|---------------------|---------------------------|
-| **M1: Tool tokens** | ✅ Single tokens | ❌ Multi-token spans | ✅ Single tokens |
-| **M2: Capacity** | ✅ 30B MoE (3B active) | ❌ 7B dense | 🟡 24B dense (untested) |
-| **M3: Format compat** | ✅ Qwen3 XML/ChatML | ❌ JSON/different | ⚠️ Mistral JSON (needs work) |
-| **M4: Code pretraining** | ✅ Qwen3-Coder | ✅ Qwen2.5-Coder | ✅ Code-specialized |
-| **S1: Multi-turn** | ✅ Strong (but gaps in 27.5) | ❌ Weak | 🟡 Likely (needs validation) |
-| **S2: Field access** | ✅ 90% (trained) | ❌ 0% | ❓ Unknown (trainable) |
-| **S3: Quantization** | ✅ 19.5 GB (5-bit) | ✅ ~5 GB (5-bit) | ✅ 17 GB (5-bit) |
-| **N1: MoE** | ✅ 2.90s gen time | ❌ Dense | ❌ Dense (est. 20-30s) |
-| **N2: Long context** | ✅ 32K usable | ✅ 32K | ✅ 256K |
-| **N3: Multi-step** | ✅ 92-100% (trained) | ❌ 35% | 🟡 Likely (trainable) |
-| **N4: MLX ecosystem** | ✅ Proven | ✅ Proven | ⚠️ Known issues |
-| **Score** | **11/11 ✅** | **2/11 ❌** | **~6-7/11 🟡** |
-| **Phase 27 accuracy** | **100% (40/40)** | **0% tool calling** | **Untested** |
-| **Phase 27.5 honest** | **72% (29/40)** | **N/A** | **Untested** |
+| Requirement | Qwen3-30B-A3B (Production) | Qwen3-8B (Failed Ph40) | Qwen3-14B (Ph43b) | Devstral-24B (Candidate) |
+|-------------|----------------------------|-----------------------|-------------------|--------------------------|
+| **M1: Tool tokens** | ✅ Single tokens | ✅ Single tokens | ✅ Single tokens | ✅ Single tokens |
+| **M2: Capacity** | ✅ 30B MoE (3B active) | ❌ 8B dense (failed) | ❓ 14B dense (testing) | 🟡 24B dense (untested) |
+| **M3: Format compat** | ✅ Qwen3 ChatML | ✅ Qwen3 ChatML | ✅ Qwen3 ChatML | ⚠️ Mistral JSON (needs work) |
+| **M4: Code pretraining** | ✅ Qwen3-Coder | 🟡 Qwen3 (general) | 🟡 Qwen3 (no Coder) | ✅ Code-specialized |
+| **S1: Multi-turn** | ✅ Strong (but gaps in 27.5) | ❌ 18.5% total | ❓ Untested | 🟡 Likely (needs validation) |
+| **S2: Field access** | ✅ 90% (trained) | ❌ 0% | ❓ Unknown (trainable) | ❓ Unknown (trainable) |
+| **S3: Quantization** | ✅ 20 GB (5-bit) | ✅ 5.3 GB (5-bit) | ✅ ~9 GB (5-bit, est.) | ✅ 17 GB (5-bit) |
+| **N1: MoE** | ✅ ~2-5s gen time | ❌ Dense (~2s est.) | ❌ Dense (~1-2s est.) | ❌ Dense (est. 20-30s) |
+| **N2: Long context** | ✅ 32K usable | ✅ 32K | ✅ 32K | ✅ 256K |
+| **N3: Multi-step** | ✅ 82.4% (trained) | ❌ 18.5% | ❓ Unknown | 🟡 Likely (trainable) |
+| **N4: MLX ecosystem** | ✅ Proven | ✅ Proven | ✅ Qwen3 family | ⚠️ Known issues |
+| **Score** | **11/11 ✅** | **4/11 ❌** | **~7-8/11 ❓** | **~6-7/11 🟡** |
+| **Phase 33b accuracy** | **82.4%** | **18.5% (Ph40)** | **Pending Ph43b** | **Untested** |
+| **Phase 27.5 honest** | **72% (29/40)** | **N/A** | **N/A** | **Untested** |
 
 ---
 

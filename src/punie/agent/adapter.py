@@ -138,7 +138,7 @@ class PunieAgent:
         self._disconnected_clients: dict[str, float] = {}  # client_id → disconnect_time
         self._session_tokens: dict[str, str] = {}  # session_id → resume_token
         self._grace_period = 300  # 5 minutes to reconnect
-        self._resuming_sessions: set[str] = set()  # Issue #9: Prevent cleanup during resume
+        self._resuming_sessions: dict[str, float] = {}  # Issue #9: session_id → resume_start_time
 
         # Issue #7: Add locks to protect shared state
         self._state_lock = asyncio.Lock()  # Protects all dictionaries
@@ -184,11 +184,25 @@ class PunieAgent:
                         if current_time - disconnect_time > self._grace_period
                     ]
 
+                    # Expire stuck resuming sessions (sessions that have been in
+                    # _resuming_sessions longer than grace_period without completing)
+                    stuck_resuming = [
+                        sid for sid, start_time in self._resuming_sessions.items()
+                        if current_time - start_time > self._grace_period
+                    ]
+                    for sid in stuck_resuming:
+                        logger.warning(
+                            f"Session {sid} stuck in resuming state for >{self._grace_period}s, "
+                            "removing from resuming set"
+                        )
+                        del self._resuming_sessions[sid]
+
                     # Clean up expired sessions
                     for client_id in expired:
                         logger.info(f"Cleaning up expired client {client_id}")
 
-                        # Find sessions owned by this client (Issue #9: skip sessions being resumed)
+                        # Find sessions owned by this client
+                        # Skip sessions currently being resumed (within TTL)
                         sessions_to_remove = [
                             sid for sid, owner in self._session_owners.items()
                             if owner == client_id and sid not in self._resuming_sessions
@@ -712,8 +726,8 @@ class PunieAgent:
                     f"Session owner {original_owner} is not disconnected (already connected?)"
                 )
 
-            # Issue #9: Mark as being resumed to prevent cleanup race
-            self._resuming_sessions.add(session_id)
+            # Issue #9: Mark as being resumed to prevent cleanup race (record start time)
+            self._resuming_sessions[session_id] = time.time()
 
             try:
                 # Transfer ownership to new client_id
@@ -738,7 +752,7 @@ class PunieAgent:
                         del self._session_owners[sid]
             finally:
                 # Always remove from resuming set
-                self._resuming_sessions.discard(session_id)
+                self._resuming_sessions.pop(session_id, None)
 
         logger.info(f"Successfully resumed session {session_id}")
         return ResumeSessionResponse()

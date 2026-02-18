@@ -12,6 +12,7 @@ Consolidates:
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -539,7 +540,7 @@ def test_build_server_command_minimal():
     cmd = build_server_command(config)
 
     assert cmd == [
-        "python",
+        sys.executable,
         "-m",
         "mlx_lm",
         "server",
@@ -653,7 +654,7 @@ def test_build_server_command_all_parameters():
     cmd = build_server_command(config)
 
     expected = [
-        "python",
+        sys.executable,
         "-m",
         "mlx_lm",
         "server",

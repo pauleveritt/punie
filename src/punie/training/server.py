@@ -3,6 +3,7 @@
 import asyncio
 import signal
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from types import TracebackType
 
@@ -21,7 +22,7 @@ def build_server_command(config: ServerConfig) -> list[str]:
     parameter in chat completion requests), not as server-level configuration.
     """
     cmd = [
-        "python",
+        sys.executable,
         "-m",
         "mlx_lm",
         "server",
@@ -112,7 +113,7 @@ class ServerProcess:
         )
 
         # Poll /v1/models until ready or timeout
-        start_time = asyncio.get_event_loop().time()
+        start_time = asyncio.get_running_loop().time()
         while True:
             # Check if process died
             if self._process.poll() is not None:
@@ -128,7 +129,7 @@ class ServerProcess:
                 return
 
             # Check timeout
-            elapsed = asyncio.get_event_loop().time() - start_time
+            elapsed = asyncio.get_running_loop().time() - start_time
             if elapsed > timeout:
                 await self.stop()
                 raise TimeoutError(
@@ -159,9 +160,9 @@ class ServerProcess:
             self._process.send_signal(signal.SIGTERM)
 
             # Wait for process to exit
-            start_time = asyncio.get_event_loop().time()
+            start_time = asyncio.get_running_loop().time()
             while self._process.poll() is None:
-                elapsed = asyncio.get_event_loop().time() - start_time
+                elapsed = asyncio.get_running_loop().time() - start_time
                 if elapsed > timeout:
                     # Timeout - force kill
                     self._process.kill()

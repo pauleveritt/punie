@@ -162,7 +162,7 @@ class WebSocketClient:
         params = SessionNotification(
             session_id=session_id, update=update, field_meta=kwargs or None
         ).model_dump(mode="json", exclude_none=True, by_alias=True)
-        await self._send_notification("session_update", params)
+        await self._send_notification("session/update", params)
         logger.info("   ✅ Notification sent")
 
     async def request_permission(
@@ -189,7 +189,7 @@ class WebSocketClient:
             tool_call=tool_call,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("session_request_permission", params)
+        result = await self._send_request("session/request_permission", params)
         return RequestPermissionResponse(**result)
 
     async def read_text_file(
@@ -219,7 +219,7 @@ class WebSocketClient:
             line=line,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("fs_read_text_file", params)
+        result = await self._send_request("fs/read_text_file", params)
         return ReadTextFileResponse(**result)
 
     async def write_text_file(
@@ -242,7 +242,7 @@ class WebSocketClient:
             session_id=session_id,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("fs_write_text_file", params)
+        result = await self._send_request("fs/write_text_file", params)
         return WriteTextFileResponse(**result) if result else None
 
     async def create_terminal(
@@ -278,7 +278,7 @@ class WebSocketClient:
             output_byte_limit=output_byte_limit,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("terminal_create", params)
+        result = await self._send_request("terminal/create", params)
         return CreateTerminalResponse(**result)
 
     async def terminal_output(
@@ -299,7 +299,7 @@ class WebSocketClient:
             terminal_id=terminal_id,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("terminal_output", params)
+        result = await self._send_request("terminal/output", params)
         return TerminalOutputResponse(**result)
 
     async def release_terminal(
@@ -320,7 +320,7 @@ class WebSocketClient:
             terminal_id=terminal_id,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("terminal_release", params)
+        result = await self._send_request("terminal/release", params)
         return ReleaseTerminalResponse(**result) if result else None
 
     async def wait_for_terminal_exit(
@@ -341,7 +341,7 @@ class WebSocketClient:
             terminal_id=terminal_id,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("terminal_wait_for_exit", params)
+        result = await self._send_request("terminal/wait_for_exit", params)
         return WaitForTerminalExitResponse(**result)
 
     async def kill_terminal(
@@ -362,7 +362,7 @@ class WebSocketClient:
             terminal_id=terminal_id,
             field_meta=kwargs or None,
         ).model_dump(mode="json", exclude_none=True)
-        result = await self._send_request("terminal_kill", params)
+        result = await self._send_request("terminal/kill", params)
         return KillTerminalCommandResponse(**result) if result else None
 
     async def discover_tools(self, session_id: str, **kwargs: Any) -> dict[str, Any]:
@@ -440,10 +440,11 @@ class WebSocketClient:
         Called when WebSocket disconnects to prevent 30s hangs.
         """
         self._connected = False
+        count = len(self._pending_requests)
         for request_id, future in list(self._pending_requests.items()):
             if not future.done():
                 future.set_exception(
                     ConnectionError("WebSocket disconnected while waiting for response")
                 )
         self._pending_requests.clear()
-        logger.info(f"Aborted {len(self._pending_requests)} pending requests")
+        logger.info(f"Aborted {count} pending requests")

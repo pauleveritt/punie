@@ -59,7 +59,7 @@ from punie.acp.schema import (
     UserMessageChunk,
 )
 
-__all__ = ["FakeAgent", "FakeClient", "FakeTerminal"]
+__all__ = ["FakeAgent", "FakeClient", "FakeTerminal", "FakeWebSocket"]
 
 
 @dataclass
@@ -417,4 +417,71 @@ class FakeAgent:
 
     def on_connect(self, conn) -> None:
         """Called when client connection is established."""
+        pass
+
+
+class FakeWebSocket:
+    """Fake WebSocket for testing client-side receive loops.
+
+    Simulates the websockets ClientConnection interface with pre-configured
+    response sequences.
+
+    Args:
+        responses: List of message dicts to return from recv().
+                   Each dict is JSON-serialized. Pass
+                   ``{"__close__": True}`` to simulate connection close.
+        close_after: If set, raises ConnectionClosed after this many recv() calls.
+
+    Example:
+        fake = FakeWebSocket(responses=[
+            {"method": "session_update", "params": {"update": {"sessionUpdate": "agent_message_chunk"}}},
+            {"id": "req-1", "result": {"status": "ok"}},
+        ])
+        result = await receive_messages(fake, request_id="req-1")
+        assert result == {"status": "ok"}
+        assert fake.sent  # verify we sent the prompt
+    """
+
+    __test__ = False
+
+    def __init__(
+        self,
+        responses: list[dict] | None = None,
+        close_after: int | None = None,
+    ) -> None:
+        import json as _json
+        self._json = _json
+        self._responses = list(responses or [])
+        self._close_after = close_after
+        self._recv_count = 0
+        self.sent: list[str] = []  # messages sent via send()
+
+    async def send(self, data: str | bytes) -> None:
+        """Record sent data."""
+        if isinstance(data, bytes):
+            data = data.decode("utf-8")
+        self.sent.append(data)
+
+    async def recv(self) -> str:
+        """Return next pre-configured response or raise ConnectionClosed."""
+        import websockets.exceptions
+
+        self._recv_count += 1
+
+        if self._close_after is not None and self._recv_count > self._close_after:
+            raise websockets.exceptions.ConnectionClosed(None, None)  # type: ignore[arg-type]
+
+        if not self._responses:
+            raise websockets.exceptions.ConnectionClosed(None, None)  # type: ignore[arg-type]
+
+        response = self._responses.pop(0)
+
+        # Special sentinel: simulate connection close
+        if response.get("__close__"):
+            raise websockets.exceptions.ConnectionClosed(None, None)  # type: ignore[arg-type]
+
+        return self._json.dumps(response)
+
+    async def close(self) -> None:
+        """Simulate connection close."""
         pass

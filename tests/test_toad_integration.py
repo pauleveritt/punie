@@ -461,7 +461,7 @@ def test_send_prompt_stream_calls_callback_for_each_chunk(test_app, fake_callbac
 
                         # Simulate agent_message_chunk
                         chunk1 = {
-                            "method": "session_update",
+                            "method": "session/update",
                             "params": {
                                 "update": {
                                     "sessionUpdate": "agent_message_chunk",
@@ -471,7 +471,7 @@ def test_send_prompt_stream_calls_callback_for_each_chunk(test_app, fake_callbac
                         }
 
                         chunk2 = {
-                            "method": "session_update",
+                            "method": "session/update",
                             "params": {
                                 "update": {
                                     "sessionUpdate": "agent_message_chunk",
@@ -569,7 +569,7 @@ def test_send_prompt_stream_skips_non_session_update_notifications(fake_callback
                     # Valid session_update
                     return json.dumps(
                         {
-                            "method": "session_update",
+                            "method": "session/update",
                             "params": {
                                 "update": {
                                     "sessionUpdate": "agent_message_chunk",

@@ -1,6 +1,8 @@
 """Configuration for mlx_lm.server instances."""
 
+import os
 from dataclasses import dataclass
+from pathlib import Path
 
 # Default stop sequences for Qwen models to prevent garbage token generation
 QWEN_STOP_SEQUENCES = ("<|im_end|>", "<|endoftext|>")
@@ -30,3 +32,27 @@ class ServerConfig:
     def base_url(self) -> str:
         """Return the OpenAI-compatible API base URL."""
         return f"http://{self.host}:{self.port}/v1"
+
+
+def find_local_model(search_dir: Path | None = None) -> Path | None:
+    """Find the most recent fused_model_* directory.
+
+    Checks PUNIE_MODEL_PATH env var first, then globs for fused_model_*
+    sorted by name (lexicographic = chronological for our naming convention).
+    Returns None if no model found.
+
+    Args:
+        search_dir: Directory to search (defaults to cwd)
+    """
+    env_path = os.getenv("PUNIE_MODEL_PATH")
+    if env_path:
+        p = Path(env_path)
+        if p.exists():
+            return p
+
+    base = search_dir or Path.cwd()
+    candidates = sorted(base.glob("fused_model_*"))
+    if candidates:
+        return candidates[-1]
+
+    return None

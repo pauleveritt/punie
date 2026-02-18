@@ -370,7 +370,7 @@ def test_serve_resolves_model(monkeypatch):
     """Model resolution chain works."""
     resolved_model = None
 
-    async def capture_model(model, name, host, port, log_level):
+    async def capture_model(model, name, host, port, log_level, mlx_port=5001):
         nonlocal resolved_model
         resolved_model = model
 
@@ -386,7 +386,7 @@ def test_serve_model_flag_overrides_env(monkeypatch):
     """--model flag takes priority."""
     resolved_model = None
 
-    async def capture_model(model, name, host, port, log_level):
+    async def capture_model(model, name, host, port, log_level, mlx_port=5001):
         nonlocal resolved_model
         resolved_model = model
 

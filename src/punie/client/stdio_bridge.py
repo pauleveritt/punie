@@ -150,14 +150,15 @@ async def run_stdio_bridge(server_url: str) -> NoReturn:
         logger.info("WebSocket connection established")
 
         # Setup stdio streams
+        loop = asyncio.get_running_loop()
         reader = asyncio.StreamReader()
         protocol = asyncio.StreamReaderProtocol(reader)
-        await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
 
-        writer_transport, writer_protocol = await asyncio.get_event_loop().connect_write_pipe(
+        writer_transport, writer_protocol = await loop.connect_write_pipe(
             asyncio.streams.FlowControlMixin, sys.stdout
         )
-        writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, asyncio.get_event_loop())
+        writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
 
         logger.info("Stdio streams connected, starting bidirectional forwarding")
 
