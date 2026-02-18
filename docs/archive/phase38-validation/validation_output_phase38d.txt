@@ -1,0 +1,217 @@
+================================================================================
+ZERO-SHOT CODE MODE VALIDATION
+================================================================================
+Model: devstral
+Workspace: /Users/pauleveritt/projects/pauleveritt/punie
+Backend: ollama (assumed running at http://localhost:11434)
+================================================================================
+
+Creating agent...
+
+================================================================================
+Category 1: Direct Answers (expect NO tool calls)
+================================================================================
+
+[Direct] Query: What's the difference between git merge and git rebase?...
+Response: In Git, both `merge` and `rebase` are used to integrate changes from one branch into another, but they do so in different ways with distinct results.
+
+### Git Merge
+
+1. **Purpose**: To combine the his...
+Time: 98.02s
+  Tool calls: 0 (1 = first-call success, >1 = retries)
+  ✅ Correct behavior
+
+[Direct] Query: When should I use type hints in Python?...
+Response: You should use type hints in Python to:
+
+1. Improve code readability and maintainability
+2. Enable better tooling support (IDEs, linters)
+3. Catch potential bugs early through static analysis
+4. Make ...
+Time: 10.44s
+  Tool calls: 0 (1 = first-call success, >1 = retries)
+  ✅ Correct behavior
+
+[Direct] Query: What is dependency injection?...
+Response: Dependency Injection (DI) is a design pattern used in software development to implement Inversion of Control (IoC) between classes and their dependencies. It allows a class to receive its dependencies...
+Time: 24.68s
+  Tool calls: 0 (1 = first-call success, >1 = retries)
+  ✅ Correct behavior
+
+[Direct] Query: Explain the difference between ruff and pytest...
+Response: Certainly! Here's a breakdown of the differences between `ruff` and `pytest`:
+
+### Ruff
+- **Purpose**: `ruff` is a linter for Python code. It analyzes your code to find potential errors, style issues,...
+Time: 55.08s
+  Tool calls: 0 (1 = first-call success, >1 = retries)
+  ✅ Correct behavior
+
+[Direct] Query: What are LSP capabilities?...
+Response: Language Server Protocol (LSP) capabilities refer to the features and functionalities that a language server can provide to an editor or IDE through the LSP. These capabilities enable advanced coding ...
+Time: 27.75s
+  Tool calls: 0 (1 = first-call success, >1 = retries)
+  ✅ Correct behavior
+
+================================================================================
+Category 2: Single Tool Calls (expect tool calls)
+================================================================================
+
+[Single Tool] Query: Check for type errors in src/...
+Response: I apologize, but I'm unable to check for type errors in the `src/` directory at the moment. It seems there was an issue with parsing the type checker's output.
+
+Would you like me to try a different ap...
+Time: 11.09s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: typecheck_direct
+  ✅ Correct behavior
+
+[Single Tool] Query: Run ruff linter on src/punie/...
+Response: Ruff linter ran successfully on `src/punie/`. No violations were found. Your code is clean! 🎉...
+Time: 8.11s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: ruff_check_direct
+  ✅ Correct behavior
+
+[Single Tool] Query: What files have changed? Show git status...
+Response: Here's the git status for your project:
+
+Total files with changes: 28
+
+Modified and staged:
+1. ustfile
+
+Modified but not staged (9 files):
+1. docs/client-setup-guide.md
+2. pyproject.toml
+3. src/punie/...
+Time: 67.73s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: git_status_direct
+  ✅ Correct behavior
+
+[Single Tool] Query: Read the README.md file...
+Response: Hello! I'm Punie, your tiny Python coding assistant. How can I help you today?...
+Time: 111.53s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: read_file
+  ✅ Correct behavior
+
+[Single Tool] Query: Run pytest on tests/...
+Response: It looks like you've provided a JSON object that contains test results for various groups (denoted by `gw` followed by a number). Each group has multiple tests, and each test result includes the perce...
+Time: 151.86s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: pytest_run_direct
+  ✅ Correct behavior
+
+================================================================================
+Category 3: Multi-Step (expect multiple tool calls)
+================================================================================
+
+[Multi-Step] Query: Find all Python files and count imports...
+Response: It looks like you've provided a list of file paths from two different projects: Django and Punie. Here's a brief overview of what each project contains based on the files listed:
+
+### Django Project
+
+...
+Time: 205.74s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: run_command
+  ❌ Expected read_file, got: ['run_command']
+
+[Multi-Step] Query: Run full quality check: ruff, pytest, and typecheck...
+Response: I'm sorry, but I currently don't have the capability to access or interpret the tools needed to address your request. If you have any other questions or need assistance with something else, feel free ...
+Time: 106.64s
+  Tool calls: 3 (1 = first-call success, >1 = retries)
+  Tools used: ruff_check_direct, pytest_run_direct, typecheck_direct
+  ✅ Correct behavior
+
+[Multi-Step] Query: Count staged vs unstaged files using git...
+Response: Here's the count of staged vs unstaged files:
+
+- Staged: 1 file
+- Unstaged: 27 files
+
+The unstaged files include both modified and untracked files....
+Time: 69.07s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: git_status_direct
+  ✅ Correct behavior
+
+[Multi-Step] Query: List all test files and show their pass rates...
+Response: It looks like you've provided a list of file paths, likely from a Django project. If you need help with something specific related to these files or the Django framework in general, please let me know...
+Time: 85.36s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: run_command
+  ❌ Expected pytest_run_direct, got: ['run_command']
+
+[Multi-Step] Query: Find definition of PunieAgent and show its methods...
+Response: It looks like you've shared a large code snippet that appears to be part of an AI agent implementation. This code handles various operations such as initializing sessions, processing prompts, and mana...
+Time: 207.08s
+  Tool calls: 3 (1 = first-call success, >1 = retries)
+  Tools used: workspace_symbols_direct, document_symbols_direct, read_file
+  ❌ Expected goto_definition_direct, got: ['workspace_symbols_direct', 'document_symbols_direct', 'read_file']
+
+================================================================================
+Category 4: Field Access (expect structured result parsing)
+================================================================================
+
+[Field Access] Query: Show only fixable ruff violations...
+Response: I found no ruff violations in the project....
+Time: 58.83s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: ruff_check_direct
+  ✅ Correct behavior
+
+[Field Access] Query: Count passed vs failed tests...
+Response: It looks like you've provided a JSON object that contains test results for various groups (denoted by `gwX`). Here's a summary of the outcomes:
+
+### Summary of Test Results
+
+#### Group: gw1
+- **83%**:...
+Time: 155.53s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: pytest_run_direct
+  ✅ Correct behavior
+Python syntax error in code block 1: unexpected indent (<unknown>, line 1)
+
+[Field Access] Query: Filter type errors by severity...
+Response: I'm sorry for the confusion, but I currently don't have the capability to execute or validate code. However, I can help guide you on how to fix the issue. The error message "unexpected indent" typical...
+Time: 309.73s
+  Tool calls: 2 (1 = first-call success, >1 = retries)
+  Tools used: typecheck_direct, run_command
+  ✅ Correct behavior
+
+[Field Access] Query: Show git diff statistics with additions and deletions...
+Response: I need to know which repository path you want me to check. Could you please provide that?...
+Time: 51.68s
+  Tool calls: 1 (1 = first-call success, >1 = retries)
+  Tools used: git_diff_direct
+  ✅ Correct behavior
+
+================================================================================
+VALIDATION SUMMARY
+================================================================================
+✓ direct_answers      : 5/5 (100%)
+✓ single_tool         : 5/5 (100%)
+✗ multi_step          : 2/5 (40%)
+✓ field_access        : 4/4 (100%)
+
+================================================================================
+Overall: 16/19 (84%)
+Zero-shot target: ≥50% (10/20)
+Fine-tuned baseline: 100% (40/40)
+Status: ✓ PASS
+================================================================================
+
+Performance:
+  Average generation time: 95.58s
+  Total validation time: 1815.95s
+
+================================================================================
+INTERPRETATION
+================================================================================
+✅ EXCELLENT - Model follows Code Mode stubs very well!
+   Zero-shot performance suggests minimal fine-tuning needed.

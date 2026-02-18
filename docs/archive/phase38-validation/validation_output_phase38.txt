@@ -1,0 +1,187 @@
+================================================================================
+ZERO-SHOT CODE MODE VALIDATION
+================================================================================
+Model: devstral
+Workspace: /Users/pauleveritt/projects/pauleveritt/punie
+Backend: ollama (assumed running at http://localhost:11434)
+================================================================================
+
+Creating agent...
+
+================================================================================
+Category 1: Direct Answers (expect NO tool calls)
+================================================================================
+
+[Direct] Query: What's the difference between git merge and git rebase?...
+Response: In Git, both `merge` and `rebase` are used to integrate changes from one branch into another, but they do so in different ways with distinct results.
+
+1. **Git Merge**:
+   - Creates a new commit (call...
+Time: 86.30s
+  ✅ Correct behavior
+
+[Direct] Query: When should I use type hints in Python?...
+Response: Type hints in Python are a powerful feature that can help improve code quality, readability, and maintainability. Here are some guidelines on when to use type hints:
+
+1. **Public APIs**: Always use ty...
+Time: 52.94s
+  ✅ Correct behavior
+
+[Direct] Query: What is dependency injection?...
+Response: Dependency Injection (DI) is a design pattern used in software development to implement Inversion of Control (IoC) between classes and their dependencies. It allows a class to receive its dependencies...
+Time: 25.04s
+  ✅ Correct behavior
+
+[Direct] Query: Explain the difference between ruff and pytest...
+Response: Certainly! Here's a brief explanation of the differences between `ruff` and `pytest`:
+
+### Ruff
+- **Purpose**: `ruff` is a linter for Python code. It helps identify and flag issues in your code that d...
+Time: 48.19s
+  ✅ Correct behavior
+
+[Direct] Query: What are LSP capabilities?...
+Response: Language Server Protocol (LSP) capabilities refer to the features and functionalities that a language server can provide to an editor or IDE. These capabilities enable advanced coding assistance featu...
+Time: 22.11s
+  ✅ Correct behavior
+
+================================================================================
+Category 2: Single Tool Calls (expect tool calls)
+================================================================================
+
+[Single Tool] Query: Check for type errors in src/...
+Response: It seems there was an issue with the type checker. Let me try running it again.
+
+I apologize for the inconvenience. It appears we're having some technical difficulties with the type checker. Would you...
+Time: 11.43s
+  ✅ Correct behavior
+
+[Single Tool] Query: Run ruff linter on src/punie/...
+Response: Ruff linter completed successfully. No violations found in the `src/punie/` directory....
+Time: 6.75s
+  ✅ Correct behavior
+
+[Single Tool] Query: What files have changed? Show git status...
+Response: Here are the files that have changed:
+
+Modified and staged:
+1. ustfile
+
+Modified but not staged (20 files):
+1. docs/client-setup-guide.md
+2. pyproject.toml
+3. scripts/validate_zero_shot_code_mode.py
+4...
+Time: 65.26s
+  ✅ Correct behavior
+
+[Single Tool] Query: Read the README.md file...
+Response: Hello! I'm Punie, your tiny Python coding assistant. How can I help you today?...
+Time: 61.49s
+  ✅ Correct behavior
+
+[Single Tool] Query: Run pytest on tests/...
+Response: It looks like you've provided a list of test results from some kind of automated testing framework. Each entry in the list represents an individual test case with details such as its name, outcome, du...
+Time: 151.36s
+  ✅ Correct behavior
+
+================================================================================
+Category 3: Multi-Step (expect multiple tool calls)
+================================================================================
+
+[Multi-Step] Query: Find all Python files and count imports...
+Response: I'm here to help, but I currently don't have the capability to directly search for files or execute code on your system. However, I can guide you on how to find all Python files and count imports in t...
+Time: 89.51s
+  ❌ Expected tool call but got direct answer
+
+[Multi-Step] Query: Run full quality check: ruff, pytest, and typecheck...
+Response: I'm Punie, your AI coding assistant. I'm here to help you with your code-related tasks. How can I assist you today?...
+Time: 53.81s
+  ✅ Correct behavior
+
+[Multi-Step] Query: Count staged vs unstaged files using git...
+Response: There are 1 staged file and 28 unstaged files in the repository....
+Time: 66.68s
+  ✅ Correct behavior
+
+[Multi-Step] Query: List all test files and show their pass rates...
+Response: It looks like you've provided a list of test results with various outcomes (passed, failed, skipped) and their respective percentages. Here's a summary of the data:
+
+### Summary of Test Results
+
+#### ...
+Time: 177.21s
+  ✅ Correct behavior
+
+[Multi-Step] Query: Find definition of PunieAgent and show its methods...
+Response: The `PunieAgent` class is defined in `/Users/pauleveritt/projects/pauleveritt/punie/src/punie/agent/adapter.py`. Here are its methods:
+
+1. `__init__`
+2. `shutdown`
+3. `_cleanup_expired_sessions`
+4. `o...
+Time: 103.75s
+  ✅ Correct behavior
+
+================================================================================
+Category 4: Field Access (expect structured result parsing)
+================================================================================
+
+[Field Access] Query: Show only fixable ruff violations...
+Response: There are no ruff violations in your project....
+Time: 52.43s
+  ✅ Correct behavior
+
+[Field Access] Query: Count passed vs failed tests...
+Response: It looks like you've provided a list of test results with various outcomes and percentages. Here's a summary of the data:
+
+### Summary of Test Results
+
+#### Outcomes:
+- **Passed**: 67
+- **Failed**: 12...
+Time: 149.23s
+  ✅ Correct behavior
+
+[Field Access] Query: Filter type errors by severity...
+Response: I'm sorry, but I currently don't have the tools needed to filter type errors by severity. Is there another way I can assist you or something else you'd like help with?...
+Time: 52.43s
+  ❌ Expected tool call but got direct answer
+
+[Field Access] Query: Show git diff statistics with additions and deletions...
+Response: Here's the git diff statistics for your repository:
+
+Total files changed: 11
+Total additions: 1295
+Total deletions: 36
+
+File changes:
+1. Justfile: 101 additions, 7 deletions
+2. docs/client-setup-guide...
+Time: 61.71s
+  ✅ Correct behavior
+
+================================================================================
+VALIDATION SUMMARY
+================================================================================
+✓ direct_answers      : 5/5 (100%)
+✓ single_tool         : 5/5 (100%)
+✓ multi_step          : 4/5 (80%)
+✓ field_access        : 3/4 (75%)
+
+================================================================================
+Overall: 17/19 (89%)
+Zero-shot target: ≥50% (10/20)
+Fine-tuned baseline: 100% (40/40)
+Status: ✓ PASS
+================================================================================
+
+Performance:
+  Average generation time: 70.40s
+  Total validation time: 1337.63s
+
+================================================================================
+INTERPRETATION
+================================================================================
+✅ EXCELLENT - Model follows Code Mode stubs very well!
+   Zero-shot performance suggests minimal fine-tuning needed.

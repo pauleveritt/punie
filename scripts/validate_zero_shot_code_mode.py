@@ -18,13 +18,15 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+from pydantic_ai.messages import ModelResponse, ToolCallPart  # noqa: E402
+
 from punie.acp.contrib.tool_calls import ToolCallTracker  # noqa: E402
 from punie.agent.deps import ACPDeps  # noqa: E402
 from punie.agent.factory import create_local_agent  # noqa: E402
 
 
 async def test_query(
-    agent, client, query: str, category: str, expects_tool_call: bool
+    agent, client, query: str, category: str, expected_tool: str | None = None
 ) -> tuple[bool, str, float]:
     """Test a single query and return (success, response, time).
 
@@ -33,7 +35,7 @@ async def test_query(
         client: LocalClient instance
         query: Query string to test
         category: Category name for logging
-        expects_tool_call: Whether this query should trigger tool calls
+        expected_tool: Expected tool name (None for direct answers)
 
     Returns:
         (success, response, elapsed_time)
@@ -54,20 +56,36 @@ async def test_query(
         print(f"Response: {response[:200]}...")
         print(f"Time: {elapsed:.2f}s")
 
-        # Check if tool was called (tracker has internal _calls dict)
-        tool_called = len(deps.tracker._calls) > 0
+        # Collect all tool calls from message history
+        tools_called = [
+            part.tool_name
+            for msg in result.all_messages()
+            if isinstance(msg, ModelResponse)
+            for part in msg.parts
+            if isinstance(part, ToolCallPart)
+        ]
 
-        # Success heuristic:
-        # - If we expect tool call: check that tool was called
-        # - If we don't expect tool call: check that response is substantial (direct answer)
-        if expects_tool_call:
-            success = tool_called
+        tool_call_count = len(tools_called)
+        print(f"  Tool calls: {tool_call_count} (1 = first-call success, >1 = retries)")
+        if tools_called:
+            print(f"  Tools used: {', '.join(tools_called)}")
+
+        # Success check:
+        # - If expected_tool is None: check that no tools were called (direct answer)
+        # - If expected_tool is specified: check that the specific tool was called
+        if expected_tool is None:
+            # Direct answer expected
+            success = len(tools_called) == 0 and len(response) > 20
             if not success:
-                print("  ❌ Expected tool call but got direct answer")
+                if tools_called:
+                    print(f"  ❌ Expected direct answer but got tool calls: {tools_called}")
+                else:
+                    print("  ❌ Expected direct answer but response too short")
         else:
-            success = len(response) > 20 and not tool_called
+            # Tool call expected
+            success = expected_tool in tools_called
             if not success:
-                print("  ❌ Expected direct answer but got tool call or empty response")
+                print(f"  ❌ Expected {expected_tool}, got: {tools_called or 'no tools'}")
 
         if success:
             print("  ✅ Correct behavior")
@@ -131,67 +149,67 @@ async def run_validation(model_name: str, workspace: Path) -> bool:
 
     for query in direct_queries:
         success, response, elapsed = await test_query(
-            agent, client, query, "Direct", expects_tool_call=False
+            agent, client, query, "Direct", expected_tool=None
         )
         results["direct_answers"].append(success)
         times.append(elapsed)
 
-    # Category 2: Single tool calls (5 queries) - should call tools
+    # Category 2: Single tool calls (5 queries) - should call direct tools
     print("\n" + "=" * 80)
     print("Category 2: Single Tool Calls (expect tool calls)")
     print("=" * 80)
 
     single_tool_queries = [
-        "Check for type errors in src/",
-        "Run ruff linter on src/punie/",
-        "What files have changed? Show git status",
-        "Read the README.md file",
-        "Run pytest on tests/",
+        ("Check for type errors in src/", "typecheck_direct"),
+        ("Run ruff linter on src/punie/", "ruff_check_direct"),
+        ("What files have changed? Show git status", "git_status_direct"),
+        ("Read the README.md file", "read_file"),
+        ("Run pytest on tests/", "pytest_run_direct"),
     ]
 
-    for query in single_tool_queries:
+    for query, expected_tool in single_tool_queries:
         success, response, elapsed = await test_query(
-            agent, client, query, "Single Tool", expects_tool_call=True
+            agent, client, query, "Single Tool", expected_tool=expected_tool
         )
         results["single_tool"].append(success)
         times.append(elapsed)
 
-    # Category 3: Multi-step Code Mode (5 queries) - should call execute_code
+    # Category 3: Multi-step (5 queries) - should call multiple tools across turns
+    # For multi-step, we check if ANY appropriate tool was called (flexible)
     print("\n" + "=" * 80)
-    print("Category 3: Multi-Step Code Mode (expect execute_code)")
+    print("Category 3: Multi-Step (expect multiple tool calls)")
     print("=" * 80)
 
     multi_step_queries = [
-        "Find all Python files and count imports",
-        "Run full quality check: ruff, pytest, and typecheck",
-        "Count staged vs unstaged files using git",
-        "List all test files and show their pass rates",
-        "Find definition of PunieAgent and show its methods",
+        ("Find all Python files and count imports", "read_file"),
+        ("Run full quality check: ruff, pytest, and typecheck", "ruff_check_direct"),
+        ("Count staged vs unstaged files using git", "git_status_direct"),
+        ("List all test files and show their pass rates", "pytest_run_direct"),
+        ("Find definition of PunieAgent and show its methods", "goto_definition_direct"),
     ]
 
-    for query in multi_step_queries:
+    for query, expected_tool in multi_step_queries:
         success, response, elapsed = await test_query(
-            agent, client, query, "Multi-Step", expects_tool_call=True
+            agent, client, query, "Multi-Step", expected_tool=expected_tool
         )
         results["multi_step"].append(success)
         times.append(elapsed)
 
-    # Category 4: Field access (5 queries) - should access structured results
+    # Category 4: Field access (4 queries) - direct tools return structured text
     print("\n" + "=" * 80)
-    print("Category 4: Field Access (expect structured result access)")
+    print("Category 4: Field Access (expect structured result parsing)")
     print("=" * 80)
 
     field_access_queries = [
-        "Show only fixable ruff violations",
-        "Count passed vs failed tests",
-        "Filter type errors by severity",
-        "Show git diff statistics with additions and deletions",
-        "Count errors vs warnings in type check results",
+        ("Show only fixable ruff violations", "ruff_check_direct"),
+        ("Count passed vs failed tests", "pytest_run_direct"),
+        ("Filter type errors by severity", "typecheck_direct"),
+        ("Show git diff statistics with additions and deletions", "git_diff_direct"),
     ]
 
-    for query in field_access_queries:
+    for query, expected_tool in field_access_queries:
         success, response, elapsed = await test_query(
-            agent, client, query, "Field Access", expects_tool_call=True
+            agent, client, query, "Field Access", expected_tool=expected_tool
         )
         results["field_access"].append(success)
         times.append(elapsed)

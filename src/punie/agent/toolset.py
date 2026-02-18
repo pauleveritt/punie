@@ -672,6 +672,402 @@ async def kill_terminal(ctx: RunContext[ACPDeps], terminal_id: str) -> str:
         raise ModelRetry(f"Failed to kill terminal {terminal_id}: {exc}") from exc
 
 
+# ============================================================================
+# Direct Code Tools (Phase 38) - For zero-shot models like Devstral
+# ============================================================================
+# These tools bypass Code Mode indirection by exposing typed tools directly
+# as PydanticAI tools. Used for models that weren't trained on Code Mode.
+
+
+async def _run_terminal(
+    ctx: RunContext[ACPDeps], command: str, args: list[str], cwd: str | None = None
+) -> str:
+    """Run a command via terminal and return output.
+
+    Helper for direct Code Tools. Handles create → wait → output → release workflow.
+
+    Args:
+        ctx: Run context with ACPDeps
+        command: Command to execute
+        args: Command arguments
+        cwd: Optional working directory
+
+    Returns:
+        Terminal output text
+
+    Raises:
+        ModelRetry: If terminal execution fails
+    """
+    term = await ctx.deps.client_conn.create_terminal(
+        command=command, args=args, cwd=cwd, session_id=ctx.deps.session_id
+    )
+    try:
+        await ctx.deps.client_conn.wait_for_terminal_exit(
+            session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+        )
+        output = await ctx.deps.client_conn.terminal_output(
+            session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+        )
+        return output.output
+    finally:
+        # Always release terminal to prevent resource leak
+        await ctx.deps.client_conn.release_terminal(
+            session_id=ctx.deps.session_id, terminal_id=term.terminal_id
+        )
+
+
+def _format_typed_result(result: Any) -> str:
+    """Serialize a Pydantic result model to JSON.
+
+    JSON is more model-friendly than Python dict reprs for nested structures.
+
+    Args:
+        result: Pydantic model instance (TypeCheckResult, RuffResult, etc.)
+
+    Returns:
+        JSON-formatted string with indentation
+    """
+    return result.model_dump_json(indent=2)
+
+
+async def typecheck_direct(ctx: RunContext[ACPDeps], path: str) -> str:
+    """Run ty type checker on a file or directory.
+
+    Returns structured results with error count, errors list, and summary.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: File or directory path to type check
+
+    Returns:
+        Formatted TypeCheckResult with errors and warnings
+    """
+    from punie.agent.typed_tools import parse_ty_output
+
+    logger.info(f"🔧 TOOL: typecheck_direct(path={path})")
+    try:
+        output = await _run_terminal(
+            ctx, "ty", ["check", path, "--output-format", "json"]
+        )
+        result = parse_ty_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to run typecheck on {path}: {exc}") from exc
+
+
+async def ruff_check_direct(ctx: RunContext[ACPDeps], path: str) -> str:
+    """Run ruff linter on a file or directory.
+
+    Returns structured results with violation count, violations list, and fixable count.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: File or directory path to lint
+
+    Returns:
+        Formatted RuffResult with violations and fixable info
+    """
+    from punie.agent.typed_tools import parse_ruff_output
+
+    logger.info(f"🔧 TOOL: ruff_check_direct(path={path})")
+    try:
+        output = await _run_terminal(ctx, "ruff", ["check", path])
+        result = parse_ruff_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to run ruff check on {path}: {exc}") from exc
+
+
+async def pytest_run_direct(ctx: RunContext[ACPDeps], path: str) -> str:
+    """Run pytest on a file or directory.
+
+    Returns structured results with passed/failed/error counts and test details.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: File or directory path to test
+
+    Returns:
+        Formatted TestResult with test outcomes and statistics
+    """
+    from punie.agent.typed_tools import parse_pytest_output
+
+    logger.info(f"🔧 TOOL: pytest_run_direct(path={path})")
+    try:
+        output = await _run_terminal(ctx, "pytest", [path, "-v", "--tb=short"])
+        result = parse_pytest_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to run pytest on {path}: {exc}") from exc
+
+
+async def git_status_direct(ctx: RunContext[ACPDeps], path: str = ".") -> str:
+    """Get git working tree status.
+
+    Returns structured results with file changes and staged/unstaged info.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: Repository path (default: current directory)
+
+    Returns:
+        Formatted GitStatusResult with file statuses
+    """
+    from punie.agent.typed_tools import parse_git_status_output
+
+    logger.info(f"🔧 TOOL: git_status_direct(path={path})")
+    try:
+        output = await _run_terminal(
+            ctx, "git", ["status", "--porcelain"], cwd=path if path != "." else None
+        )
+        result = parse_git_status_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to get git status for {path}: {exc}") from exc
+
+
+async def git_diff_direct(
+    ctx: RunContext[ACPDeps], path: str = ".", staged: bool = False
+) -> str:
+    """Get git diff output.
+
+    Returns structured results with additions/deletions per file.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: Repository path (default: current directory)
+        staged: Whether to show staged changes (default: unstaged)
+
+    Returns:
+        Formatted GitDiffResult with file changes
+    """
+    from punie.agent.typed_tools import parse_git_diff_output
+
+    logger.info(f"🔧 TOOL: git_diff_direct(path={path}, staged={staged})")
+    try:
+        args = ["diff"]
+        if staged:
+            args.append("--staged")
+
+        output = await _run_terminal(ctx, "git", args, cwd=path if path != "." else None)
+        result = parse_git_diff_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to get git diff for {path}: {exc}") from exc
+
+
+async def git_log_direct(
+    ctx: RunContext[ACPDeps], path: str = ".", count: int = 10
+) -> str:
+    """Get git commit history.
+
+    Returns structured results with commits, hashes, authors, and messages.
+
+    Args:
+        ctx: Run context with ACPDeps
+        path: Repository path (default: current directory)
+        count: Number of commits to show (default: 10)
+
+    Returns:
+        Formatted GitLogResult with commit details
+    """
+    from punie.agent.typed_tools import parse_git_log_output
+
+    logger.info(f"🔧 TOOL: git_log_direct(path={path}, count={count})")
+    try:
+        output = await _run_terminal(
+            ctx,
+            "git",
+            ["log", "--format=%h|%an|%ad|%s", f"-n{count}"],
+            cwd=path if path != "." else None,
+        )
+        result = parse_git_log_output(output)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to get git log for {path}: {exc}") from exc
+
+
+async def goto_definition_direct(
+    ctx: RunContext[ACPDeps], file_path: str, line: int, column: int, symbol: str
+) -> str:
+    """Find where a symbol is defined using LSP.
+
+    Returns structured results with definition locations.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: File containing the symbol
+        line: Line number (1-based)
+        column: Column number (1-based)
+        symbol: Symbol name (for error messages)
+
+    Returns:
+        Formatted GotoDefinitionResult with locations
+    """
+    from punie.agent.lsp_client import get_lsp_client
+    from punie.agent.typed_tools import parse_definition_response
+
+    logger.info(f"🔧 TOOL: goto_definition_direct(file_path={file_path}, line={line}, column={column}, symbol={symbol})")
+    try:
+        client = await get_lsp_client()
+        response = await client.goto_definition(file_path, line, column)
+        result = parse_definition_response(response, symbol)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to find definition of {symbol} at {file_path}:{line}:{column}: {exc}") from exc
+
+
+async def find_references_direct(
+    ctx: RunContext[ACPDeps], file_path: str, line: int, column: int, symbol: str
+) -> str:
+    """Find all usages of a symbol using LSP.
+
+    Returns structured results with reference locations.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: File containing the symbol
+        line: Line number (1-based)
+        column: Column number (1-based)
+        symbol: Symbol name (for error messages)
+
+    Returns:
+        Formatted FindReferencesResult with reference list
+    """
+    from punie.agent.lsp_client import get_lsp_client
+    from punie.agent.typed_tools import parse_references_response
+
+    logger.info(f"🔧 TOOL: find_references_direct(file_path={file_path}, line={line}, column={column}, symbol={symbol})")
+    try:
+        client = await get_lsp_client()
+        response = await client.find_references(file_path, line, column)
+        result = parse_references_response(response, symbol)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to find references for {symbol} at {file_path}:{line}:{column}: {exc}") from exc
+
+
+async def hover_direct(
+    ctx: RunContext[ACPDeps], file_path: str, line: int, column: int, symbol: str
+) -> str:
+    """Get type info and docstrings for a symbol using LSP.
+
+    Returns structured results with hover content.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: File containing the symbol
+        line: Line number (1-based)
+        column: Column number (1-based)
+        symbol: Symbol name (for error messages)
+
+    Returns:
+        Formatted HoverResult with type info and docs
+    """
+    from punie.agent.lsp_client import get_lsp_client
+    from punie.agent.typed_tools import parse_hover_response
+
+    logger.info(f"🔧 TOOL: hover_direct(file_path={file_path}, line={line}, column={column}, symbol={symbol})")
+    try:
+        client = await get_lsp_client()
+        response = await client.hover(file_path, line, column)
+        result = parse_hover_response(response, symbol)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to get hover info for {symbol} at {file_path}:{line}:{column}: {exc}") from exc
+
+
+async def document_symbols_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Get all symbols in a file using LSP.
+
+    Returns structured results with hierarchical symbol tree.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: File path to analyze
+
+    Returns:
+        Formatted DocumentSymbolsResult with symbol hierarchy
+    """
+    from punie.agent.lsp_client import get_lsp_client
+    from punie.agent.typed_tools import parse_document_symbols_response
+
+    logger.info(f"🔧 TOOL: document_symbols_direct(file_path={file_path})")
+    try:
+        client = await get_lsp_client()
+        response = await client.document_symbols(file_path)
+        result = parse_document_symbols_response(response, file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to get document symbols for {file_path}: {exc}") from exc
+
+
+async def workspace_symbols_direct(ctx: RunContext[ACPDeps], query: str) -> str:
+    """Search for symbols across the workspace using LSP.
+
+    Returns structured results with matching symbols.
+
+    Args:
+        ctx: Run context with ACPDeps
+        query: Search query string
+
+    Returns:
+        Formatted WorkspaceSymbolsResult with matching symbols
+    """
+    from punie.agent.lsp_client import get_lsp_client
+    from punie.agent.typed_tools import parse_workspace_symbols_response
+
+    logger.info(f"🔧 TOOL: workspace_symbols_direct(query={query})")
+    try:
+        client = await get_lsp_client()
+        response = await client.workspace_symbols(query)
+        result = parse_workspace_symbols_response(response, query)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to search workspace symbols for '{query}': {exc}") from exc
+
+
+def create_direct_toolset() -> FunctionToolset[ACPDeps]:
+    """Create toolset for zero-shot models with direct tool calling.
+
+    Used for models like Devstral that use standard function calling rather
+    than Code Mode. All typed tools are promoted to direct PydanticAI tools,
+    eliminating the execute_code indirection.
+
+    Returns:
+        FunctionToolset with 14 tools:
+        - 3 base tools: read_file, write_file, run_command
+        - 11 Code Tools: typecheck_direct, ruff_check_direct, pytest_run_direct,
+          git_status_direct, git_diff_direct, git_log_direct, goto_definition_direct,
+          find_references_direct, hover_direct, document_symbols_direct,
+          workspace_symbols_direct
+
+    Note:
+        execute_code and terminal management tools are excluded since zero-shot
+        models call tools directly without needing a sandbox.
+    """
+    return FunctionToolset[ACPDeps](
+        tools=[
+            # Base file/command tools
+            read_file,
+            write_file,
+            run_command,
+            # Direct Code Tools (typed tools promoted to PydanticAI tools)
+            typecheck_direct,
+            ruff_check_direct,
+            pytest_run_direct,
+            git_status_direct,
+            git_diff_direct,
+            git_log_direct,
+            goto_definition_direct,
+            find_references_direct,
+            hover_direct,
+            document_symbols_direct,
+            workspace_symbols_direct,
+        ]
+    )
+
+
 def create_toolset() -> FunctionToolset[ACPDeps]:
     """Create ACP toolset with all client tools (Tier 3 fallback).
 

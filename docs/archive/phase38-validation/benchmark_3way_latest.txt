@@ -1,0 +1,100 @@
+3-Way Model Comparison
+================================================================================
+Query: 'Show me how the protocol class is used in the codebase'
+Expected: Should call a tool (grep/search)
+
+
+================================================================================
+Benchmarking: Base Qwen3-30B-A3B
+Path: mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
+================================================================================
+Disk size: N/A (cached model)
+Loading model...
+Fetching 15 files:   0%|          | 0/15 [00:00<?, ?it/s]Fetching 15 files: 100%|██████████| 15/15 [00:00<00:00, 170039.35it/s]
+mx.metal.get_active_memory is deprecated and will be removed in a future version. Use mx.get_active_memory instead.
+mx.metal.clear_cache is deprecated and will be removed in a future version. Use mx.clear_cache instead.
+✓ Loaded in 6.50s
+  Runtime memory: 16.00 GB
+
+Running warm-up query...
+  Query: Show me how the protocol class is used in the codebase
+  Expected: tool, Got: direct
+  Warm-up time: 15.15s
+
+Running steady-state queries (3x)...
+  Query 1: 12.37s ✗
+  Query 2: 12.36s ✗
+  Query 3: 12.38s ✗
+
+================================================================================
+Results:
+  Accuracy: 0% (at least one failure)
+  Warm-up time: 15.15s
+  Steady-state avg: 12.37s
+================================================================================
+
+================================================================================
+Benchmarking: Phase 21 (XML, pre-code-tools)
+Path: fused_model_qwen3_phase21_5bit
+================================================================================
+Disk size: N/A (cached model)
+Loading model...
+✓ Loaded in 6.11s
+  Runtime memory: 19.55 GB
+
+Running warm-up query...
+  Query: Show me how the protocol class is used in the codebase
+  Expected: tool, Got: tool
+  Warm-up time: 5.10s
+
+Running steady-state queries (3x)...
+  Query 1: 1.81s ✓
+  Query 2: 1.80s ✓
+  Query 3: 1.82s ✓
+
+================================================================================
+Results:
+  Accuracy: 100%
+  Warm-up time: 5.10s
+  Steady-state avg: 1.81s
+================================================================================
+
+================================================================================
+Benchmarking: Phase 27 (Current production)
+Path: fused_model_qwen3_phase27_cleaned_5bit
+================================================================================
+Disk size: N/A (cached model)
+Loading model...
+✓ Loaded in 6.47s
+  Runtime memory: 19.55 GB
+
+Running warm-up query...
+  Query: Show me how the protocol class is used in the codebase
+  Expected: tool, Got: tool
+  Warm-up time: 7.42s
+
+Running steady-state queries (3x)...
+  Query 1: 2.32s ✓
+  Query 2: 2.32s ✓
+  Query 3: 2.33s ✓
+
+================================================================================
+Results:
+  Accuracy: 100%
+  Warm-up time: 7.42s
+  Steady-state avg: 2.32s
+================================================================================
+
+================================================================================
+COMPARISON TABLE
+================================================================================
+
+Model                                   Disk   Memory    Load   Warmup   Steady   Accuracy
+                                        (GB)     (GB)     (s)      (s)      (s)           
+--------------------------------------------------------------------------------
+Base Qwen3-30B-A3B                       N/A     16.0     6.5    15.15    12.37         0%
+Phase 21 (XML, pre-code-tools)           N/A     19.6     6.1     5.10     1.81       100%
+Phase 27 (Current production)            N/A     19.6     6.5     7.42     2.32       100%
+================================================================================
+
+✓ Results saved to: benchmark_3way_results.json

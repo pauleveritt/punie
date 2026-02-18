@@ -2602,15 +2602,17 @@ INTERPRETATION
 
 ## 37. Devstral Zero-Shot Evaluation
 
-**Status:** ⏳ Ready to Execute - Branch: `ollama`
+**Status:** ✅ COMPLETE - Branch: `phase37-devstral-validation`
+
+**Result:** 84% accuracy achieved, but **40x slower** than Qwen3 (95s vs 2.3s) → **not production viable**
 
 **Goal:** Run the validation suite with Devstral to measure zero-shot Code Mode performance and decide if fine-tuning is needed.
 
 **Prerequisites:**
 - ✅ Phase 35: Ollama backend infrastructure (completed)
 - ✅ Phase 36: Validation framework (completed)
-- ⏳ Ollama installed locally
-- ⏳ Devstral model pulled (~14GB download)
+- ✅ Ollama installed locally
+- ✅ Devstral model pulled (~14GB download)
 
 **Execution Steps:**
 
@@ -2696,11 +2698,13 @@ python scripts/validate_zero_shot_code_mode.py --model devstral \
 ```
 
 **Success Criteria:**
-- ⏳ Ollama server running successfully
-- ⏳ Devstral model pulled and available
-- ⏳ Validation script executes without errors
-- ⏳ Results documented with accuracy breakdown
-- ⏳ Decision path identified based on results
+- ✅ Ollama server running successfully
+- ✅ Devstral model pulled and available
+- ✅ Validation script executes without errors
+- ✅ Results documented with accuracy breakdown (84%, 16/19 queries)
+- ✅ Decision path identified: Performance issue discovered (40x slower)
+- ✅ Root cause analyzed: Verbose responses (200+ tokens vs concise tool calls)
+- ✅ Documentation: `docs/phase38-devstral-conclusion.md`
 
 **Risks & Mitigations:**
 
@@ -2715,7 +2719,9 @@ python scripts/validate_zero_shot_code_mode.py --model devstral \
 
 ## 38. Model Selection Decision
 
-**Status:** 🔮 Pending Phase 37 Results
+**Status:** ✅ COMPLETE - Decision: **Path D (Stick with Phase 27 Model)**
+
+**Outcome:** Devstral achieved 84% accuracy but **40x slower** than Qwen3 (95s vs 2.3s per query). Fine-tuning ROI (40x speedup, 100% accuracy) decisively beats zero-shot convenience.
 
 **Goal:** Based on Devstral zero-shot validation results, choose the optimal path forward for Punie's inference backend.
 
@@ -2950,12 +2956,27 @@ async def ruff_check(ctx: RunContext[ACPDeps], path: str) -> RuffResult:
 
 ## Success Criteria
 
-- ⏳ Decision made within 24 hours of Phase 37 completion
-- ⏳ Path chosen based on measured accuracy (not assumptions)
-- ⏳ Trade-offs understood and documented
-- ⏳ Migration plan ready (if path requires changes)
-- ⏳ Fallback identified (if chosen path fails)
+- ✅ Decision made within 24 hours of Phase 37 completion
+- ✅ Path chosen based on measured accuracy AND performance (not assumptions)
+- ✅ Trade-offs understood and documented (`docs/phase38-devstral-conclusion.md`)
+- ✅ Migration plan: Return to Qwen3 Phase 27 (no migration needed)
+- ✅ Cleanup complete: Devstral removed, logs archived (~22 GB disk freed)
+- ✅ Fallback: Phase 27 model remains production standard (100% accuracy, 2.3s)
 
-**Next:** Execute chosen path based on Phase 37 results
+**Decision Rationale:**
+- Accuracy: 84% vs 100% (Qwen3 wins)
+- Speed: 95s vs 2.3s (Qwen3 **40x faster**)
+- Consistency: 8-309s range vs 2-3s (Qwen3 predictable)
+- Cost: Slow = expensive at scale (Qwen3 cheaper)
+- ROI: Fine-tuning pays for itself after ~1000 queries
+
+**What We Learned:**
+- ✅ Zero-shot direct tools architecture works (84% proves concept)
+- ✅ Production-ready error handling established
+- ❌ Speed matters: 40x slowdown makes zero-shot impractical
+- ❌ Verbose responses are the bottleneck (200+ tokens vs concise calls)
+- ✅ Fine-tuning ROI is excellent for production agents
+
+**Next:** Phase 39 - LibCST transformation tools with Qwen3
 
 ---

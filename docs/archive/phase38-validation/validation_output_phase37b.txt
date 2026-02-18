@@ -1,0 +1,183 @@
+================================================================================
+ZERO-SHOT CODE MODE VALIDATION
+================================================================================
+Model: devstral
+Workspace: /Users/pauleveritt/projects/pauleveritt/punie
+Backend: ollama (assumed running at http://localhost:11434)
+================================================================================
+
+Creating agent...
+
+================================================================================
+Category 1: Direct Answers (expect NO tool calls)
+================================================================================
+
+[Direct] Query: What's the difference between git merge and git rebase?...
+Response: In Git, both `merge` and `rebase` are used to integrate changes from one branch into another, but they do so in different ways with distinct results.
+
+### Git Merge
+
+1. **Purpose**: To combine the his...
+Time: 58.60s
+  ✅ Correct behavior
+
+[Direct] Query: When should I use type hints in Python?...
+Response: You should use type hints in Python to improve code readability, help with debugging, and enable better tooling support. Type hints can make your code easier to understand by clearly indicating the ex...
+Time: 18.91s
+  ✅ Correct behavior
+
+[Direct] Query: What is dependency injection?...
+Response: Dependency Injection (DI) is a design pattern used in software development to implement Inversion of Control (IoC) between classes and their dependencies. It allows a class to receive its dependencies...
+Time: 25.64s
+  ✅ Correct behavior
+
+[Direct] Query: Explain the difference between ruff and pytest...
+Response: Certainly! Both `ruff` and `pytest` are tools used in Python development, but they serve different purposes:
+
+### Ruff
+- **Purpose**: `ruff` is a linter for Python code. It analyzes your code to find ...
+Time: 55.58s
+  ✅ Correct behavior
+
+[Direct] Query: What are LSP capabilities?...
+Response: Language Server Protocol (LSP) capabilities refer to the features and functionalities that a language server can provide to an editor or IDE. These capabilities enable advanced development tools like ...
+Time: 29.87s
+  ✅ Correct behavior
+
+================================================================================
+Category 2: Single Tool Calls (expect tool calls)
+================================================================================
+
+[Single Tool] Query: Check for type errors in src/...
+Response: I found a type error in your code. Here's the issue:
+
+In file `src/punie/acp/agent/connection.py`, line 74:
+```python
+agent = to_agent(self) if callable(to_agent) else to_agent
+```
+
+The error is: `Exp...
+Time: 28.30s
+  ✅ Correct behavior
+
+[Single Tool] Query: Run ruff linter on src/punie/...
+Response: I'll run the ruff linter on the `src/punie/` directory to check for code quality issues. This will help identify any linting errors or warnings in the codebase.
+
+Let me execute this using the `ruff_ch...
+Time: 26.32s
+  ❌ Expected tool call but got direct answer
+
+[Single Tool] Query: What files have changed? Show git status...
+Response: I'll check the git status for you to see which files have changes. This will show both staged and unstaged changes in the repository.
+
+Let me run the command......
+Time: 9.16s
+  ❌ Expected tool call but got direct answer
+
+[Single Tool] Query: Read the README.md file...
+Response: Here's the content of the README.md file:
+
+# Punie the tiny Python agent
+
+Imagine a tiny Python coding agent:
+
+- Runs with local models
+- Integrates into PyCharm via ACP
+- Shifts more of the work of t...
+Time: 474.92s
+  ✅ Correct behavior
+
+[Single Tool] Query: Run pytest on tests/...
+Response: ```python
+import os
+
+# Run pytest in the tests directory
+result = pytest_run("tests/")
+
+# Print test results
+print(f"Tests run: {result.tests_run}")
+print(f"Passed: {result.passed}")
+print(f"Failed: {...
+Time: 21.34s
+  ❌ Expected tool call but got direct answer
+
+================================================================================
+Category 3: Multi-Step Code Mode (expect execute_code)
+================================================================================
+
+[Multi-Step] Query: Find all Python files and count imports...
+Response: I'm sorry, but I currently don't have the capability to execute code directly. However, I can guide you on how to find all Python files and count imports in them.
+
+You can use a script like this:
+
+```...
+Time: 51.20s
+  ✅ Correct behavior
+
+[Multi-Step] Query: Run full quality check: ruff, pytest, and typecheck...
+Response: I'll run a comprehensive quality check on your codebase using ruff (linting), pytest (testing), and typecheck (type checking). This will help identify any issues with code style, test failures, or typ...
+Time: 49.51s
+  ❌ Expected tool call but got direct answer
+
+[Multi-Step] Query: Count staged vs unstaged files using git...
+Response: I'll use the `git_status()` function to get information about staged and unstaged files. This will give us a structured result with file statuses that we can analyze.
+
+Let me execute this code:
+
+```py...
+Time: 22.65s
+  ❌ Expected tool call but got direct answer
+[stderr] ✗ Code execution failed: Runtime error: __import__ not found
+
+[Multi-Step] Query: List all test files and show their pass rates...
+Response: I apologize for the error. Let me try a different approach to find the test files and their pass rates.
+
+First, I'll look for test files in the project directory. Then I'll run pytest on each one to g...
+Time: 69.12s
+  ✅ Correct behavior
+
+[Multi-Step] Query: Find definition of PunieAgent and show its methods...
+Response: I'm sorry, but I currently don't have the capability to access or search for specific definitions like "PunieAgent." However, if you have any other questions or need assistance with something else, fe...
+Time: 6.38s
+  ❌ Expected tool call but got direct answer
+
+================================================================================
+Category 4: Field Access (expect structured result access)
+================================================================================
+
+[Field Access] Query: Show only fixable ruff violations...
+Response: I'll run the ruff linter and filter out only the fixable violations. Let me do that for you.
+
+```python
+result = ruff_check(".")
+if not result.success:
+    fixable = [v for v in result.violations if v...
+Time: 19.96s
+  ❌ Expected tool call but got direct answer
+
+[Field Access] Query: Count passed vs failed tests...
+Response: I'll run the tests and count the number of passed vs. failed tests for you. This will help us understand the current test status of your project.
+
+Let's proceed with running the tests using pytest....
+Time: 7.65s
+  ❌ Expected tool call but got direct answer
+
+[Field Access] Query: Filter type errors by severity...
+Response: I've run the type checker and found several errors. Let me filter them by severity to show only the most critical ones.
+
+Here are the high-severity type errors:
+
+1. **Too many values to unpack** (inva...
+Time: 476.19s
+  ✅ Correct behavior
+
+[Field Access] Query: Show git diff statistics with additions and deletions...
+Response: The git diff shows the following changes:
+
+- Justfile: 108 additions, 1 deletion
+- docs/client-setup-guide.md: 16 additions
+- pyproject.toml: 11 additions, 1 deletion
+- scripts/validate_zero_shot_code...
+Time: 30.42s
+  ✅ Correct behavior
+[stderr] ✗ Code execution failed: Runtime error: __import__ not found

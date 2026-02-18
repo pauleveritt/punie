@@ -16,9 +16,9 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.toolsets import AbstractToolset
 
-from punie.agent.config import PUNIE_LOCAL_INSTRUCTIONS, AgentConfig
+from punie.agent.config import PUNIE_DIRECT_INSTRUCTIONS, PUNIE_LOCAL_INSTRUCTIONS, AgentConfig, default_stop_sequences
 from punie.agent.deps import ACPDeps
-from punie.agent.toolset import create_toolset
+from punie.agent.toolset import create_direct_toolset, create_toolset
 
 if TYPE_CHECKING:
     from punie.local import LocalClient
@@ -233,13 +233,14 @@ def create_pydantic_agent(
         model = _create_local_model(model.split(":", 1)[1])
     elif isinstance(model, str) and model.startswith("ollama:"):
         model_name = model.split(":", 1)[1]
-        from pydantic_ai.models.openai import OpenAIChatModel
-        from pydantic_ai.providers.openai import OpenAIProvider
+        from pydantic_ai.providers.ollama import OllamaProvider
+
+        from punie.agent.ollama_model import OllamaChatModel
 
         logger.info("Creating ollama model: %s", model_name)
         # Ollama uses OpenAI-compatible API at http://localhost:11434/v1
-        provider = OpenAIProvider(base_url="http://localhost:11434/v1", api_key="ollama")
-        model = OpenAIChatModel(model_name, provider=provider)
+        provider = OllamaProvider(base_url="http://localhost:11434/v1")
+        model = OllamaChatModel(model_name, provider=provider)
 
     # Build model settings dict with standard parameters
     model_settings_dict = {
@@ -301,17 +302,38 @@ def create_local_agent(
         ACPDeps(client_conn=client, session_id=..., tracker=...)
     """
     from punie.local import LocalClient
-    from punie.training.server_config import QWEN_STOP_SEQUENCES
 
+    # Detect model type for toolset and config selection
+    model_str = model if isinstance(model, str) else "local"
+    if model_str == "test":
+        model_str = "local"
+
+    # Model-adaptive toolset: Ollama models use direct tools, others use Code Mode
+    # Always select toolset based on model type (independent of config)
+    is_ollama = model_str.startswith("ollama:")
+    toolset = create_direct_toolset() if is_ollama else None
+
+    # Default config if not provided
     if config is None:
-        config = AgentConfig(
-            instructions=PUNIE_LOCAL_INSTRUCTIONS,
-            validate_python_syntax=True,
-            stop_sequences=QWEN_STOP_SEQUENCES,
-        )
+        if is_ollama:
+            # Zero-shot models: use direct toolset + simplified instructions
+            config = AgentConfig(
+                instructions=PUNIE_DIRECT_INSTRUCTIONS,
+                validate_python_syntax=True,
+                stop_sequences=default_stop_sequences(model_str),
+            )
+        else:
+            # Fine-tuned models: use Code Mode toolset + full instructions
+            config = AgentConfig(
+                instructions=PUNIE_LOCAL_INSTRUCTIONS,
+                validate_python_syntax=True,
+                stop_sequences=default_stop_sequences(model_str),
+            )
 
     workspace = workspace or Path.cwd()
     client = LocalClient(workspace=workspace)
-    agent = create_pydantic_agent(model=model, config=config, perf_collector=perf_collector)
+    agent = create_pydantic_agent(
+        model=model, toolset=toolset, config=config, perf_collector=perf_collector
+    )
 
     return agent, client
