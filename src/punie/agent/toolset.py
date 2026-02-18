@@ -555,6 +555,66 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             future = asyncio.run_coroutine_threadsafe(_run_git_log(), loop)
             return future.result(timeout=30)
 
+        def sync_cst_find_pattern(file_path: str, pattern: str):
+            """Bridge from sync sandbox to local LibCST cst_find_pattern."""
+            from punie.cst.code_tools import cst_find_pattern
+            return cst_find_pattern(file_path, pattern)
+
+        def sync_cst_rename(file_path: str, old_name: str, new_name: str):
+            """Bridge from sync sandbox to local LibCST cst_rename."""
+            from punie.cst.code_tools import cst_rename
+            return cst_rename(file_path, old_name, new_name)
+
+        def sync_cst_add_import(file_path: str, import_stmt: str):
+            """Bridge from sync sandbox to local LibCST cst_add_import."""
+            from punie.cst.code_tools import cst_add_import
+            return cst_add_import(file_path, import_stmt)
+
+        def sync_validate_component(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_component."""
+            from punie.cst.validators.tdom import validate_component
+            return validate_component(file_path)
+
+        def sync_check_render_tree(file_path: str):
+            """Bridge from sync sandbox to local LibCST check_render_tree."""
+            from punie.cst.validators.tdom import check_render_tree
+            return check_render_tree(file_path)
+
+        def sync_validate_escape_context(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_escape_context."""
+            from punie.cst.validators.tdom import validate_escape_context
+            return validate_escape_context(file_path)
+
+        def sync_validate_service_registration(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_service_registration."""
+            from punie.cst.validators.svcs import validate_service_registration
+            return validate_service_registration(file_path)
+
+        def sync_check_dependency_graph(file_path: str):
+            """Bridge from sync sandbox to local LibCST check_dependency_graph."""
+            from punie.cst.validators.svcs import check_dependency_graph
+            return check_dependency_graph(file_path)
+
+        def sync_validate_injection_site(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_injection_site."""
+            from punie.cst.validators.svcs import validate_injection_site
+            return validate_injection_site(file_path)
+
+        def sync_validate_middleware_chain(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_middleware_chain."""
+            from punie.cst.validators.tdom_svcs import validate_middleware_chain
+            return validate_middleware_chain(file_path)
+
+        def sync_check_di_template_binding(file_path: str):
+            """Bridge from sync sandbox to local LibCST check_di_template_binding."""
+            from punie.cst.validators.tdom_svcs import check_di_template_binding
+            return check_di_template_binding(file_path)
+
+        def sync_validate_route_pattern(file_path: str):
+            """Bridge from sync sandbox to local LibCST validate_route_pattern."""
+            from punie.cst.validators.tdom_svcs import validate_route_pattern
+            return validate_route_pattern(file_path)
+
         # Execute code in sandbox (runs in thread pool to not block event loop)
         external_functions = ExternalFunctions(
             read_file=sync_read_file,
@@ -571,6 +631,18 @@ async def execute_code(ctx: RunContext[ACPDeps], code: str) -> str:
             git_status=sync_git_status,
             git_diff=sync_git_diff,
             git_log=sync_git_log,
+            cst_find_pattern=sync_cst_find_pattern,
+            cst_rename=sync_cst_rename,
+            cst_add_import=sync_cst_add_import,
+            validate_component=sync_validate_component,
+            check_render_tree=sync_check_render_tree,
+            validate_escape_context=sync_validate_escape_context,
+            validate_service_registration=sync_validate_service_registration,
+            check_dependency_graph=sync_check_dependency_graph,
+            validate_injection_site=sync_validate_injection_site,
+            validate_middleware_chain=sync_validate_middleware_chain,
+            check_di_template_binding=sync_check_di_template_binding,
+            validate_route_pattern=sync_validate_route_pattern,
         )
         output = await loop.run_in_executor(None, run_code, code, external_functions)
 
@@ -1027,6 +1099,283 @@ async def workspace_symbols_direct(ctx: RunContext[ACPDeps], query: str) -> str:
         raise ModelRetry(f"Failed to search workspace symbols for '{query}': {exc}") from exc
 
 
+async def cst_find_pattern_direct(
+    ctx: RunContext[ACPDeps], file_path: str, pattern: str
+) -> str:
+    """Find nodes matching a pattern in a Python file using LibCST.
+
+    Returns structured results with line numbers and code snippets.
+
+    Supported patterns: "FunctionDef", "ClassDef", "Call", "Decorator",
+    "ImportFrom", "call:name", "decorator:name", "import:name"
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to the Python file to analyze
+        pattern: Pattern to search for (e.g., "FunctionDef", "call:print")
+
+    Returns:
+        Formatted CstFindResult with matches and line numbers
+    """
+    from punie.cst.code_tools import cst_find_pattern
+
+    logger.info(f"🔧 TOOL: cst_find_pattern_direct(file_path={file_path}, pattern={pattern})")
+    try:
+        result = cst_find_pattern(file_path, pattern)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to find pattern '{pattern}' in {file_path}: {exc}") from exc
+
+
+async def cst_rename_direct(
+    ctx: RunContext[ACPDeps], file_path: str, old_name: str, new_name: str
+) -> str:
+    """Rename all occurrences of a symbol in a Python file using LibCST.
+
+    Preserves all whitespace and formatting. Returns the modified source.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to the Python file to modify
+        old_name: Symbol name to rename
+        new_name: New symbol name
+
+    Returns:
+        Formatted CstRenameResult with rename_count and modified_source
+    """
+    from punie.cst.code_tools import cst_rename
+
+    logger.info(f"🔧 TOOL: cst_rename_direct(file_path={file_path}, old_name={old_name}, new_name={new_name})")
+    try:
+        result = cst_rename(file_path, old_name, new_name)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to rename '{old_name}' to '{new_name}' in {file_path}: {exc}") from exc
+
+
+async def cst_add_import_direct(
+    ctx: RunContext[ACPDeps], file_path: str, import_stmt: str
+) -> str:
+    """Add an import statement to a Python file using LibCST (idempotent).
+
+    Only adds the import if not already present. Preserves formatting.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to the Python file to modify
+        import_stmt: Import statement to add (e.g., "from typing import Optional")
+
+    Returns:
+        Formatted CstAddImportResult with import_added flag and modified_source
+    """
+    from punie.cst.code_tools import cst_add_import
+
+    logger.info(f"🔧 TOOL: cst_add_import_direct(file_path={file_path}, import_stmt={import_stmt!r})")
+    try:
+        result = cst_add_import(file_path, import_stmt)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to add import '{import_stmt}' to {file_path}: {exc}") from exc
+
+
+async def validate_component_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Validate tdom component patterns in a Python file.
+
+    Checks: @dataclass present, __call__ returns Node, no f-strings in html().
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file containing component definitions
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom import validate_component
+
+    logger.info(f"🔧 TOOL: validate_component_direct(file_path={file_path})")
+    try:
+        result = validate_component(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate component in {file_path}: {exc}") from exc
+
+
+async def check_render_tree_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Check component render tree composition in a Python file.
+
+    Verifies component references and composition patterns.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file to analyze
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom import check_render_tree
+
+    logger.info(f"🔧 TOOL: check_render_tree_direct(file_path={file_path})")
+    try:
+        result = check_render_tree(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to check render tree in {file_path}: {exc}") from exc
+
+
+async def validate_escape_context_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Validate that html() calls use safe t-strings, not f-strings.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file to analyze
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom import validate_escape_context
+
+    logger.info(f"🔧 TOOL: validate_escape_context_direct(file_path={file_path})")
+    try:
+        result = validate_escape_context(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate escape context in {file_path}: {exc}") from exc
+
+
+async def validate_service_registration_direct(
+    ctx: RunContext[ACPDeps], file_path: str
+) -> str:
+    """Validate svcs service registration patterns in a Python file.
+
+    Checks: @injectable present, @dataclass present, Inject[] fields typed correctly.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file containing service definitions
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.svcs import validate_service_registration
+
+    logger.info(f"🔧 TOOL: validate_service_registration_direct(file_path={file_path})")
+    try:
+        result = validate_service_registration(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate service registration in {file_path}: {exc}") from exc
+
+
+async def check_dependency_graph_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Check svcs dependency graph for layer violations.
+
+    Verifies services don't depend on components (layer violation).
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file to analyze
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.svcs import check_dependency_graph
+
+    logger.info(f"🔧 TOOL: check_dependency_graph_direct(file_path={file_path})")
+    try:
+        result = check_dependency_graph(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to check dependency graph in {file_path}: {exc}") from exc
+
+
+async def validate_injection_site_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Validate Inject[] field sites reference imported types.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file to analyze
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.svcs import validate_injection_site
+
+    logger.info(f"🔧 TOOL: validate_injection_site_direct(file_path={file_path})")
+    try:
+        result = validate_injection_site(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate injection site in {file_path}: {exc}") from exc
+
+
+async def validate_middleware_chain_direct(
+    ctx: RunContext[ACPDeps], file_path: str
+) -> str:
+    """Validate tdom-svcs middleware patterns in a Python file.
+
+    Checks: @middleware has categories, correct __call__ signature.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file containing middleware definitions
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom_svcs import validate_middleware_chain
+
+    logger.info(f"🔧 TOOL: validate_middleware_chain_direct(file_path={file_path})")
+    try:
+        result = validate_middleware_chain(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate middleware chain in {file_path}: {exc}") from exc
+
+
+async def check_di_template_binding_direct(
+    ctx: RunContext[ACPDeps], file_path: str
+) -> str:
+    """Check that DI components have context passed in html() calls.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file to analyze
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom_svcs import check_di_template_binding
+
+    logger.info(f"🔧 TOOL: check_di_template_binding_direct(file_path={file_path})")
+    try:
+        result = check_di_template_binding(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to check DI template binding in {file_path}: {exc}") from exc
+
+
+async def validate_route_pattern_direct(ctx: RunContext[ACPDeps], file_path: str) -> str:
+    """Validate route patterns in a Python file.
+
+    Checks paths start with / and have balanced braces.
+
+    Args:
+        ctx: Run context with ACPDeps
+        file_path: Path to Python file containing route definitions
+
+    Returns:
+        Formatted DomainValidationResult with issues list
+    """
+    from punie.cst.validators.tdom_svcs import validate_route_pattern
+
+    logger.info(f"🔧 TOOL: validate_route_pattern_direct(file_path={file_path})")
+    try:
+        result = validate_route_pattern(file_path)
+        return _format_typed_result(result)
+    except Exception as exc:
+        raise ModelRetry(f"Failed to validate route patterns in {file_path}: {exc}") from exc
+
+
 def create_direct_toolset() -> FunctionToolset[ACPDeps]:
     """Create toolset for zero-shot models with direct tool calling.
 
@@ -1035,12 +1384,19 @@ def create_direct_toolset() -> FunctionToolset[ACPDeps]:
     eliminating the execute_code indirection.
 
     Returns:
-        FunctionToolset with 14 tools:
+        FunctionToolset with 26 tools:
         - 3 base tools: read_file, write_file, run_command
         - 11 Code Tools: typecheck_direct, ruff_check_direct, pytest_run_direct,
           git_status_direct, git_diff_direct, git_log_direct, goto_definition_direct,
           find_references_direct, hover_direct, document_symbols_direct,
           workspace_symbols_direct
+        - 3 LibCST code tools: cst_find_pattern_direct, cst_rename_direct,
+          cst_add_import_direct
+        - 9 domain validators: validate_component_direct, check_render_tree_direct,
+          validate_escape_context_direct, validate_service_registration_direct,
+          check_dependency_graph_direct, validate_injection_site_direct,
+          validate_middleware_chain_direct, check_di_template_binding_direct,
+          validate_route_pattern_direct
 
     Note:
         execute_code and terminal management tools are excluded since zero-shot
@@ -1064,6 +1420,20 @@ def create_direct_toolset() -> FunctionToolset[ACPDeps]:
             hover_direct,
             document_symbols_direct,
             workspace_symbols_direct,
+            # LibCST code tools (Phase 32)
+            cst_find_pattern_direct,
+            cst_rename_direct,
+            cst_add_import_direct,
+            # Domain validators (Phase 32)
+            validate_component_direct,
+            check_render_tree_direct,
+            validate_escape_context_direct,
+            validate_service_registration_direct,
+            check_dependency_graph_direct,
+            validate_injection_site_direct,
+            validate_middleware_chain_direct,
+            check_di_template_binding_direct,
+            validate_route_pattern_direct,
         ]
     )
 

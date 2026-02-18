@@ -4,6 +4,9 @@ import pytest
 
 from punie.agent.monty_runner import ExternalFunctions, run_code
 from punie.agent.typed_tools import (
+    CstAddImportResult,
+    CstFindResult,
+    CstRenameResult,
     DocumentSymbolsResult,
     FindReferencesResult,
     GitDiffResult,
@@ -16,6 +19,7 @@ from punie.agent.typed_tools import (
     TypeCheckResult,
     WorkspaceSymbolsResult,
 )
+from punie.cst.domain_models import DomainValidationResult
 
 
 # Fake functions for testing
@@ -140,6 +144,26 @@ def fake_git_log(path: str, count: int = 10) -> GitLogResult:  # noqa: ARG001
     return GitLogResult(success=True, commits=[], commit_count=0)
 
 
+def fake_cst_find_pattern(file_path: str, pattern: str) -> CstFindResult:  # noqa: ARG001
+    """Fake cst_find_pattern that returns no matches."""
+    return CstFindResult(success=True, match_count=0, matches=[])
+
+
+def fake_cst_rename(file_path: str, old_name: str, new_name: str) -> CstRenameResult:  # noqa: ARG001
+    """Fake cst_rename that returns zero renames."""
+    return CstRenameResult(success=True, rename_count=0)
+
+
+def fake_cst_add_import(file_path: str, import_stmt: str) -> CstAddImportResult:  # noqa: ARG001
+    """Fake cst_add_import that returns not added."""
+    return CstAddImportResult(success=True, import_added=False)
+
+
+def fake_domain_validator(file_path: str) -> DomainValidationResult:  # noqa: ARG001
+    """Fake domain validator that returns valid."""
+    return DomainValidationResult(valid=True, domain="test", issues=[])
+
+
 @pytest.fixture
 def external_functions():
     """Fixture with all external functions including typed tools."""
@@ -158,6 +182,18 @@ def external_functions():
         git_status=fake_git_status,
         git_diff=fake_git_diff,
         git_log=fake_git_log,
+        cst_find_pattern=fake_cst_find_pattern,
+        cst_rename=fake_cst_rename,
+        cst_add_import=fake_cst_add_import,
+        validate_component=fake_domain_validator,
+        check_render_tree=fake_domain_validator,
+        validate_escape_context=fake_domain_validator,
+        validate_service_registration=fake_domain_validator,
+        check_dependency_graph=fake_domain_validator,
+        validate_injection_site=fake_domain_validator,
+        validate_middleware_chain=fake_domain_validator,
+        check_di_template_binding=fake_domain_validator,
+        validate_route_pattern=fake_domain_validator,
     )
 
 
@@ -241,3 +277,43 @@ else:
     assert "Lint: 0 violations" in output
     assert "Tests: 2/2 passed" in output
     assert "Quality check: PASS" in output
+
+
+# Task 9: Sandbox integration tests for Phase 32 tools
+# These verify that the tools are correctly registered in monty_runner's namespace
+
+
+def test_run_code_calls_cst_find_pattern(external_functions):
+    """Task 9: cst_find_pattern is accessible through the sandbox."""
+    code = """
+result = cst_find_pattern("src/myfile.py", "FunctionDef")
+print(f"Success: {result.success}")
+print(f"Matches: {result.match_count}")
+"""
+    output = run_code(code, external_functions)
+    assert "Success: True" in output
+    assert "Matches: 0" in output
+
+
+def test_run_code_calls_validate_component(external_functions):
+    """Task 9: validate_component is accessible through the sandbox."""
+    code = """
+result = validate_component("src/views.py")
+print(f"Valid: {result.valid}")
+print(f"Domain: {result.domain}")
+"""
+    output = run_code(code, external_functions)
+    assert "Valid: True" in output
+    assert "Domain: test" in output
+
+
+def test_run_code_calls_cst_rename(external_functions):
+    """Task 9: cst_rename is accessible through the sandbox."""
+    code = """
+result = cst_rename("src/myfile.py", "old_name", "new_name")
+print(f"Success: {result.success}")
+print(f"Renames: {result.rename_count}")
+"""
+    output = run_code(code, external_functions)
+    assert "Success: True" in output
+    assert "Renames: 0" in output
