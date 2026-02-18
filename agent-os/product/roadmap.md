@@ -2081,25 +2081,27 @@ that scale).
 
 ---
 
-## 33. Full Retrain + Training Data Flywheel
+## 33. Full Retrain on Complete Dataset
 
 **Status:** Planned (2026-02-15)
 
-**Goal:** Retrain on complete dataset (~1265 examples) with all tool categories, then establish automatic training data
-collection from real Punie usage.
+**Prerequisite:** Phase 32 (Domain Tools) must be complete — 150 domain tool examples are required.
+
+**Goal:** One-time retrain consolidating all tool categories into a single ~1215-example dataset, giving the model
+mastery over text, validation, LSP, and domain tools together.
 
 **Context:**
 
-After Phases 26 (LSP) and 32 (Domain Tools), Punie will have:
+After Phase 32 (Domain Tools), Punie will have training data covering every tool category:
 
 - Text-based tools (grep, read, write, run_command)
 - Validation tools (ty, ruff, pytest)
 - Semantic tools (LSP navigation, type queries, refactoring)
 - Domain tools (component/service/middleware validation)
 
-This phase completes the training data and establishes the self-improvement loop.
+This is a gate event: run once, evaluate, deploy. The flywheel infrastructure that builds on this model is Phase 34.
 
-**Dataset Composition (~1265 examples):**
+**Dataset Composition (~1215 examples):**
 
 | Category                    | Count    | Purpose                                          |
 |-----------------------------|----------|--------------------------------------------------|
@@ -2110,13 +2112,32 @@ This phase completes the training data and establishes the self-improvement loop
 | Phase 32 (Domain Tools)     | 150      | Domain reasoning and design validation           |
 | **Total**                   | **1215** | Complete tool ecosystem                          |
 
-**Training Configuration:**
+**Training Configuration (proven, unchanged from Phase 27):**
 
 - Iterations: 800 (more data → more iterations for full convergence)
-- Batch size: 2 (proven effective for 7B/30B models)
-- LoRA layers: 16 for 7B (57% coverage), 8 for 30B (16% coverage)
-- Learning rate: 1e-4 (proven optimal)
-- Quantization: 5-bit (proven LoRA preservation)
+- Batch size: 1 (OOM ceiling on 32GB Apple Silicon with 30B MoE)
+- LoRA layers: 8 for 30B (17% of 48 layers; OOM at 16); 16 for 7B (57% of 28)
+- LoRA rank: 8, scale: 20.0, dropout: 0.0
+- Learning rate: 1e-4 (proven optimal since Phase 7)
+- Optimizer: Adam
+- Max sequence length: 2048
+- Quantization: 5-bit, group_size=64, affine (sharp threshold: 4-bit destroys LoRA signal)
+- Fusion: dequantize to float16 first, then re-quantize (direct re-quant destroys LoRA deltas)
+
+**New for Phase 33 (Tier 1 — safe additions):**
+
+- `--grad-accumulation-steps 4` — Effective batch = 4 at no memory cost; smoother gradients
+- `--mask-prompt` — Compute loss on assistant completions only (standard instruction-tuning practice)
+- YAML config with cosine LR schedule: warmup 50 steps (1e-7 → 1e-4), then cosine decay (1e-4 → 1e-7 over 800 steps)
+
+**Phase 33 A/B Test Candidates (Tier 2):**
+
+- AdamW + `weight_decay: 0.01` — Mild regularization; standard for LLM fine-tuning
+- `--grad-checkpoint` + `--num-layers 16` — 2x slower training but doubles LoRA coverage; worth a benchmark comparison
+
+**Blocked:**
+
+- DoRA (`--fine-tune-type dora`) — Does not support `SwitchLinear` (MoE layers); raises `ValueError` on Qwen3-30B-A3B
 
 **Retrain Goals:**
 
@@ -2134,23 +2155,52 @@ This phase completes the training data and establishes the self-improvement loop
     - "Add auth service" → validate_service_registration → validate_middleware_chain → validate_di_template_binding →
       write code
 
-**Training Data Flywheel:**
+**Success Criteria:**
 
-The holy grail vision: **automatic training data collection from real usage**.
+- ✅ Model performs well on all tool categories (text, validation, LSP, domain)
+- ✅ Multi-tool workflows succeed (>=80% on 20-query benchmark)
+- ✅ Domain reasoning is evident (model uses domain vocabulary)
+
+**Next:** Phase 34 builds the flywheel infrastructure on top of this trained model.
+
+---
+
+## 34. Flywheel Architecture Implementation
+
+**Status:** Planned (after Phase 33 retrain)
+
+**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the
+self-improvement loop.
+
+**Context:**
+
+Phase 33 completes the full retrain on ~1215 examples. Phase 34 builds the architecture described in flywheel.md and
+holy-grail-architecture.md. This is when the self-improving loop becomes reality.
+
+**Vision:**
+
+The holy grail: **automatic training data collection from real usage**.
+
+```
+Real usage → Capture → Filter → Curate → Retrain → Deploy → Better model
+                                                              ↓
+                                                        More usage ← ← ←
+```
+
+This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes
+training data. The model gets smarter with use.
+
+**Flywheel Loop:**
 
 **Phase 1: Capture**
 
+Every Punie interaction is logged:
 ```python
-# Every Punie interaction is logged:
 {
     "query": "Add authentication to this app",
-    "code": [
-        "result = validate_service_registration(...)",
-        "result = validate_middleware_chain(...)",
-        "write_file(...)"
-    ],
+    "code": ["result = validate_service_registration(...)", "write_file(...)"],
     "tool_results": [...],
-    "outcome": "success",  # or "error"
+    "outcome": "success",
     "timestamp": "2026-03-15T10:30:00Z"
 }
 ```
@@ -2158,7 +2208,6 @@ The holy grail vision: **automatic training data collection from real usage**.
 **Phase 2: Filter**
 
 Automatic quality checks:
-
 - ✅ Successful outcome (no errors, tools used correctly)
 - ✅ Novel pattern (not duplicate of existing examples)
 - ✅ No sensitive data (no API keys, personal info)
@@ -2168,7 +2217,6 @@ Automatic quality checks:
 **Phase 3: Curate**
 
 Manual review for edge cases:
-
 - Complex multi-tool workflows
 - Novel domain patterns
 - Error handling examples
@@ -2177,7 +2225,6 @@ Manual review for edge cases:
 **Phase 4: Retrain**
 
 Scheduled retraining on growing dataset:
-
 - Monthly retrain with new examples
 - Track perplexity and benchmark scores over time
 - A/B test new models before deployment
@@ -2190,54 +2237,6 @@ Scheduled retraining on growing dataset:
 - Collect more usage data
 - Repeat
 
-**Infrastructure Requirements:**
-
-1. **Logging system**
-    - Capture all Punie interactions (query, code, results)
-    - Store in structured format (JSONL)
-    - Respect privacy (opt-in, no sensitive data)
-
-2. **Filtering pipeline**
-    - Automatic quality checks
-    - Deduplication
-    - Diversity balancing (don't over-represent common patterns)
-
-3. **Curation tools**
-    - UI for manual review
-    - Tagging and categorization
-    - Example editing and annotation
-
-4. **Retraining pipeline**
-    - Automatic dataset merging
-    - Training script generation
-    - Benchmark evaluation
-    - Model versioning
-
-5. **Deployment system**
-    - A/B testing infrastructure
-    - Rollback capability
-    - Performance monitoring
-
-**Success Criteria:**
-
-- ✅ Model performs well on all tool categories (text, validation, LSP, domain)
-- ✅ Multi-tool workflows succeed (>=80% on 20-query benchmark)
-- ✅ Domain reasoning is evident (model uses domain vocabulary)
-- ✅ Training data collection is automatic (no manual example writing)
-- ✅ Retraining happens regularly (monthly)
-- ✅ Model improves continuously (perplexity decreases, benchmark scores increase)
-
-**The Flywheel Vision:**
-
-```
-Real usage → Capture → Filter → Curate → Retrain → Deploy → Better model
-                                                              ↓
-                                                        More usage ← ← ←
-```
-
-This is the endgame: **the model teaches itself** by using tools on real projects. Every successful workflow becomes
-training data. The model gets smarter with use.
-
 **Key Insight:**
 
 The flywheel only works if the tools are *rich enough* to be worth learning from:
@@ -2249,26 +2248,20 @@ The flywheel only works if the tools are *rich enough* to be worth learning from
 
 Domain tools are the key to the flywheel — they capture **design knowledge**, not just code mechanics.
 
+**Infrastructure Requirements:**
+
+1. **Logging system** — Capture all Punie interactions (query, code, results) in structured JSONL; respect privacy (no sensitive data)
+2. **Filtering pipeline** — Automatic quality checks, deduplication, diversity balancing
+3. **Curation tools** — UI for manual review, tagging, categorization, annotation
+4. **Retraining pipeline** — Automatic dataset merging, training script generation, benchmark evaluation, model versioning
+5. **Deployment system** — A/B testing infrastructure, rollback capability, performance monitoring
+
 **Future Enhancements:**
 
 - Active learning (model requests examples for weak areas)
 - Multi-user learning (aggregate patterns across users)
 - Domain expansion (new tools for new domains)
 - Cross-domain transfer (patterns from one domain inform another)
-
----
-
-## 34. Flywheel Architecture Implementation
-
-**Status:** Planned (after Phase 33)
-
-**Goal:** Build the skills framework, Monty tool infrastructure, and training data collector to activate the
-self-improvement loop.
-
-**Context:**
-
-Phase 33 completes the full retrain on ~1265 examples. Phase 34 builds the architecture described in flywheel.md and
-holy-grail-architecture.md. This is when the self-improving loop becomes reality.
 
 **Key Components:**
 
@@ -2323,8 +2316,10 @@ holy-grail-architecture.md. This is when the self-improving loop becomes reality
 
 - ✅ Skills load dynamically (no upfront token cost for all skills)
 - ✅ Monty generates valid domain artifacts (>70% validation pass rate)
-- ✅ Training collector captures all generations automatically
+- ✅ Training data collection is automatic (every generation logged to JSONL)
 - ✅ Model learns from corrections (retry count decreases over time)
+- ✅ Retraining happens regularly (monthly retrain with new examples)
+- ✅ Model improves continuously (benchmark scores rise with each retrain cycle)
 - ✅ Development velocity improves (faster time-to-working-code)
 
 **References:**
