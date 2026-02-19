@@ -410,33 +410,123 @@ uv run python scripts/run_phase33_direct_eval.py --model <fused-5bit>
 
 ---
 
-## Section 8: Expected Results and Next Steps
+## Section 8: Results and Next Steps
 
-### After Experiment A (Coder-30B)
+### Experiment A (Coder-30B) — COMPLETE ❌
 
-Expected: ~82.4% baseline confirmation. If domain or multi_tool improves → document the delta.
-If neither improves, the bottleneck is training data coverage, not the model.
+**Actual result: 38.9%** (target ≥82.4%)
 
-**If domain <60% or multi_tool <35%:**
-- Phase 44 should add more diverse domain/multi_tool examples to `data/phase33_merged`
-- Target 200+ domain examples (currently proportionally underrepresented)
+Phase 43a did NOT reproduce Phase 33b's 82.4%. The failure mode differs from Phase 40 (8B dense)
+in one key way: the 30B MoE learned correct tool routing but reverted to direct calls (0.5 score)
+instead of execute_code wrappers (1.0 score). Additionally, 10/27 prompts triggered think-mode
+interference with no tool call at all.
+
+**Score distribution (Phase 43a vs Phase 33b):**
+
+| Score | Phase 33b | Phase 43a |
+|-------|-----------|-----------|
+| 1.0 (execute_code ✓) | ~22/27 | 1/27 (multi-01 only) |
+| 0.5 (direct call) | ~5/27 | 16/27 |
+| 0.0 (prose/timeout) | ~0/27 | 10/27 |
+
+**Key finding:** Phase 33b's 82.4% is NOT a reproducible stable baseline. The execute_code
+format wrapper is **stochastically learned** — this training trajectory found a local optimum
+that routes correctly but doesn't reliably format. This adds a **5th degradation pattern**:
+
+### Pattern 5: Stochastic Format Lock (NEW — Phase 43a)
+
+**What it is:** With identical model, data, and hyperparameters, different training runs produce
+different format adherence. One run reliably uses execute_code (Phase 33b: 82.4%); another uses
+direct calls or think mode (Phase 43a: 38.9%). The difference is random mini-batch ordering and
+gradient trajectory, not data coverage.
+
+**Manifestation in Punie (Phase 43a):**
+- Same Coder-30B base, same 1,282 examples, same 800 iters, same lr/layers
+- Phase 33b: 22/27 prompts at 1.0 (execute_code format locked in)
+- Phase 43a: 1/27 prompts at 1.0 (execute_code format NOT locked in)
+- Val loss 0.111 (better than Phase 33b!) yet eval accuracy crashed
+
+**Implication:** Val loss is NOT a reliable predictor of format adherence. The gradient can
+find a lower-loss solution that reproduces tool names but forgets format structure. This is a
+form of "format forgetting" during training.
+
+**Resolution candidates:**
+1. Multiple seeds — run 3+ times, take best (expensive but simple)
+2. Format-weighted loss — upweight execute_code wrapper tokens in training loss
+3. Higher LoRA layers — more layers = more format capacity
+4. Anti-think examples — explicit training examples that suppress `<think>` tokens
+5. Longer training with early stopping on eval accuracy (not val loss)
+
+**Detail:** See `docs/research/phase43a-coder30b-results.md`
+
+### Phase 44 — Format Lock Fix Attempt (COMPLETE ❌)
+
+**Actual result: 22.2%** (target ≥80%) — worse than Phase 43a (38.9%)
+
+Phase 44 applied three infrastructure fixes and re-trained with seed=42:
+1. Added `<think>` to eval stop sequences → ✅ eliminated think-mode timeouts
+2. Removed `_direct` suffix from eval system prompt → unknown isolated effect
+3. seed=42 + best-checkpoint selection → different training trajectory
+
+The think-mode fix worked. But Phase 44's model shifted to a **new failure mode**: prose
+generation without any tool call. 15/27 prompts generated "I'll help you..., Let me first
+check..." responses scoring 0.0, where Phase 43a had 16/27 direct tool calls scoring 0.5.
+
+This adds a **6th degradation pattern**:
+
+### Pattern 6: Prose Drift Under Seed Variation (NEW — Phase 44)
+
+**What it is:** Different random seeds converge to different failure modes while keeping the
+same overall format breakdown. seed=42 produced prose drift (0.0) instead of Phase 43a's
+direct-call drift (0.5). Val loss was better (0.176 vs 0.260) but eval was worse (22.2% vs 38.9%).
+
+**Manifestation in Punie (Phase 44):**
+- seed=42, save-every=100, best checkpoint at iter 800 (val_loss=0.176, still decreasing)
+- 12/27 direct tool calls (0.5) — same intent routing as Phase 43a
+- 15/27 prose generation (0.0) — new mode: model describes what to do but doesn't do it
+- 0/27 execute_code calls (1.0) — complete failure to apply wrapper format
+
+**Score distribution (all runs with Coder-30B):**
+
+| Score | Phase 33b | Phase 43a | Phase 44 |
+|-------|-----------|-----------|---------|
+| 1.0 (execute_code ✓) | ~22/27 | 1/27 | 0/27 |
+| 0.5 (direct call) | ~5/27 | 16/27 | 12/27 |
+| 0.0 (timeout/prose) | ~0/27 | 10/27 | 15/27 |
+| **Overall** | **82.4%** | **38.9%** | **22.2%** |
+
+**Key insight:** Best val loss (0.176 at iter 800) selected a local minimum where the model
+learned conversational prose patterns from the base model alignment, not the execute_code format.
+Val loss optimization leads to different local minima depending on seed.
+
+**Implication:** Best-checkpoint selection by val loss is insufficient for format-sensitive tasks.
+Format-aware evaluation during training (scoring execute_code calls, not token loss) is needed.
+
+**Resolution candidates (updated from Pattern 5):**
+1. Format-aware early stopping — eval execute_code format during training, not val loss
+2. Multiple seeds — run 3+ times; Phase 33b's 82.4% appears to be ~1/3 probability
+3. Format-weighted loss — upweight execute_code wrapper tokens in training loss
+4. Higher LoRA layers — more layers = more format capacity
+5. Anti-think examples + anti-prose examples — explicit training to suppress wrong formats
+
+**Detail:** See `docs/research/phase44-format-fix-results.md`
 
 ### After Experiment B (14B Dense)
 
-Three scenarios:
+Three scenarios remain valid despite 43a's failure:
 
 **If ≥80%:**
 - The 10 GB production model is feasible (vs current 20 GB)
 - Latency estimate: ~1-2s (half of 30B MoE, given dense but smaller)
-- Investigate: Can Experiment A training data be fine-tuned on 14B for a smaller prod model?
+- AND: demonstrates 14B dense has more reliable format lock-in than 30B MoE stochastic
 
 **If 50-79%:**
 - Interesting middle ground; may be improvable with more LoRA layers or more training data
 - Not a clear binary outcome; may require Phase 44 investigation
 
 **If <50% (especially ~18% like Phase 40):**
-- MoE routing hypothesis confirmed
-- Focus Phase 41+ on improving the 30B MoE with better training data
+- MoE routing hypothesis confirmed for both capacity AND format learning
+- Focus Phase 44+ on improving format reliability with the 30B MoE
 - 14B dense is conclusively ruled out for Punie's Code Mode
 
 ### Updating the Comparison Table

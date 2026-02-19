@@ -46,11 +46,11 @@ EVAL_SYSTEM_PROMPT = (
     "Available tools: read_file, write_file, run_command, typecheck, ruff_check, pytest_run, "
     "goto_definition, find_references, hover, document_symbols, workspace_symbols, "
     "git_status, git_diff, git_log, "
-    "cst_find_pattern_direct, cst_rename_direct, cst_add_import_direct, "
-    "validate_component_direct, check_render_tree_direct, validate_escape_context_direct, "
-    "validate_service_registration_direct, check_dependency_graph_direct, "
-    "validate_injection_site_direct, validate_middleware_chain_direct, "
-    "check_di_template_binding_direct, validate_route_pattern_direct."
+    "cst_find_pattern, cst_rename, cst_add_import, "
+    "validate_component, check_render_tree, validate_escape_context, "
+    "validate_service_registration, check_dependency_graph, "
+    "validate_injection_site, validate_middleware_chain, "
+    "check_di_template_binding, validate_route_pattern."
 )
 
 MODEL_PATH = "fused_model_qwen3_phase33_5bit"
@@ -336,9 +336,8 @@ async def run_prompt(
             "messages": messages,
             "max_tokens": mt,
             "temperature": 0.0,
-            "stop": ["<|im_end|>", "<|endoftext|>"],
+            "stop": ["<|im_end|>", "<|endoftext|>", "<think>"],
         }
-        start = time.time()
         try:
             r = await client.post(
                 f"{server_url}/chat/completions",
@@ -379,6 +378,12 @@ async def main() -> int:
 
     if not args.no_server:
         server_proc = start_server(args.model, args.port)
+        # Wait briefly then check if the process exited immediately (port already in use)
+        await asyncio.sleep(3.0)
+        if server_proc.poll() is not None:
+            print(f"ERROR: Server exited immediately — port {args.port} is likely already occupied.")
+            print(f"  Kill the existing server on port {args.port} and retry.")
+            return 1
         print("Waiting for server to be ready...")
         server_url_for_wait = f"http://127.0.0.1:{args.port}/v1"
         ready = await wait_for_server(server_url_for_wait, timeout=120.0)
@@ -389,14 +394,15 @@ async def main() -> int:
             return 1
         print("Server ready.\n")
 
-    # Get the actual model ID from the server (full path)
+    # Get the actual model ID from the server (for informational display only)
     server_url = f"http://127.0.0.1:{args.port}/v1"
     async with httpx.AsyncClient() as probe:
         try:
             r = await probe.get(f"{server_url}/models", timeout=10.0)
             models_data = r.json()
             all_ids = [m["id"] for m in models_data.get("data", [])]
-            # Use first available model — we control the server, any loaded model is correct
+            # Note: mlx_lm reports the base model ID from config.json, not the local path.
+            # A fused model derived from X will still report X as its ID — that's expected.
             model_id = all_ids[0] if all_ids else args.model
             print(f"  Using model ID: {model_id}\n")
         except Exception as e:

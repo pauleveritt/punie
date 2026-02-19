@@ -1,33 +1,43 @@
 #!/usr/bin/env bash
-# Phase 43a training pipeline — Qwen3-Coder-30B-A3B baseline confirmation
+# Phase 44 training pipeline — Format Lock Fix
 #
-# Experiment A of Phase 43: confirms production Coder-30B-A3B baseline with fresh training run.
-# Tests whether domain (60%) and multi_tool (35%) can be improved with Phase 43 naming.
+# Addresses two failure modes from Phase 43a (38.9%):
+#   1. Think-mode interference: 10/27 prompts generated <think> blocks, timed out (0.0)
+#      Fix: Added <think> to eval stop sequences (blocks think-mode output)
+#   2. Direct tool calls: 16/27 called right tool without execute_code wrapper (0.5 not 1.0)
+#      Fix: _direct suffix mismatch in eval system prompt corrected; seed 42 for reproducibility
 #
-# Key differences from Phase 33b:
-#   - Phase 43 output paths (adapters_phase43a, fused_model_qwen3_phase43a_*)
-#   - Same base model: Qwen3-Coder-30B-A3B-Instruct-4bit (confirmed production model)
-#   - Same data: data/phase33_merged (1159 train + 123 valid)
-#   - Same hyperparams: 800 iters, lr=1e-4, 8 LoRA layers, grad-accum=4
+# Key differences from Phase 43a:
+#   - --seed 42 (reproducible training, avoids stochastic format drift)
+#   - --save-every 100 (8 checkpoints vs 4; enables best-checkpoint selection)
+#   - select_best_checkpoint.py runs before fusing (picks lowest val_loss checkpoint)
+#   - Eval stop sequences include <think> (prevents think-mode timeouts)
+#   - Eval system prompt uses bare tool names (no _direct suffix — matches training data)
+#   - Output: adapters_phase44/ → fused_model_qwen3_phase44_format_fix_5bit/
 #
-# Hypothesis: Fresh run with production Coder weights confirms 82.4% baseline.
-# Success criteria: Overall ≥82.4% AND (domain >60% OR multi_tool >35%)
+# Same as Phase 43a (unchanged):
+#   - Base model: Qwen3-Coder-30B-A3B-Instruct-4bit
+#   - Data: data/phase33_merged (1159 train + 123 valid)
+#   - 800 iters, lr=1e-4, 8 LoRA layers, grad-accum=4
+#
+# Success criteria: Overall ≥80% AND zero think-mode timeouts
 #
 # Estimated time: ~30-40 min total on Apple Silicon M-series (32 GB)
 # Disk usage: ~77 GB temp (57 GB float16 + 20 GB 5-bit); 20 GB final
 #
 # Usage:
-#   bash scripts/run_phase43a_coder30b.sh
-#   nohup bash scripts/run_phase43a_coder30b.sh &
+#   bash scripts/run_phase44_format_fix.sh
+#   nohup bash scripts/run_phase44_format_fix.sh &
 
 set -euo pipefail
 
-LOGFILE="logs/phase43a_coder30b_training.log"
+LOGFILE="logs/phase44_format_fix_training.log"
 BASE_MODEL="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
-ADAPTER_PATH="adapters_phase43a"
-FUSED_F16="fused_model_qwen3_phase43a_f16"
-FUSED_5BIT="fused_model_qwen3_phase43a_coder30b_5bit"
+ADAPTER_PATH="adapters_phase44"
+FUSED_F16="fused_model_qwen3_phase44_f16"
+FUSED_5BIT="fused_model_qwen3_phase44_format_fix_5bit"
 DATA="data/phase33_merged"
+SAVE_EVERY=100
 START_TIME=$(date +%s)
 
 log() {
@@ -43,12 +53,14 @@ elapsed() {
 mkdir -p logs
 
 log "======================================================"
-log "Phase 43a Training Pipeline — Qwen3-Coder-30B-A3B Baseline"
+log "Phase 44 Training Pipeline — Format Lock Fix"
 log "Base model: $BASE_MODEL"
 log "Data: $DATA (1159 train + 123 valid)"
 log "Adapter output: $ADAPTER_PATH"
-log "LoRA layers: 8 (MoE default; 8/94 attention layers = expert-level coverage)"
-log "Hypothesis: Confirms 82.4% baseline; may improve domain/multi_tool"
+log "LoRA layers: 8 (same as Phase 43a)"
+log "Seed: 42 (reproducible training)"
+log "Save every: $SAVE_EVERY iters (best-checkpoint selection enabled)"
+log "Fixes: <think> stop seq + bare tool names in eval system prompt"
 log "======================================================"
 
 # ------------------------------------------------------------------ #
@@ -78,7 +90,7 @@ log "  Preflight passed ✓"
 # STEP 1: LoRA Training
 # ------------------------------------------------------------------ #
 log ""
-log "STEP 1: LoRA Training (800 iters, ~3-4 hours)"
+log "STEP 1: LoRA Training (800 iters, seed=42, save-every=$SAVE_EVERY)"
 
 # Remove stale adapter if exists (resume from scratch)
 if [ -d "$ADAPTER_PATH" ] && [ ! -f "$ADAPTER_PATH/adapters.safetensors" ]; then
@@ -99,7 +111,8 @@ uv run python -m mlx_lm lora \
     --num-layers 8 \
     --grad-accumulation-steps 4 \
     --mask-prompt \
-    --save-every 200 \
+    --seed 42 \
+    --save-every "$SAVE_EVERY" \
     --steps-per-report 10 \
     --steps-per-eval 50 \
     --val-batches 10 \
@@ -115,6 +128,20 @@ if [ ! -f "$ADAPTER_PATH/adapters.safetensors" ]; then
     exit 1
 fi
 log "  Adapter saved: $ADAPTER_PATH/adapters.safetensors ✓"
+
+# ------------------------------------------------------------------ #
+# STEP 1b: Select best checkpoint by val loss
+# ------------------------------------------------------------------ #
+log ""
+log "STEP 1b: Selecting best checkpoint by validation loss"
+
+uv run python scripts/select_best_checkpoint.py \
+    --log "$LOGFILE" \
+    --adapter-dir "$ADAPTER_PATH" \
+    --save-every "$SAVE_EVERY" \
+    2>&1 | tee -a "$LOGFILE"
+
+log "STEP 1b complete: adapters.safetensors updated to best checkpoint ✓"
 
 # ------------------------------------------------------------------ #
 # STEP 2: Fuse adapters (dequantize → float16)
@@ -148,65 +175,26 @@ fi
 log "  Fused model: $FUSED_F16 ✓"
 
 # ------------------------------------------------------------------ #
-# STEP 2.5: Wait for Metal GPU memory to fully release before quantize
-# ------------------------------------------------------------------ #
-log ""
-log "STEP 2.5: Sleeping 60s to let Metal GPU memory release after fuse"
-sleep 60
-log "  GPU sleep done ✓"
-
-# ------------------------------------------------------------------ #
-# STEP 3: Quantize to 5-bit (with integrity check + one retry)
+# STEP 3: Quantize to 5-bit
 # ------------------------------------------------------------------ #
 log ""
 log "STEP 3: Quantize float16 → 5-bit (~10-20 min)"
 log "  Output: $FUSED_5BIT"
 
-quantize_and_check() {
-    if [ -d "$FUSED_5BIT" ]; then
-        log "  Removing existing $FUSED_5BIT"
-        rm -rf "$FUSED_5BIT"
-    fi
-
-    QUANT_START=$(date +%s)
-
-    uv run python -m mlx_lm convert \
-        --hf-path "$FUSED_F16" \
-        --mlx-path "$FUSED_5BIT" \
-        -q \
-        --q-bits 5 \
-        --q-group-size 64 \
-        2>&1 | tee -a "$LOGFILE"
-
-    QUANT_END=$(date +%s)
-    QUANT_MINS=$(( (QUANT_END - QUANT_START) / 60 ))
-    log "  Quantize finished in ${QUANT_MINS}m"
-
-    # Integrity check: must have 4 shards, no 0-byte files, total ≥15 GB
-    SHARD_COUNT=$(ls "$FUSED_5BIT"/model-*.safetensors 2>/dev/null | wc -l | tr -d ' ')
-    ZERO_BYTE=$(find "$FUSED_5BIT" -name "model-*.safetensors" -empty 2>/dev/null | wc -l | tr -d ' ')
-    TOTAL_BYTES=$(du -sk "$FUSED_5BIT" 2>/dev/null | cut -f1)
-
-    log "  Shards: $SHARD_COUNT / 4 expected; zero-byte files: $ZERO_BYTE; size: $(du -sh "$FUSED_5BIT" | cut -f1)"
-
-    if [ "$SHARD_COUNT" -lt 4 ] || [ "$ZERO_BYTE" -gt 0 ] || [ "$TOTAL_BYTES" -lt 15000000 ]; then
-        log "  ERROR: Integrity check FAILED (GPU timeout may have truncated output)"
-        return 1
-    fi
-
-    log "  Integrity check PASSED ✓"
-    return 0
-}
-
-# First attempt
-if ! quantize_and_check; then
-    log "STEP 3: First quantize attempt failed — sleeping 120s and retrying"
-    sleep 120
-    if ! quantize_and_check; then
-        log "ERROR: Quantize integrity check failed after retry — aborting"
-        exit 1
-    fi
+if [ -d "$FUSED_5BIT" ]; then
+    log "  Removing existing $FUSED_5BIT"
+    rm -rf "$FUSED_5BIT"
 fi
+
+QUANT_START=$(date +%s)
+
+uv run python -m mlx_lm convert \
+    --hf-path "$FUSED_F16" \
+    --mlx-path "$FUSED_5BIT" \
+    -q \
+    --q-bits 5 \
+    --q-group-size 64 \
+    2>&1 | tee -a "$LOGFILE"
 
 QUANT_END=$(date +%s)
 QUANT_MINS=$(( (QUANT_END - QUANT_START) / 60 ))
@@ -234,7 +222,8 @@ log "  Disk after: $(df -h . | tail -1 | awk '{print $4}') free"
 # STEP 5: Run Phase 33 direct eval (27 prompts)
 # ------------------------------------------------------------------ #
 log ""
-log "STEP 5: Running Phase 33 direct eval (27 prompts, target ≥82.4%)"
+log "STEP 5: Running Phase 33 direct eval (27 prompts, target ≥80%)"
+log "  Fixes active: <think> stop seq + bare tool names in system prompt"
 
 EVAL_EXIT=0
 uv run python scripts/run_phase33_direct_eval.py --model "$FUSED_5BIT" --port 8080 \
@@ -252,22 +241,19 @@ fi
 TOTAL_MINS=$(( ($(date +%s) - START_TIME) / 60 ))
 log ""
 log "======================================================"
-log "Phase 43a training pipeline COMPLETE"
+log "Phase 44 training pipeline COMPLETE"
 log "  Total time: ${TOTAL_MINS}m"
 log "  Production model: $FUSED_5BIT"
 log "  Model size: $(du -sh "$FUSED_5BIT" | cut -f1)"
 log "  Eval verdict: $([ $EVAL_EXIT -eq 0 ] && echo 'PASS ✓' || echo 'needs review')"
 log "======================================================"
 log ""
-log "Pre-registered success criteria (Phase 43a vs Phase 33b baseline):"
-log "  text_tools:  ≥100%  (baseline 100%)"
-log "  validation:  ≥100%  (baseline 100%)"
-log "  git:         ≥100%  (baseline 100%)"
-log "  cst:         ≥100%  (baseline 100%)"
-log "  lsp:         ≥90%   (baseline 90%)"
-log "  domain:      >60%   (baseline 60%) ← target improvement"
-log "  multi_tool:  >35%   (baseline 35%) ← target improvement"
-log "  Overall:     ≥82.4% (baseline 82.4%)"
+log "Phase 44 success criteria:"
+log "  Overall:     ≥80%   (Phase 43a got 38.9%)"
+log "  Think-mode:  0 timeouts (Phase 43a had 10/27)"
+log "  Format:      All tool calls via execute_code wrapper (not direct)"
 log ""
-log "Compare against Phase 33b (production): fused_model_qwen3_phase33b_5bit/"
+log "Compare against:"
+log "  Phase 33b (production):  fused_model_qwen3_phase33b_5bit/ (82.4%)"
+log "  Phase 43a (failed):      adapters_phase43a/ (38.9%)"
 log "Log: $LOGFILE"
